@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About — NessGate</title>
+<meta name="description" content="NessGate is the open, neutral resolver for the agentic web: give it a domain and it reads whatever that domain already publishes (ARD, A2A, llms.txt, API catalogs, and more) and returns one normalized answer, with a link back to each source.">
+<link rel="canonical" href="https://nessgate.com/about">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#0F2D4A">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0F2D4A">
+<meta property="og:site_name" content="NessGate">
+<meta property="og:type" content="website">
+<meta property="og:title" content="About — NessGate">
+<meta property="og:description" content="The open, neutral resolver for the agentic web: give it a domain and get one normalized answer with the machine-readable resources the domain publishes — across ARD, A2A, llms.txt and more.">
+<meta property="og:url" content="https://nessgate.com/about">
+<meta property="og:image" content="https://nessgate.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/style.css?v=10">
+</head>
+<body>
+<header class="site-head"><a class="brand" href="/"><img src="/logo-horizontal.svg" alt="NessGate" width="143" height="28" class="brand-logo"></a><nav class="top-nav" aria-label="Primary"><a href="/check">Check</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/about">About</a><a class="nav-gh" href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a></nav></header>
+<main>
+<h1>About NessGate</h1>
+<p>AI systems increasingly need machine-readable entry points into companies — but every
+company publishes them differently, in a growing pile of standards and locations. An agent
+that wants to work with a domain has to know about, and check, all of them.</p>
+<p>NessGate answers exactly one question:</p>
+<pre><code>Given a domain, which machine-readable resources does it
+publish — and where?</code></pre>
+<p>A resource can be a JSON data file, an API, an agent endpoint (MCP, A2A, or a protocol
+that does not exist yet), documentation, or a feed. NessGate doesn't host or invent any of
+this — on each request it reads whatever the domain already publishes across the standard
+machine-discovery locations (ARD, A2A, llms.txt, API catalogs, OpenAPI, ORD, AWP,
+host-meta) and returns one normalized answer. Every resource carries a
+<code>sourceUrl</code> back to the domain, so an agent can go straight to the source and
+check it directly. The analogy is DNS: DNS resolves a domain to an IP address; NessGate resolves a
+domain to the machine-readable resources the domain publishes:</p>
+<pre><code>DNS       example.com → 93.184.216.34
+NessGate  example.com → https://example.com/ai-info.json
+                        https://api.example.com
+                        https://example.com/mcp</code></pre>
+
+<h2>Principles</h2>
+<p><strong>Resolved on demand, cached at the edge.</strong> NessGate does not maintain a copy of your
+resources. When an agent asks about your domain, NessGate fetches whatever you publish and
+normalizes it in the response, then caches that answer at the edge for up to 10 minutes. Change
+what you publish and the next answer reflects it within about 10 minutes — there is nothing to
+update on our side.</p>
+<p><strong>Stores nothing.</strong> NessGate keeps no database of domains and no record of
+what it read. Everything lives on your own infrastructure, under your own name; NessGate
+holds only a link back to it. It never stores, indexes, or crawls your site, and it never
+retains the contents it fetched to build an answer.</p>
+<p><strong>Neutral — no ranking, no gatekeeping.</strong> NessGate does not score, rank,
+rate, or endorse anyone. It reports what a domain publishes and where, and nothing more.
+It makes no ownership or safety claim about any resource: the domain is the authority, the
+<code>sourceUrl</code> points straight back to it, and an agent decides for itself.</p>
+<p><strong>Open and independently implementable.</strong> Resolving a domain is free and
+public for everyone (AI agents, crawlers, scripts, and humans) through a simple
+<a href="/api">open API</a> with no keys and no sign-up. The behavior is documented in the
+<a href="/spec">Spec</a> and the code is open source, so anyone can run their own resolver
+and get the same answer. NessGate is complementary to the discovery standards it reads, not
+a competing format.</p>
+<p><strong>Bring your own format — and your own protocol.</strong> NessGate imposes no
+required schema, no mandatory fields, and no closed list of resource types. It reads the
+standards a domain already uses; if a new protocol appears tomorrow, NessGate can resolve
+its location without needing to understand what is behind it. Agents consume your resources
+directly from your URLs, so forcing one structure would add friction without adding value.</p>
+<p><strong>Deliberately minimal.</strong> A resolver should be boring, fast, and
+predictable. NessGate does one job — turn a domain into one normalized list of the
+resources it already publishes — and avoids features that would make it a middleman rather
+than a gate.</p>
+
+<h2>Try it</h2>
+<p>Point it at any domain with the free <a href="/check">check</a>, or read the
+<a href="/guide">Guide</a> to see how NessGate reads a domain and what it returns. There is
+nothing to sign up for and nothing to add — if your domain already publishes
+machine-readable resources, NessGate can already resolve it.</p>
+</main>
+<footer>
+  <nav aria-label="Footer"><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/charter">Charter</a><a href="/changelog">Changelog</a><a href="/blog">Blog</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></nav>
+  <p class="foot-src"><a href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a> &middot; <a href="https://www.npmjs.com/package/@nessgate/resolver" rel="noopener">npm</a></p>
+  <p>© 2026 NessGate</p>
+</footer>
+</body>
+</html>

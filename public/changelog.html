@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Changelog — NessGate</title>
+<meta name="description" content="NessGate changelog: notable changes to the resolver and the NessGate Resolver Specification.">
+<link rel="canonical" href="https://nessgate.com/changelog">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#0F2D4A">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0F2D4A">
+<meta property="og:site_name" content="NessGate">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Changelog — NessGate">
+<meta property="og:description" content="Notable changes to the NessGate resolver and its specification.">
+<meta property="og:url" content="https://nessgate.com/changelog">
+<meta property="og:image" content="https://nessgate.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/style.css?v=10">
+</head>
+<body>
+<header class="site-head"><a class="brand" href="/"><img src="/logo-horizontal.svg" alt="NessGate" width="143" height="28" class="brand-logo"></a><nav class="top-nav" aria-label="Primary"><a href="/check">Check</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/about">About</a><a class="nav-gh" href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a></nav></header>
+<main>
+<h1>Changelog</h1>
+<p>Notable changes to the NessGate resolver and its specification, newest first. Specification
+stability guarantees live in the <a href="/spec">specification</a>.</p>
+
+<h2>2026</h2>
+
+<h3 id="v1-1-0">v1.1.0 — Initial public release</h3>
+<ul>
+<li><strong>The neutral resolver.</strong> <code>GET /discover/{domain}</code> reads whatever a
+    domain publishes across the supported machine-discovery locations (ARD /
+    <code>ai-catalog.json</code>, A2A agent card, <code>llms.txt</code>, RFC 9727 api-catalog,
+    ai-info.json, OpenAPI, Open Resource Discovery, host-meta) and returns one normalized answer,
+    with a link back to each source so an agent can read the domain directly. NessGate reads
+    these; it does not define or replace them.</li>
+<li><strong>Embeddable library.</strong> A dependency-free resolver at
+    <a href="/resolver.mjs"><code>/resolver.mjs</code></a> and on npm as
+    <code>@nessgate/resolver</code>, running in browsers, Node, Deno, Workers, and agent runtimes
+    with no runtime dependency on nessgate.com. The same lookup is available as the
+    <code>discover_domain</code> MCP tool at <code>/mcp</code>.</li>
+<li><strong>Open and neutral.</strong> Open specification, Apache-2.0 reference implementation,
+    governed by the <a href="/charter">Charter</a>: free forever, neutral, no accounts, no
+    ranking, no lock-in, stores nothing.</li>
+</ul>
+</main>
+<footer>
+  <nav aria-label="Footer"><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/charter">Charter</a><a href="/changelog">Changelog</a><a href="/blog">Blog</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></nav>
+  <p class="foot-src"><a href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a> &middot; <a href="https://www.npmjs.com/package/@nessgate/resolver" rel="noopener">npm</a></p>
+  <p>© 2026 NessGate</p>
+</footer>
+</body>
+</html>

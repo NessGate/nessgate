@@ -1,0 +1,15 @@
+{
+  "name": "nessgate",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "node scripts/deploy.mjs",
+    "test": "node scripts/test.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "check": "node scripts/test.mjs && node scripts/smoke.mjs",
+    "rollback": "wrangler rollback"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

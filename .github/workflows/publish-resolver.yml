@@ -1,0 +1,43 @@
+name: Publish @nessgate/resolver
+
+# Tokenless publish to npm via GitHub Actions Trusted Publishing (OIDC).
+# No long-lived NPM_TOKEN is stored anywhere; npm mints a short-lived,
+# provenance-backed credential from the OIDC id-token at publish time.
+#
+# Triggers: manually (workflow_dispatch) or when a GitHub Release is published.
+# Nothing publishes automatically on push.
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write   # required for OIDC Trusted Publishing + provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/resolver
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      # Trusted Publishing + provenance require a recent npm.
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      # Parity guard: the published file must match the served resolver exactly.
+      - name: Verify resolver parity
+        working-directory: .
+        run: node scripts/test.mjs
+
+      - name: Publish (provenance, public, tokenless via OIDC)
+        run: npm publish --provenance --access public

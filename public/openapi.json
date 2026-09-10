@@ -1,0 +1,123 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "NessGate API",
+    "version": "1.1.0",
+    "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads whatever that domain already publishes across the standard machine-discovery locations (llms.txt, ARD / ai-catalog.json, A2A agent card, RFC 9727 API catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP manifest, RFC 6415 host-meta) and returns one normalized answer, each record carrying a sourceUrl back to the domain. NessGate stores nothing, never crawls or indexes, and makes no ownership or safety claim. Read endpoints are public, unauthenticated, and CORS-open. The response contract is stable and additive: new optional fields may appear; clients must ignore unknown fields.",
+    "contact": { "email": "contact@nessgate.com", "url": "https://nessgate.com/contact" },
+    "termsOfService": "https://nessgate.com/terms",
+    "license": { "name": "Apache-2.0", "url": "https://www.apache.org/licenses/LICENSE-2.0" }
+  },
+  "servers": [{ "url": "https://nessgate.com" }],
+  "paths": {
+    "/discover/{domain}": {
+      "get": {
+        "operationId": "discoverDomain",
+        "summary": "Resolve a domain to the machine-readable resources it publishes",
+        "description": "Reads what the domain itself publishes at the standard machine-discovery locations (llms.txt, ARD/ai-catalog, A2A agent card, RFC 9727 api-catalog, ai-info.json, openapi.json, Open Resource Discovery, AWP manifest awp.json, RFC 6415 host-meta) and returns one normalized answer. Provenance is always \"self-published\": each record carries a sourceUrl back to the domain so the caller can verify. \"Found\" means the location exists and its content parses (JSON, or non-HTML text); it does not assert protocol conformance. Nothing is stored or indexed; results are computed live and cached for 10 minutes.",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "description": "Domain name, e.g. example.com. Scheme, path, port, and a leading www. are ignored; ASCII/punycode form required.",
+            "schema": { "type": "string", "example": "example.com" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Observation complete. An empty discovered array is still a successful answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "domain": { "type": "string", "example": "example.com" },
+                    "provenance": { "type": "string", "enum": ["self-published"], "example": "self-published" },
+                    "note": { "type": "string" },
+                    "discovered": {
+                      "type": "array",
+                      "description": "The routing map: which standards the domain publishes, and where.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": { "type": "string", "example": "llms.txt" },
+                          "url": { "type": "string", "example": "https://example.com/llms.txt" }
+                        }
+                      }
+                    },
+                    "resources": {
+                      "type": "array",
+                      "description": "The normalized union of what those documents contain, flattened into one list.",
+                      "items": { "$ref": "#/components/schemas/Resource" }
+                    },
+                    "checked": {
+                      "type": "array",
+                      "description": "Every standard NessGate probed for, so an empty result is still informative.",
+                      "items": { "type": "string" },
+                      "example": ["llms.txt", "ard-catalog", "a2a-agent-card", "api-catalog", "ai-info.json", "openapi", "ord", "awp", "host-meta"]
+                    }
+                  },
+                  "required": ["domain", "provenance", "discovered", "resources", "checked"]
+                }
+              }
+            }
+          },
+          "400": { "description": "Input is not a valid domain.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "429": { "description": "Rate limited (120 requests/hour per IP).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/mcp": {
+      "post": {
+        "operationId": "mcp",
+        "summary": "Model Context Protocol server (Streamable HTTP)",
+        "description": "JSON-RPC 2.0 over the MCP Streamable HTTP transport. Stateless, no authentication. Exposes one read-only tool, discover_domain, which returns the same normalized answer as GET /discover/{domain}.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "description": "A single JSON-RPC 2.0 message (initialize, tools/list, tools/call, ping)." },
+              "example": {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": { "name": "discover_domain", "arguments": { "domain": "example.com" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "A single JSON-RPC response." },
+          "202": { "description": "Acknowledged notification (no body)." },
+          "400": { "description": "Malformed or invalid JSON-RPC message." },
+          "405": { "description": "GET is not supported; use POST." }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Resource": {
+        "type": "object",
+        "description": "A normalized record. NessGate reuses each source's own labels and adds source/sourceUrl.",
+        "properties": {
+          "source": { "type": "string", "description": "Which standard this record came from.", "example": "ard-catalog" },
+          "sourceUrl": { "type": "string", "description": "The native document the record was read from — authoritative; follow it to verify.", "example": "https://example.com/.well-known/ard.json" },
+          "type": { "type": "string", "description": "An open label taken from the source. Not a closed set.", "example": "application/json" },
+          "url": { "type": "string", "example": "https://example.com/ai-info.json" },
+          "name": { "type": "string" },
+          "id": { "type": "string" },
+          "rel": { "type": "string" },
+          "raw": { "type": "object" }
+        },
+        "required": ["source", "sourceUrl", "type", "url"]
+      },
+      "Error": {
+        "type": "object",
+        "properties": { "error": { "type": "string" } },
+        "required": ["error"]
+      }
+    }
+  }
+}

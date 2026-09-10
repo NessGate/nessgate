@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What is ARD? The ard.json standard, explained simply — NessGate</title>
+<meta name="description" content="A plain-English guide to ARD (Agentic Resource Discovery) — the Google/Microsoft/AWS-backed standard for making your resources discoverable by AI agents — with a working ard.json example and a 5-minute setup path.">
+<link rel="canonical" href="https://nessgate.com/blog/what-is-ard-ai-catalog-json">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#0F2D4A">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0F2D4A">
+<link rel="stylesheet" href="/style.css?v=10">
+<link rel="alternate" type="application/rss+xml" title="NessGate Blog" href="/blog/feed.xml">
+<meta property="og:site_name" content="NessGate">
+<meta property="og:type" content="article">
+<meta property="og:title" content="What is ARD? The ard.json standard, explained simply">
+<meta property="og:description" content="What ARD actually is, what the ard.json file looks like, and how to publish one in about five minutes — with the honest caveats the launch posts leave out.">
+<meta property="og:url" content="https://nessgate.com/blog/what-is-ard-ai-catalog-json">
+<meta property="og:image" content="https://nessgate.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting",
+ "headline":"What is ARD? The ard.json standard, explained simply",
+ "description":"A plain-English guide to ARD (Agentic Resource Discovery), with a working ard.json example.",
+ "author":{"@type":"Person","name":"Adam Dean"},
+ "publisher":{"@type":"Organization","name":"NessGate","url":"https://nessgate.com/"},
+ "datePublished":"2026-09-08","dateModified":"2026-09-08",
+ "mainEntityOfPage":"https://nessgate.com/blog/what-is-ard-ai-catalog-json"}
+</script>
+</head>
+<body>
+<header class="site-head"><a class="brand" href="/"><img src="/logo-horizontal.svg" alt="NessGate" width="143" height="28" class="brand-logo"></a><nav class="top-nav" aria-label="Primary"><a href="/check">Check</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/about">About</a><a class="nav-gh" href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a></nav></header>
+<main>
+<h1>What is ARD? The <code>ard.json</code> standard, explained simply</h1>
+<p class="meta">By Adam Dean · September 8, 2026 · <a href="/blog">NessGate Blog</a></p>
+
+<p><em>ARD (Agentic Resource Discovery) is the discovery standard Google, Microsoft,
+AWS, and a dozen other companies got behind in mid-2026. Here's what it actually is,
+what the file looks like, and how to publish one in about five minutes — no 50-page
+spec reading required.</em></p>
+
+<h2>The problem ARD solves</h2>
+<p>AI agents are starting to do real work: research, purchasing, integration,
+comparison. To use <em>your</em> stuff — your data, your API, your agent — they first
+have to find it. Until now, every ecosystem invented its own discovery mechanism, and
+businesses faced an alphabet soup (llms.txt, agent cards, API catalogs, MCP manifests)
+with no way to know which mattered.</p>
+<p>ARD's answer: <strong>one catalog file, on your own domain, listing everything you
+want agents to find.</strong> Discovery services ("registries") then index those
+catalogs, the way search engines index sitemaps.</p>
+
+<h2>Who's behind it</h2>
+<p>The specification is developed by Microsoft and Google together with AWS, Cisco,
+Databricks, GitHub, GoDaddy, Hugging Face, Nvidia, Salesforce, ServiceNow, and
+Snowflake, released under Apache 2.0 at
+<a href="https://agenticresourcediscovery.org/spec/" rel="nofollow">agenticresourcediscovery.org</a>.
+It is currently <strong>version 0.91, a Proposal</strong> — real, backed, and still a
+draft. Keep that last part in mind.</p>
+
+<h2>What the file looks like</h2>
+<p>You host a JSON file at:</p>
+<pre><code>https://yourdomain.com/.well-known/ard.json</code></pre>
+<p>It has one required top-level field — <code>entries</code> — listing your resources:</p>
+<pre><code>{
+  "entries": [
+    {
+      "identifier": "urn:air:example.com:main:company-data",
+      "displayName": "Company data",
+      "type": "application/json",
+      "url": "https://example.com/ai-info.json"
+    },
+    {
+      "identifier": "urn:air:example.com:main:support-agent",
+      "displayName": "Support agent",
+      "type": "application/a2a-agent-card+json",
+      "url": "https://example.com/.well-known/agent-card.json"
+    }
+  ]
+}</code></pre>
+<p>Each entry needs four things:</p>
+<ul>
+<li><strong><code>identifier</code></strong> — a URN of the form
+<code>urn:air:&lt;your-domain&gt;:&lt;namespace&gt;:&lt;name&gt;</code>. The domain
+segment is what ties the entry to your authority.</li>
+<li><strong><code>displayName</code></strong> — a human-readable name.</li>
+<li><strong><code>type</code></strong> — a media type describing what the resource is
+(<code>application/json</code> for data files,
+<code>application/mcp-server-card+json</code> for MCP servers, and so on).</li>
+<li><strong><code>url</code></strong> — where it lives.</li>
+</ul>
+<p>Optional fields (<code>description</code>, <code>tags</code>,
+<code>representativeQueries</code>, <code>capabilities</code>, <code>version</code>,
+<code>metadata</code>) make entries richer — <code>representativeQueries</code> in
+particular ("sample questions this resource can answer") is worth adding by hand,
+because it's how intent-based registry search finds you.</p>
+
+<h2>The honest caveats</h2>
+<p>Three things the launch posts won't tell you:</p>
+<ol>
+<li><strong>It's a draft.</strong> v0.91 will change before v1.0. Whatever you publish
+today may need updating — pick a setup you can regenerate, not one you hand-crafted
+and forgot.</li>
+<li><strong>Registries are nascent.</strong> The federated registries that make ARD
+useful are just starting to appear. Publishing a catalog today is about being indexed
+early, not about immediate traffic.</li>
+<li><strong>Getting it wrong is silent.</strong> The A2A ecosystem's July 2026 numbers
+are the warning: of 65 published agent cards, 41 were broken in ways a client can't
+consume — wrong types, malformed JSON, catch-all routes returning HTML. Nothing tells
+you your file is broken. It just doesn't work. (More data in our
+<a href="/blog/state-of-ai-discovery-september-2026">State of AI Discovery report</a>.)</li>
+</ol>
+
+<h2>The 5-minute path</h2>
+<p>You can write <code>ard.json</code> by hand from the example above — it's not a
+complicated format:</p>
+<ol>
+<li>Copy the example, list your official resources in the <code>entries</code> array —
+data files, APIs, agent endpoints, anything — and give each a stable <code>identifier</code>,
+a <code>displayName</code>, a media <code>type</code>, and its <code>url</code>.</li>
+<li>Host it on your own domain at <code>/.well-known/ard.json</code>.</li>
+<li>That's it — there's nothing to register. NessGate (and any AI agent) reads the file
+straight from your domain; resolve it any time at
+<code>nessgate.com/discover/yourdomain.com</code>.</li>
+</ol>
+<p>Either way: the file sits on <strong>your</strong> domain, under
+<strong>your</strong> control. That's the whole point of the standard — and of
+everything worth doing in AI discovery right now.</p>
+<p class="note">Want to see what agents can already find on your domain?
+<a href="/check">Run the free check</a>.</p>
+</main>
+<footer>
+  <nav aria-label="Footer"><a href="/check">Check your domain</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/charter">Charter</a><a href="/changelog">Changelog</a><a href="/blog">Blog</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></nav>
+  <p class="foot-src"><a href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a> &middot; <a href="https://www.npmjs.com/package/@nessgate/resolver" rel="noopener">npm</a></p>
+  <p>© 2026 NessGate</p>
+</footer>
+</body>
+</html>

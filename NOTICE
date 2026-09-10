@@ -1,0 +1,14 @@
+NessGate — reference implementation of the NessGate Protocol
+Copyright 2026 NessGate
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This repository is the official reference implementation of the NessGate
+Protocol (https://nessgate.com/spec). The protocol is open and may be
+implemented independently; see TRADEMARK.md for how the "NessGate" name may
+and may not be used, and CHARTER (https://nessgate.com/charter) for the
+project's binding neutrality and free-forever commitments.
+
+The WordPress plugin is distributed separately under the GPL (as required by
+the WordPress.org plugin directory) and is not covered by this Apache-2.0
+license.

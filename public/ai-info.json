@@ -1,0 +1,30 @@
+{
+  "name": "NessGate",
+  "url": "https://nessgate.com",
+  "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads the machine-readable resources that domain publishes at the standard discovery locations (llms.txt, ARD / ai-catalog.json, A2A agent card, RFC 9727 api-catalog, ai-info.json, OpenAPI, Open Resource Discovery, host-meta) and returns one normalized answer, each record linking back to its source on the domain. NessGate reads on demand, stores nothing, and makes no ownership or safety claim.",
+  "category": "internet infrastructure / AI discovery",
+  "api": {
+    "discover": "https://nessgate.com/discover/{domain}",
+    "mcp": "https://nessgate.com/mcp",
+    "library": "https://www.npmjs.com/package/@nessgate/resolver",
+    "docs": "https://nessgate.com/api",
+    "spec": "https://nessgate.com/spec",
+    "authentication": "none",
+    "cors": "open"
+  },
+  "well_known": {
+    "api_catalog": "https://nessgate.com/.well-known/api-catalog",
+    "security": "https://nessgate.com/.well-known/security.txt"
+  },
+  "principles": [
+    "reads the standards a domain already publishes; defines no new format",
+    "the domain is the source of truth; NessGate stores nothing and rehosts nothing",
+    "no accounts, no registration, no ranking; free to use",
+    "reports what a domain serves and links back to each source; makes no ownership or safety claim",
+    "open specification; Apache-2.0 reference implementation; anyone may run their own resolver"
+  ],
+  "repository": "https://github.com/NessGate/nessgate",
+  "llms_txt": "https://nessgate.com/llms.txt",
+  "contact": "contact@nessgate.com",
+  "updated": "2026-09-10"
+}

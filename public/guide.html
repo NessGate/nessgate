@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guide — make your domain AI-discoverable — NessGate</title>
+<meta name="description" content="A plain-language guide to publishing the standard machine-readable files on your own domain (llms.txt, an ARD catalog, an A2A agent card, an API catalog) so AI agents and the NessGate resolver can read them. Nothing to register.">
+<link rel="canonical" href="https://nessgate.com/guide">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#0F2D4A">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0F2D4A">
+<meta property="og:site_name" content="NessGate">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Guide — make your domain AI-discoverable — NessGate">
+<meta property="og:description" content="A plain-language guide to publishing the standard machine-readable files on your own domain (llms.txt, an ARD catalog, an A2A agent card, an API catalog) so AI agents and the NessGate resolver can read them. Nothing to register.">
+<meta property="og:url" content="https://nessgate.com/guide">
+<meta property="og:image" content="https://nessgate.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/style.css?v=10">
+</head>
+<body>
+<header class="site-head"><a class="brand" href="/"><img src="/logo-horizontal.svg" alt="NessGate" width="143" height="28" class="brand-logo"></a><nav class="top-nav" aria-label="Primary"><a href="/check">Check</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/about">About</a><a class="nav-gh" href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a></nav></header>
+<main>
+<h1>Guide — make your domain AI-discoverable</h1>
+<p>There is nothing to register with NessGate, and no account to create. You make your
+domain discoverable by <strong>publishing a few standard, machine-readable files on your
+own domain</strong>. AI agents read those files directly, and so does the NessGate
+resolver — live, over the public web.</p>
+<p>You don't need all of them. Pick the ones that fit what you have: a plain description of
+your site, an agent, or public APIs. Each file below is optional and independent.</p>
+
+<h2 id="security">Is this safe?</h2>
+<p>Yes. NessGate is a read-only resolver. When someone looks up your domain, NessGate:</p>
+<ul>
+<li><strong>only performs read-only public lookups</strong> — plain HTTPS <code>GET</code>
+requests for the same public files any browser or AI agent could already fetch from your
+site;</li>
+<li><strong>never asks for passwords, API keys, or hosting credentials</strong> — there is
+nothing to enter and no account to create;</li>
+<li><strong>never gets access to your server, DNS account, or code</strong> — you host the
+files yourself, in your own systems;</li>
+<li><strong>never asks you to install or run anything</strong> — no scripts, no plugins, no
+agents;</li>
+<li><strong>stores nothing and never crawls or indexes</strong> — it reads your files at
+the moment of the request, returns a normalized answer with a link back to each source,
+and keeps no copy.</li>
+</ul>
+<p>The files described here are meant to be public — they hold only the information you
+choose to make discoverable. Publishing them exposes nothing that isn't already public on
+your website.</p>
+
+<h2>1. <code>llms.txt</code> — a plain-language pointer for AI</h2>
+<p>The simplest thing you can publish. <code>llms.txt</code> is a small Markdown file at the
+root of your site that tells AI systems who you are and points to your most useful pages. It
+is text, so anyone can write it by hand.</p>
+<p>Host it at:</p>
+<pre><code>https://yourdomain.com/llms.txt</code></pre>
+<p>A tiny example:</p>
+<pre><code># Acme Pumps
+
+&gt; Industrial pump manufacturer serving 40 countries.
+
+## Docs
+- [Product catalog](https://yourdomain.com/products): our full range
+- [Support](https://yourdomain.com/support): contact and help
+</code></pre>
+
+<h2>2. An ARD catalog at <code>/.well-known/ard.json</code></h2>
+<p><a href="https://agenticresourcediscovery.org/spec/" rel="nofollow">Agentic Resource
+Discovery (ARD)</a> is the open standard — backed by Google, Microsoft, AWS, and others —
+for listing the resources on your domain that AI agents can use: APIs, agents,
+documentation, feeds. You publish a single JSON file with an <code>entries</code> array,
+one entry per resource.</p>
+<p>Host it at:</p>
+<pre><code>https://yourdomain.com/.well-known/ard.json</code></pre>
+<p>A minimal example:</p>
+<pre><code>{
+  "version": "1",
+  "entries": [
+    {
+      "identifier": "orders-api",
+      "displayName": "Orders API",
+      "type": "application/vnd.oai.openapi+json",
+      "url": "https://yourdomain.com/openapi.json"
+    },
+    {
+      "identifier": "support-agent",
+      "displayName": "Support agent",
+      "type": "application/json",
+      "url": "https://yourdomain.com/.well-known/agent-card.json"
+    }
+  ]
+}</code></pre>
+<p class="note">Add as many entries as you like. Each points at a resource that lives on
+your own domain. AI agents and registries read this file straight from your site — that is
+what makes you discoverable.</p>
+
+<h2>3. An A2A agent card at <code>/.well-known/agent-card.json</code></h2>
+<p class="note">Only if you actually run an agent. Skip this otherwise.</p>
+<p>If your domain hosts an agent that speaks the
+<a href="https://a2a-protocol.org/" rel="nofollow">A2A protocol</a>, publish its agent card
+so other agents know how to reach it and what it can do.</p>
+<p>Host it at:</p>
+<pre><code>https://yourdomain.com/.well-known/agent-card.json</code></pre>
+<p>A minimal example:</p>
+<pre><code>{
+  "name": "Acme Support Agent",
+  "description": "Answers order and shipping questions.",
+  "version": "1.0.0",
+  "protocolVersion": "1.0",
+  "supportedInterfaces": [
+    { "url": "https://yourdomain.com/a2a", "transport": "JSONRPC" }
+  ],
+  "skills": [
+    { "id": "order-status", "name": "Check order status" }
+  ]
+}</code></pre>
+
+<h2>4. An API catalog and/or OpenAPI description</h2>
+<p class="note">Only if you offer public APIs.</p>
+<p>If you have one or more public APIs, there are two standard, complementary ways to make
+them discoverable — publish whichever you can.</p>
+<p><strong>An RFC 9727 API catalog</strong> lists all your APIs from one well-known
+location:</p>
+<pre><code>https://yourdomain.com/.well-known/api-catalog</code></pre>
+<p>It is served as a <a href="https://www.rfc-editor.org/rfc/rfc8288" rel="nofollow">link
+set</a> (JSON), pointing to each API's description:</p>
+<pre><code>{
+  "linkset": [
+    {
+      "anchor": "https://yourdomain.com",
+      "service-desc": [
+        { "href": "https://yourdomain.com/openapi.json" }
+      ]
+    }
+  ]
+}</code></pre>
+<p><strong>An OpenAPI description</strong> describes a single API in detail. Most API
+frameworks can generate one for you. Host it somewhere predictable, e.g.:</p>
+<pre><code>https://yourdomain.com/openapi.json</code></pre>
+
+<h2 id="templates">5. <code>ai-info.json</code> — a simple company/product file</h2>
+<p>If you'd rather just describe your business in JSON, publish an <code>ai-info.json</code>.
+There is <strong>no required schema</strong> — the structure and field names are entirely
+yours. Describe who you are, what you offer, and how to reach you, then host it at a
+predictable URL such as <code>https://yourdomain.com/ai-info.json</code>.</p>
+<p>Here are three optional starter examples. Copy one, replace the values with your own,
+delete what doesn't apply, and add whatever is missing. You may also reuse
+<a href="https://schema.org" rel="noopener">schema.org</a> vocabulary if you prefer.</p>
+
+<details>
+<summary><strong>Example: corporate profile</strong></summary>
+<pre><code>{
+  "name": "Acme GmbH",
+  "legal_name": "Acme Industries GmbH",
+  "description": "Industrial pump manufacturer serving 40 countries.",
+  "founded": 1985,
+  "headquarters": "Stuttgart, Germany",
+  "industries": ["manufacturing", "industrial equipment"],
+  "products": [
+    {
+      "name": "AquaFlow 300",
+      "category": "centrifugal pumps",
+      "url": "https://acme.example/products/aquaflow-300"
+    }
+  ],
+  "certifications": ["ISO 9001"],
+  "contact": { "sales": "sales@acme.example", "phone": "+49 711 000000" },
+  "updated": "2026-09-08"
+}</code></pre>
+</details>
+
+<details>
+<summary><strong>Example: e-commerce</strong></summary>
+<pre><code>{
+  "name": "Sunrise Coffee",
+  "description": "Specialty coffee roaster with worldwide shipping.",
+  "currency": "EUR",
+  "shipping_regions": ["EU", "UK", "US"],
+  "catalog_url": "https://sunrise.example/products.json",
+  "bestsellers": [
+    {
+      "name": "Ethiopia Yirgacheffe 250g",
+      "price": 12.90,
+      "sku": "ETH-250",
+      "url": "https://sunrise.example/p/eth-250"
+    }
+  ],
+  "returns_policy": "https://sunrise.example/returns",
+  "support": "help@sunrise.example",
+  "updated": "2026-09-08"
+}</code></pre>
+</details>
+
+<details>
+<summary><strong>Example: local service</strong></summary>
+<pre><code>{
+  "name": "Fairfax Dental Care",
+  "description": "Family dental clinic.",
+  "services": ["checkups", "orthodontics", "implants"],
+  "address": "123 Main St, Fairfax, VA 22030, USA",
+  "hours": { "mon-fri": "08:00-18:00", "sat": "09:00-13:00" },
+  "phone": "+1 703 000 0000",
+  "booking_url": "https://fairfaxdental.example/book",
+  "insurance_accepted": ["Delta Dental", "Cigna"],
+  "languages": ["English", "Spanish"],
+  "updated": "2026-09-08"
+}</code></pre>
+</details>
+
+<p class="note">Tip: an <code>"updated"</code> date helps AI systems judge freshness, and
+keeping the file small and factual beats marketing copy — but this is your file and your
+call.</p>
+
+<h2>Where to put the files</h2>
+<p>Files under <code>/.well-known/</code> (and root files like <code>llms.txt</code>) must be
+served from your domain itself. How you add them depends on your hosting:</p>
+<table>
+<tr><th>Hosting</th><th>How</th></tr>
+<tr><td>Own server (Apache, Nginx)</td><td>Create a folder named <code>.well-known</code> in your web root and put the files inside.</td></tr>
+<tr><td>cPanel / Plesk</td><td>Use the File Manager: open your site's public folder (often <code>public_html</code>), create <code>.well-known</code>, add the files. Enable "show hidden files" if the folder is invisible.</td></tr>
+<tr><td>WordPress</td><td>Upload via your host's file manager or SFTP into the site root.</td></tr>
+<tr><td>Vercel / Netlify / static hosts</td><td>Add the files under your <code>public</code> (or output) folder and redeploy.</td></tr>
+<tr><td>GitHub Pages</td><td>Commit the files at the matching paths in your Pages branch.</td></tr>
+</table>
+<p class="note">Check yourself: open a file's URL in a browser. If you can see it, so can an
+AI agent and the NessGate resolver.</p>
+
+<h2>Check your work</h2>
+<p>Once your files are live, confirm them with <a href="/check">/check</a> — it is free,
+reads only your public files, and stores nothing.</p>
+<p>After that, no registration is needed. NessGate resolves your domain automatically:</p>
+<pre><code>Web:  https://nessgate.com/discover/yourdomain.com
+MCP:  the "discover_domain" tool on the NessGate MCP server</code></pre>
+<p>Each answer is normalized and links back to the source file on your own domain. Update or
+remove any file whenever you like — NessGate reads the current version every time, so your
+domain always reflects exactly what you publish.</p>
+</main>
+<footer>
+  <nav aria-label="Footer"><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/charter">Charter</a><a href="/changelog">Changelog</a><a href="/blog">Blog</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></nav>
+  <p class="foot-src"><a href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a> &middot; <a href="https://www.npmjs.com/package/@nessgate/resolver" rel="noopener">npm</a></p>
+  <p>© 2026 NessGate</p>
+</footer>
+</body>
+</html>

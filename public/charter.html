@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The NessGate Charter — free, neutral, forever</title>
+<meta name="description" content="NessGate's binding public promises: free forever, neutral to all, never sells ranking or placement, an open specification anyone can implement, and the resource always lives on the domain — NessGate only reads and links back.">
+<link rel="canonical" href="https://nessgate.com/charter">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#0F2D4A">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0F2D4A">
+<meta property="og:site_name" content="NessGate">
+<meta property="og:type" content="website">
+<meta property="og:title" content="The NessGate Charter — free, neutral, forever">
+<meta property="og:description" content="NessGate's binding public promises: free forever, neutral to all, never sells ranking or placement, an open specification anyone can implement, and the resource always lives on the domain — NessGate only reads and links back.">
+<meta property="og:url" content="https://nessgate.com/charter">
+<meta property="og:image" content="https://nessgate.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/style.css?v=10">
+</head>
+<body>
+<header class="site-head"><a class="brand" href="/"><img src="/logo-horizontal.svg" alt="NessGate" width="143" height="28" class="brand-logo"></a><nav class="top-nav" aria-label="Primary"><a href="/check">Check</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/about">About</a><a class="nav-gh" href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a></nav></header>
+<main>
+<h1>The NessGate Charter</h1>
+<p class="meta">Version 1.0 · Our binding public promises. These will not be quietly walked back;
+any change is announced in the <a href="/changelog">changelog</a>.</p>
+
+<p>NessGate exists to answer one small question, and to answer it neutrally:</p>
+<pre><code>Which machine-readable resources does this domain
+itself publish right now?</code></pre>
+
+<h2>What NessGate is</h2>
+<p>The smallest possible <strong>compatibility resolver</strong> for the AI web. Given a domain,
+NessGate reads whatever that domain already publishes across the standard machine-discovery
+locations (a data file, an API, an A2A agent card, an <code>llms.txt</code>, an
+ARD catalog, or a format that does not exist yet) and returns one normalized answer, with a link
+back to each source on the domain. It reads the domain on demand and caches each answer at the
+edge for up to 10 minutes, and stores nothing.
+Anyone (an AI agent, a tool, a person) can ask NessGate what a domain publishes, instead of
+guessing among unofficial pages, third-party databases, and scraped sources.</p>
+
+<h2>What NessGate is not</h2>
+<p>NessGate is <strong>not</strong> a catalog, a search engine, a crawler, a directory, or a
+data store. It does not rank, score, rate, or describe anyone. It does not host your content or
+define your format, and it makes no ownership, accuracy, or safety claim about what it finds. It
+is not a competitor to the resource formats and discovery standards below — it reads them and
+points back at them.</p>
+
+<h2>It works with everything</h2>
+<p>NessGate is deliberately format-neutral. When it reads a domain it recognizes, among others:</p>
+<ul>
+<li><code>llms.txt</code> file</li>
+<li>ARD / <code>ai-catalog.json</code> catalog</li>
+<li>A2A agent card</li>
+<li>RFC 9727 API catalog, OpenAPI description, or plain API</li>
+<li>Schema.org feed, JSON data file, or a custom company format</li>
+<li>any standard that has not been invented yet</li>
+</ul>
+<p>NessGate does not need to understand any of these deeply. It reads what the domain publishes
+and normalizes it. That makes it complementary to the emerging discovery ecosystem, not a rival
+to it.</p>
+
+<h2>Our promises</h2>
+<ol>
+<li><strong>Free forever to participate.</strong> There is never a fee to use the resolver, to be
+    read, or to build on it. Free is not a launch promotion; it is the design.</li>
+<li><strong>Never sell ranking, placement, priority, or badges.</strong> There is nothing to buy
+    that changes how a domain is treated, because there is no ranking to buy.</li>
+<li><strong>Neutral to everyone.</strong> Every domain is read the same way and returned the same
+    way. No favored partners, no preferential treatment, no pay-to-win.</li>
+<li><strong>The resource always lives on the domain.</strong> Your resources stay on your
+    infrastructure, under your control. NessGate only reads them on demand and links back — it never
+    stores, rehosts, owns, dictates, or becomes the resource.</li>
+<li><strong>Open and independently implementable.</strong> The specification is public and the
+    reference implementation is open source (Apache-2.0). Anyone may build a compatible resolver
+    without asking permission. If nessgate.com disappeared, every resource would still stand on
+    its own domain, unchanged.</li>
+<li><strong>No accounts, no tracking.</strong> There is nothing to sign up for. NessGate keeps no
+    user data and no domain data; this site sets no cookies and runs no analytics.</li>
+<li><strong>A stable, additive specification.</strong> A response shape published for one major
+    version keeps working across every later release in that version. A breaking change would only
+    ever arrive as a new major version, with the old one supported through a long transition.</li>
+</ol>
+
+<h2>Honesty</h2>
+<p>NessGate is not the first to see this need, and does not claim to be. A whole family of open,
+neutral discovery infrastructure is emerging at once — among them Agentic Resource Discovery, AI
+Catalog, DNS-AID, MCP, A2A, and IETF drafts for domain-anchored machine discovery. We treat that
+as validation, not competition: it confirms the AI web needs a trustworthy way to read what a
+domain publishes. NessGate's contribution is to be the smallest, most neutral version of that
+primitive — one that takes no position on your format and asks nothing of the ecosystems it
+complements. We will never claim adoption, endorsement, or use that we do not actually have.</p>
+
+<p class="note">Read the technical details in the <a href="/spec">NessGate Resolver Specification</a>, or learn
+more <a href="/about">about the project</a>.</p>
+</main>
+<footer>
+  <nav aria-label="Footer"><a href="/check">Check</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/charter">Charter</a><a href="/changelog">Changelog</a><a href="/blog">Blog</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></nav>
+  <p class="foot-src"><a href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a> &middot; <a href="https://www.npmjs.com/package/@nessgate/resolver" rel="noopener">npm</a></p>
+  <p>© 2026 NessGate</p>
+</footer>
+</body>
+</html>

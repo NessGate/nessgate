@@ -1,0 +1,48 @@
+{
+  "name": "@nessgate/resolver",
+  "version": "1.1.0",
+  "description": "Open, neutral resolver for the agentic web: give it a domain and get one normalized answer with the machine-readable resources the domain publishes across ARD, A2A, llms.txt, api-catalog, ORD, host-meta and OpenAPI. Dependency-free; fetches the domain directly.",
+  "type": "module",
+  "exports": {
+    ".": "./index.mjs"
+  },
+  "main": "./index.mjs",
+  "files": [
+    "index.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "license": "Apache-2.0",
+  "author": "Adam Dean",
+  "homepage": "https://nessgate.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NessGate/nessgate.git",
+    "directory": "packages/resolver"
+  },
+  "bugs": {
+    "url": "https://github.com/NessGate/nessgate/issues"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "mcp",
+    "a2a",
+    "ard",
+    "llms-txt",
+    "resolver",
+    "agentic-web",
+    "discovery",
+    "well-known",
+    "openapi",
+    "nessgate"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

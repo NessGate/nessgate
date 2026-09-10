@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Is your website ready for AI? — Free check — NessGate</title>
+<meta name="description" content="Free instant check: enter your website and see which of the supported machine-discovery files your site publishes right now, what's missing, and how to fix it. Nothing is stored.">
+<link rel="canonical" href="https://nessgate.com/check">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#0F2D4A">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0F2D4A">
+<link rel="stylesheet" href="/style.css?v=10">
+<meta property="og:site_name" content="NessGate">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Which discovery files does your domain publish?">
+<meta property="og:description" content="Free instant check of the supported machine-discovery files your domain publishes — and how to add the ones you're missing.">
+<meta property="og:url" content="https://nessgate.com/check">
+<meta property="og:image" content="https://nessgate.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+<header class="site-head"><a class="brand" href="/"><img src="/logo-horizontal.svg" alt="NessGate" width="143" height="28" class="brand-logo"></a><nav class="top-nav" aria-label="Primary"><a href="/check">Check</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/about">About</a><a class="nav-gh" href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a></nav></header>
+<main>
+<h1>Is your website ready for AI?</h1>
+<p>NessGate supports a set of standard machine-discovery files that sites can publish so AI
+systems and agents can read them. Enter your website below and see which of those supported
+files your site publishes right now — and what's missing. It's free, reads only public files,
+and stores nothing.</p>
+
+<form id="checkForm" class="resolver check-form">
+  <input id="checkDomain" placeholder="yourbusiness.com" autocomplete="off" spellcheck="false"
+         inputmode="url" required aria-label="Website to check">
+  <button type="submit">Check</button>
+</form>
+<div id="checkError" class="result err" hidden></div>
+
+<div id="report" hidden>
+  <h2>Which supported discovery files your website publishes</h2>
+  <p class="hint">The supported machine-discovery files, read on demand from your site right
+  now by the NessGate resolver. "Found" means the file is there and readable.</p>
+  <div id="probeCard" class="panel result report-panel"></div>
+
+  <div id="ctaCard" class="card cta-card">
+    <h2>Add the ones you're missing</h2>
+    <p class="hint">Each of these is a small file you publish on your own domain — no account and
+    nothing to register with NessGate. The <a href="/guide">guide</a> walks through adding
+    <code>llms.txt</code>, an ARD catalog, and the rest. Once they're live, NessGate (and any AI
+    agent) reads them straight from your domain.</p>
+    <p class="cta-go"><a href="/guide">See the guide →</a></p>
+  </div>
+</div>
+</main>
+<footer>
+  <nav aria-label="Footer"><a href="/check">Check your domain</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/charter">Charter</a><a href="/changelog">Changelog</a><a href="/blog">Blog</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></nav>
+  <p class="foot-src"><a href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a> &middot; <a href="https://www.npmjs.com/package/@nessgate/resolver" rel="noopener">npm</a></p>
+  <p>© 2026 NessGate</p>
+</footer>
+<script src="/check.js"></script>
+</body>
+</html>

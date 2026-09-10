@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The State of AI Discovery — September 2026 — NessGate</title>
+<meta name="description" content="Data-driven report on how AI systems actually discover business information in September 2026: llms.txt adoption vs. real crawler behavior, A2A conformance rates, MCP's scale, and the ARD / DNS-AID / ANS standards war.">
+<link rel="canonical" href="https://nessgate.com/blog/state-of-ai-discovery-september-2026">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#0F2D4A">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0F2D4A">
+<link rel="stylesheet" href="/style.css?v=10">
+<link rel="alternate" type="application/rss+xml" title="NessGate Blog" href="/blog/feed.xml">
+<meta property="og:site_name" content="NessGate">
+<meta property="og:type" content="article">
+<meta property="og:title" content="The State of AI Discovery — September 2026">
+<meta property="og:description" content="llms.txt adoption vs. real crawler behavior, A2A conformance rates, MCP's scale, and the standards war that started this summer — with sources.">
+<meta property="og:url" content="https://nessgate.com/blog/state-of-ai-discovery-september-2026">
+<meta property="og:image" content="https://nessgate.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting",
+ "headline":"The State of AI Discovery — September 2026",
+ "description":"Data-driven report on how AI systems actually discover business information in September 2026.",
+ "author":{"@type":"Person","name":"Adam Dean"},
+ "publisher":{"@type":"Organization","name":"NessGate","url":"https://nessgate.com/"},
+ "datePublished":"2026-09-08","dateModified":"2026-09-08",
+ "mainEntityOfPage":"https://nessgate.com/blog/state-of-ai-discovery-september-2026"}
+</script>
+</head>
+<body>
+<header class="site-head"><a class="brand" href="/"><img src="/logo-horizontal.svg" alt="NessGate" width="143" height="28" class="brand-logo"></a><nav class="top-nav" aria-label="Primary"><a href="/check">Check</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/about">About</a><a class="nav-gh" href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a></nav></header>
+<main>
+<h1>The State of AI Discovery — September 2026</h1>
+<p class="meta">By Adam Dean · September 8, 2026 · <a href="/blog">NessGate Blog</a></p>
+
+<p><em>How do AI systems actually find out about your business? We pulled the published
+data on every major mechanism — adoption numbers, real crawler behavior, and the
+standards war that started this summer. Some of it contradicts what the industry is
+selling.</em></p>
+
+<p class="note">All figures are sourced and dated; sources at the end.
+<strong>Disclosure:</strong> NessGate operates a free, neutral resolver in this
+space — we say so again where it's relevant, and this report includes data that is
+inconvenient for us too.</p>
+
+<h2>The short version</h2>
+<ol>
+<li><strong>Publishers are moving faster than AI consumers.</strong> Businesses are
+adding AI-discovery files at a growing rate — and the major AI crawlers are, for the
+most part, not reading them yet.</li>
+<li><strong>Conformance is the silent failure.</strong> Where machine-discovery
+standards <em>are</em> adopted, most published artifacts are broken — a majority of
+real-world A2A agent cards can't be consumed by an actual A2A client.</li>
+<li><strong>The standards war began in earnest this summer.</strong> Google, Microsoft,
+AWS, and the Linux Foundation all shipped or backed discovery standards between May
+and August 2026. Nobody knows which wins. Anyone who tells you otherwise is selling
+something.</li>
+</ol>
+
+<h2>llms.txt: adopted by publishers, ignored by crawlers</h2>
+<p>llms.txt — a plain-text guidance file for AI assistants at <code>/llms.txt</code> —
+is the mechanism most businesses have heard of. The 2026 numbers:</p>
+<ul>
+<li><strong>8.7% of the world's top 1,000 websites</strong> publish one (Rankability,
+June 2026).</li>
+<li><strong>10.13% of a ~300,000-domain sample</strong> had the file (SE Ranking,
+May 2026) — and the same study found <strong>no measurable relationship</strong>
+between having llms.txt and how often a domain is cited in major LLM answers.</li>
+<li>And the uncomfortable part: ALLMO's January 2026 analysis of the <strong>fifty
+most-cited domains in AI search found exactly one</strong> (Target.com) had llms.txt —
+and of 94,614 URLs cited by AI answers, exactly one was an llms.txt page. Log-file
+studies of crawler behavior point the same direction: crawling the file is rare, and
+crawling alone doesn't imply the content gets used.</li>
+<li>In June 2026, <strong>Google's own documentation stated that llms.txt is not
+needed and has no effect</strong> — positive or negative — on Search visibility.</li>
+</ul>
+<p><strong>Honest takeaway:</strong> llms.txt is cheap to add and might matter later,
+but today it is a bet on the future, not a lever on the present. Anyone promising that
+llms.txt alone will get you "seen by AI" is ahead of the evidence.</p>
+
+<h2>A2A agent cards: the conformance disaster</h2>
+<p>Google's A2A protocol gives agents a standard identity file at
+<code>/.well-known/agent-card.json</code>. In July 2026, API Evangelist surveyed
+22,341 API providers:</p>
+<ul>
+<li><strong>65</strong> had published an agent card — 0.3%.</li>
+<li>Of those, <strong>41 had published something an A2A client cannot reliably
+consume.</strong></li>
+<li>Roughly <strong>10 were actually conformant.</strong></li>
+</ul>
+<p>That's the finding that generalizes: even among the earliest, most motivated
+adopters, <strong>a majority get the spec wrong.</strong> Machine-discovery files look
+simple and are quietly easy to break — a wrong content type, a missing required field,
+an HTML-returning catch-all route — and there's no error message anywhere when you do.
+Your file just silently doesn't work.</p>
+
+<h2>MCP: the one layer with real adoption</h2>
+<p>For calibration, the Model Context Protocol shows what genuine adoption looks like:
+<strong>97 million-plus monthly SDK downloads</strong> and roughly <strong>10,000
+active servers in the official registry</strong> (per the Digital Applied MCP adoption
+tracker, May 2026). But note what MCP is: developer tooling for connecting AI to
+systems — not a way for an ordinary business to describe itself to the AI ecosystem.
+The business-facing discovery layer is still unsettled.</p>
+
+<h2>The standards war: May–August 2026</h2>
+<p>Then the giants moved, all at once:</p>
+<table>
+<tr><th>Standard</th><th>Backers</th><th>Model</th><th>Status</th></tr>
+<tr><td><strong>ARD</strong> (Agentic Resource Discovery)</td><td>Google, Microsoft, AWS, Cisco, GitHub, GoDaddy, Nvidia, Salesforce, ServiceNow, Hugging Face, others</td><td>You publish an <code>ard.json</code> catalog on your own domain; federated registries index it</td><td>Spec v0.91, Proposal (Aug 2026)</td></tr>
+<tr><td><strong>DNS-AID</strong></td><td>Linux Foundation: Cloudflare, GoDaddy, Infoblox, ISC, Equinix, others</td><td>Discovery records in DNS itself; explicitly anti-centralized-registry</td><td>IETF standards track (draft, 2026)</td></tr>
+<tr><td><strong>ANS</strong> (Agent Name Service)</td><td>GoDaddy (+ Cloudflare partnership)</td><td>Registrar-anchored verified identity for agents, with a marketplace</td><td>Live product</td></tr>
+<tr><td><strong>ACP / UCP</strong> (commerce)</td><td>OpenAI + Stripe / Google</td><td>Product feeds and agent checkout</td><td>Live at retail scale (Shopify 1M+ merchants; major US retailers)</td></tr>
+</table>
+<p>Three honest observations:</p>
+<p><strong>First, they conflict.</strong> ARD assumes registries; DNS-AID exists to
+make registries unnecessary; ANS anchors trust in registrars. These reflect different
+corporate interests, and businesses are being asked to pick sides in a war whose
+outcome nobody knows.</p>
+<p><strong>Second, they all agree on one thing:</strong> the <em>domain</em> is the
+unit of identity, and what you publish under a domain you control is the root of
+machine trust. Every standard above is a variation on "put a verifiable artifact where
+your domain authority covers it."</p>
+<p><strong>Third, commerce shows what winning looks like</strong> — and why the rest
+is unsettled. ACP and UCP got adoption fast because two platforms (OpenAI, Google)
+control both sides of the transaction. General business discovery has no such forcing
+function yet, which is exactly why the publisher-side standards are still jockeying.</p>
+
+<h2>What a sane business does in September 2026</h2>
+<p>Given the data, we think the honest advice is:</p>
+<ol>
+<li><strong>Don't bet on a single standard.</strong> The war just started; llms.txt
+shows how a "must-have" can turn out to be ignored.</li>
+<li><strong>Do publish the cheap artifacts correctly.</strong> Everything above costs
+minutes if generated correctly and nothing to maintain — the risk isn't effort, it's
+the silent-breakage problem the A2A numbers demonstrate.</li>
+<li><strong>Anchor everything in your domain.</strong> Every credible standard
+resolves to domain authority. Files on infrastructure you control, verifiable as
+yours, survive whichever protocol wins.</li>
+<li><strong>Treat "AI visibility" vendors' urgency claims skeptically</strong> —
+including ours. The consumer side (the AI agents actually reading these artifacts at
+scale) is still arriving. The case for acting now is being <em>early and correct</em>,
+not that agents are already choosing businesses by these files today.</li>
+</ol>
+
+<h2>Where NessGate fits (disclosure)</h2>
+<p>NessGate is a free, neutral resolver: give it a domain and it reads whatever that domain
+already publishes across these standards (ARD, A2A, llms.txt, API catalogs, and more)
+and returns one normalized answer, with a link back to each source. It reads on demand and stores
+nothing; it takes no position on the format and makes no ownership or safety claim. You can
+<a href="/check">check what AI can discover about your domain right now</a> — it's free and
+stores nothing.</p>
+
+<h2>Sources</h2>
+<ul>
+<li>Rankability, <a href="https://www.rankability.com/data/llms-txt-adoption/" rel="nofollow">"llms.txt Adoption: 8.7% of the Top 1,000"</a>, June 2026</li>
+<li>SE Ranking, <a href="https://seranking.com/blog/llms-txt/" rel="nofollow">llms.txt study of ~300,000 domains (10.13% adoption; no citation-frequency relationship)</a>, May 2026</li>
+<li>ALLMO, <a href="https://www.allmo.ai/articles/llms-txt" rel="nofollow">"LLMs.txt for AI Search Report" (1 of top-50 AI-cited domains; 1 of 94,614 cited URLs)</a>, January 2026</li>
+<li>Google Search Central, <a href="https://developers.google.com/search/updates" rel="nofollow">documentation updates (llms.txt "not needed", no ranking effect)</a>, June 2026</li>
+<li>Casey Burridge, <a href="https://caseyrb.com/blog/state-of-llms-txt-adoption/" rel="nofollow">"Does anyone actually have an llms.txt? I checked millions of websites"</a>, 2026</li>
+<li>API Evangelist, <a href="https://apievangelist.com/2026/07/29/most-published-agent-cards-are-not-actually-a2a/" rel="nofollow">"Most Published Agent Cards Are Not Actually A2A"</a>, July 2026</li>
+<li>Google Developers Blog, <a href="https://developers.googleblog.com/announcing-the-agentic-resource-discovery-specification/" rel="nofollow">"Announcing the Agentic Resource Discovery specification"</a>, 2026</li>
+<li><a href="https://agenticresourcediscovery.org/spec/" rel="nofollow">ARD specification v0.91</a></li>
+<li>Linux Foundation, <a href="https://www.linuxfoundation.org/press/linux-foundation-announces-dns-aid-project-to-advance-decentralized-ai-agent-discovery" rel="nofollow">"DNS-AID Project" announcement</a>, May 27, 2026</li>
+<li>Cloudflare, <a href="https://www.cloudflare.com/press/press-releases/2026/cloudflare-and-godaddy-partner-to-help-enable-an-open-agentic-web/" rel="nofollow">"Cloudflare and GoDaddy Partner to Help Enable an Open Agentic Web"</a>, 2026</li>
+<li>GoDaddy, <a href="https://www.godaddy.com/ans" rel="nofollow">ANS Marketplace</a>, 2025–2026</li>
+<li>Jacob Langvad Nilsson, <a href="https://jlangvad.com/insights/mcp-protocol-one-year-on/" rel="nofollow">"How the Protocol Won: MCP, One Year On"</a> (97M+ monthly SDK downloads; ~10,000 registry servers, per the Digital Applied tracker), 2026; Model Context Protocol, <a href="https://modelcontextprotocol.io/registry/about" rel="nofollow">"The MCP Registry"</a></li>
+<li>OpenAI, <a href="https://openai.com/index/powering-product-discovery-in-chatgpt/" rel="nofollow">"Powering Product Discovery in ChatGPT"</a>, 2026; Google Developers Blog, <a href="https://developers.googleblog.com/under-the-hood-universal-commerce-protocol-ucp/" rel="nofollow">"Universal Commerce Protocol"</a>, 2026</li>
+</ul>
+</main>
+<footer>
+  <nav aria-label="Footer"><a href="/check">Check your domain</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/charter">Charter</a><a href="/changelog">Changelog</a><a href="/blog">Blog</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></nav>
+  <p class="foot-src"><a href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a> &middot; <a href="https://www.npmjs.com/package/@nessgate/resolver" rel="noopener">npm</a></p>
+  <p>© 2026 NessGate</p>
+</footer>
+</body>
+</html>

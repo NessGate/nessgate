@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API Documentation — NessGate</title>
+<meta name="description" content="NessGate public API: give it any domain and get one normalized answer with the machine-readable resources the domain publishes — across ARD, A2A, llms.txt, API catalogs and more. Open access, no authentication, CORS enabled.">
+<link rel="canonical" href="https://nessgate.com/api">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#0F2D4A">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0F2D4A">
+<meta property="og:site_name" content="NessGate">
+<meta property="og:type" content="website">
+<meta property="og:title" content="API Documentation — NessGate">
+<meta property="og:description" content="NessGate public API: give it any domain and get one normalized answer with the machine-readable resources the domain publishes. Open access, no authentication, CORS enabled.">
+<meta property="og:url" content="https://nessgate.com/api">
+<meta property="og:image" content="https://nessgate.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/style.css?v=10">
+</head>
+<body>
+<header class="site-head"><a class="brand" href="/"><img src="/logo-horizontal.svg" alt="NessGate" width="143" height="28" class="brand-logo"></a><nav class="top-nav" aria-label="Primary"><a href="/check">Check</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/about">About</a><a class="nav-gh" href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a></nav></header>
+<main>
+<h1>API Documentation</h1>
+<p>Base URL: <code>https://nessgate.com</code>. Every endpoint is a public read — no
+authentication, no API keys, CORS enabled (<code>Access-Control-Allow-Origin: *</code>).
+Responses are JSON unless noted. NessGate stores nothing; every answer is read on demand from the
+target domain and cached at the edge for up to 10 minutes.</p>
+
+<h2>Resolve a domain</h2>
+<pre><code>GET /discover/{domain}</code></pre>
+<p>Give it any domain. NessGate reads whatever that domain publishes across the standard
+machine-discovery locations and returns one normalized answer, with a <code>sourceUrl</code> on
+every record pointing back to the document it came from so you can verify against the domain
+directly.</p>
+<pre><code>$ curl https://nessgate.com/discover/example.com
+
+200 OK
+{
+  "domain": "example.com",
+  "provenance": "self-published",
+  "note": "These locations are published by the domain itself …",
+  "discovered": [
+    { "type": "llms.txt", "url": "https://example.com/llms.txt" },
+    { "type": "ard-catalog", "url": "https://example.com/.well-known/ard.json" }
+  ],
+  "resources": [
+    { "source": "ard-catalog",
+      "sourceUrl": "https://example.com/.well-known/ard.json",
+      "type": "application/json",
+      "name": "Company data",
+      "url": "https://example.com/ai-info.json" }
+  ],
+  "checked": ["llms.txt","ard-catalog","a2a-agent-card","api-catalog",
+              "ai-info.json","openapi","ord","awp","host-meta"]
+}
+
+400 Bad Request      — input is not a valid domain
+429 Too Many Requests — rate limited (120/hour per IP)</code></pre>
+<p class="note"><code>discovered</code> is the routing map (which standards the domain publishes,
+and where). <code>resources</code> is the normalized union of what those documents contain —
+each record keeps its <code>source</code> standard, the authoritative <code>sourceUrl</code>, an
+open <code>type</code> label (never a closed set), and, where the source provides them,
+<code>name</code>/<code>id</code>/<code>raw</code>. <code>checked</code> lists every standard
+probed, so an empty <code>discovered</code> is still a successful <code>200</code> observation.
+Answers are cached 10 minutes. See the <a href="/spec">specification</a> for the full contract.</p>
+
+<h2>Run the resolver yourself</h2>
+<p>The same normalization is available as a dependency-free library that fetches target domains
+directly, with no runtime dependency on nessgate.com:</p>
+<pre><code>npm i @nessgate/resolver
+
+import { resolve } from "@nessgate/resolver";
+const { resources } = await resolve("example.com");</code></pre>
+<p>Or import it straight from the edge: <code>import { resolve } from
+"https://nessgate.com/resolver.mjs"</code>. Source and package:
+<a href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a> ·
+<a href="https://www.npmjs.com/package/@nessgate/resolver" rel="noopener">npm</a>.</p>
+
+<h2>MCP server (for AI agents)</h2>
+<pre><code>POST /mcp          — Model Context Protocol, Streamable HTTP transport</code></pre>
+<p>AI agents can call the resolver natively over the
+<a href="https://modelcontextprotocol.io" rel="nofollow">Model Context Protocol</a> instead of the
+REST API. The server is stateless, requires no authentication, and exposes one read-only tool that
+dispatches to the same handler (and rate limits) as <code>/discover</code>:</p>
+<table>
+<tr><th>Tool</th><th>Returns</th></tr>
+<tr><td><code>discover_domain</code></td><td>The normalized machine-readable resources the domain publishes (same answer as <code>/discover/{domain}</code>), with a <code>sourceUrl</code> on each record.</td></tr>
+</table>
+<pre><code>$ curl -X POST https://nessgate.com/mcp -H "Content-Type: application/json" -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "discover_domain",
+                "arguments": { "domain": "example.com" } } }'</code></pre>
+<p class="note">Connect from an MCP client with transport type <code>streamable-http</code> and URL
+<code>https://nessgate.com/mcp</code>. Sessions and server-initiated streams are not used, and
+batching is not supported.</p>
+
+<h2>Human-readable pages</h2>
+<pre><code>GET /{domain}          e.g. https://nessgate.com/example.com</code></pre>
+<p>A live HTML view of what a domain publishes — the resolver rendered for humans. Machine
+discovery: <a href="/sitemap.xml">/sitemap.xml</a> and <a href="/robots.txt">/robots.txt</a>.</p>
+
+<h2>NessGate's own declaration</h2>
+<p>NessGate reads these standards on other domains, so it publishes its own where meaningful:
+<a href="/llms.txt"><code>/llms.txt</code></a>, an RFC 9727 API catalog at
+<a href="/.well-known/api-catalog"><code>/.well-known/api-catalog</code></a>,
+<a href="/ai-info.json"><code>/ai-info.json</code></a>, and an OpenAPI description at
+<a href="/openapi.json"><code>/openapi.json</code></a>. It does <em>not</em> publish an A2A agent
+card, because NessGate is not an A2A agent — publishing artifacts that describe nothing real is
+exactly what this project exists to discourage.</p>
+
+<h2>Machine-readable API description</h2>
+<p>An OpenAPI 3.0 description of this API is available at
+<a href="/openapi.json"><code>/openapi.json</code></a> for client generation and tooling, and is
+linked from the RFC 9727 catalog at
+<a href="/.well-known/api-catalog"><code>/.well-known/api-catalog</code></a>.</p>
+</main>
+<footer>
+  <nav aria-label="Footer"><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/charter">Charter</a><a href="/changelog">Changelog</a><a href="/blog">Blog</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></nav>
+  <p class="foot-src"><a href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a> &middot; <a href="https://www.npmjs.com/package/@nessgate/resolver" rel="noopener">npm</a></p>
+  <p>© 2026 NessGate</p>
+</footer>
+</body>
+</html>

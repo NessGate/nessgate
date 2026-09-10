@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — NessGate</title>
+<meta name="description" content="NessGate privacy policy: no accounts, no cookies, no trackers, and no stored domain data — only short-lived, IP-based rate-limit counters that expire within about an hour.">
+<link rel="canonical" href="https://nessgate.com/privacy">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#0F2D4A">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0F2D4A">
+<meta property="og:site_name" content="NessGate">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Privacy Policy — NessGate">
+<meta property="og:description" content="NessGate privacy policy: no accounts, no cookies, no trackers, and no stored domain data — only short-lived, IP-based rate-limit counters that expire within about an hour.">
+<meta property="og:url" content="https://nessgate.com/privacy">
+<meta property="og:image" content="https://nessgate.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/style.css?v=10">
+</head>
+<body>
+<header class="site-head"><a class="brand" href="/"><img src="/logo-horizontal.svg" alt="NessGate" width="143" height="28" class="brand-logo"></a><nav class="top-nav" aria-label="Primary"><a href="/check">Check</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/about">About</a><a class="nav-gh" href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a></nav></header>
+<main>
+<h1>Privacy Policy</h1>
+<p class="meta">Effective September 10, 2026</p>
+<p>NessGate is designed to know as little as possible.</p>
+
+<h2>What we store</h2>
+<p>Nothing about you, and nothing about the domains you look up. NessGate keeps
+<strong>no domain data at all</strong> — no mappings, no copies of resources, no index.
+The only thing we store is short-lived, IP-based rate-limit counters (see Technical data),
+which exist purely to keep the free service available and expire on their own.</p>
+<p>When the <code>GET /discover/{domain}</code> endpoint is queried, NessGate fetches a
+fixed set of standard public locations on the queried domain (such as <code>/llms.txt</code>
+and <code>/.well-known/</code> files), reads and normalizes the responses, returns them with
+a link back to each source, and discards everything fetched. Nothing is stored, indexed, or
+crawled in the background — a lookup happens live, only when someone asks.</p>
+
+<h2>What we don't collect</h2>
+<p>NessGate has no user accounts and asks for no names, email addresses, or personal
+information. The site sets <strong>no cookies</strong> and uses <strong>no analytics or
+tracking scripts</strong>.</p>
+
+<h2>Technical data</h2>
+<p>Our infrastructure runs on Cloudflare. Like virtually all web services, requests pass
+through standard server infrastructure that processes IP addresses to deliver responses,
+prevent abuse, and enforce rate limits. The only data we retain is short-lived, IP-keyed
+rate-limit counters kept in Cloudflare KV, which expire automatically within about an hour;
+we do not build profiles of visitors. Cloudflare processes traffic under its own
+<a href="https://www.cloudflare.com/privacypolicy/" rel="noopener">privacy policy</a>.</p>
+
+<h2>Changes and contact</h2>
+<p>If this policy changes, the new version will be published on this page with an updated
+effective date. Questions: see <a href="/contact">Contact</a>.</p>
+</main>
+<footer>
+  <nav aria-label="Footer"><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/charter">Charter</a><a href="/changelog">Changelog</a><a href="/blog">Blog</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></nav>
+  <p class="foot-src"><a href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a> &middot; <a href="https://www.npmjs.com/package/@nessgate/resolver" rel="noopener">npm</a></p>
+  <p>© 2026 NessGate</p>
+</footer>
+</body>
+</html>

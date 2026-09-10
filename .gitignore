@@ -1,0 +1,15 @@
+node_modules/
+.wrangler/
+.dev.vars
+npm/
+
+.brand-pack/
+nessgate_brand_pack_approved_only.zip
+nessgate_brand_complete_approved/
+nessgate_brand_complete_approved.zip
+
+wordpress-plugin/
+
+# Local operator tools — kept out of the public repo (read only the public registry.json)
+/NessGate-Stats.bat
+/dashboard.html

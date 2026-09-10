@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NessGate — the neutral resolver for the agentic web</title>
+<meta name="description" content="NessGate is the open, neutral resolver for the agentic web: give it a domain and get one normalized answer with the machine-readable resources the domain publishes — across ARD, A2A, llms.txt, API catalogs and more. One call instead of ten.">
+<link rel="canonical" href="https://nessgate.com/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#0F2D4A">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0F2D4A">
+<link rel="stylesheet" href="/style.css?v=10">
+<meta property="og:site_name" content="NessGate">
+<meta property="og:type" content="website">
+<meta property="og:title" content="NessGate — the neutral resolver for the agentic web">
+<meta property="og:description" content="Give NessGate a domain and get one normalized answer with the machine-readable resources the domain publishes — across ARD, A2A, llms.txt, API catalogs and more.">
+<meta property="og:url" content="https://nessgate.com/">
+<meta property="og:image" content="https://nessgate.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[
+ {"@type":"WebSite","name":"NessGate","url":"https://nessgate.com/",
+  "description":"The open, neutral resolver for the agentic web: give it a domain and get one normalized answer with the machine-readable resources the domain publishes — across ARD, A2A, llms.txt, API catalogs and more.",
+  "potentialAction":{"@type":"SearchAction",
+    "target":{"@type":"EntryPoint","urlTemplate":"https://nessgate.com/{domain}"},
+    "query-input":"required name=domain"}},
+ {"@type":"Organization","name":"NessGate","url":"https://nessgate.com/",
+  "logo":"https://nessgate.com/apple-touch-icon.png",
+  "email":"contact@nessgate.com"}]}
+</script>
+</head>
+<body class="home">
+<header class="site-head">
+  <a class="brand" href="/">
+    <img src="/logo-horizontal.svg" alt="NessGate" width="143" height="28" class="brand-logo">
+  </a>
+  <nav class="top-nav" aria-label="Primary"><a href="/check">Check</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/about">About</a><a class="nav-gh" href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a></nav>
+</header>
+<main>
+  <div class="hero">
+    <h1>One request to every machine interface a domain exposes.</h1>
+    <p class="tag">NessGate is the open, neutral resolver for the agentic web. Give it a domain
+      and it reads whatever that domain already publishes (ARD, A2A, llms.txt, API
+      catalogs, and more) and returns one normalized answer, with a link back to each source so
+      an agent can verify. One call instead of ten.</p>
+    <div class="hero-map" aria-hidden="true">
+      <code>yourdomain.com</code><span class="arrow">→</span><code>ARD</code><code>A2A</code><code>llms.txt</code><code>API</code><span class="arrow">→</span><code>one answer</code>
+    </div>
+  </div>
+
+  <section aria-label="Resolve a domain">
+    <p class="hint">Resolve any domain — see the machine-readable resources the domain publishes:</p>
+    <form id="resolveForm" class="resolver">
+      <input id="resolveDomain" name="domain" placeholder="example.com" autocomplete="off"
+             spellcheck="false" inputmode="url" required aria-label="Domain to resolve">
+      <button type="submit">Resolve</button>
+    </form>
+    <div id="resolveResult" class="result" hidden></div>
+  </section>
+
+  <div class="columns">
+  <section class="card" aria-label="For domain owners">
+    <h2>For domain owners</h2>
+    <p class="hint">There is nothing to register and no NessGate file to add. Publish the standard
+      files AI already looks for (<code>llms.txt</code>, an ARD catalog, an agent card, an API
+      catalog) on your own domain, and NessGate reads them automatically. Your domain always stays
+      the authority; NessGate stores nothing.</p>
+    <p class="hint">Not sure what AI can see on your site today?
+      <a href="/check">Check your domain</a> — it's free, reads only public files, and stores
+      nothing. The <a href="/guide">guide</a> walks through adding whatever you're missing.</p>
+    <p class="hint">NessGate is <a href="/charter">neutral infrastructure</a>: free forever, no
+      accounts, and it never sells ranking or placement — because there is none.</p>
+  </section>
+
+  <section class="card dev" aria-label="For AI agents and developers">
+    <h2>For AI agents &amp; developers</h2>
+    <p class="hint">One request, no keys, no auth, open CORS. Works whether or not the domain has
+      ever heard of NessGate — it reads what the domain already publishes.</p>
+    <div class="endpoint">
+      <code>GET https://nessgate.com/discover/{domain}</code>
+      <button type="button" class="copy" data-copy="https://nessgate.com/discover/example.com">Copy</button>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Code examples">
+      <button type="button" class="tab active" data-tab="curl">curl</button>
+      <button type="button" class="tab" data-tab="js">JavaScript</button>
+      <button type="button" class="tab" data-tab="py">Python</button>
+    </div>
+    <pre class="snippet" id="snip-curl"><code>curl https://nessgate.com/discover/example.com
+# → { "resources": [ { "source": "ard-catalog",
+#       "type": "application/json",
+#       "url": "https://example.com/ai-info.json",
+#       "sourceUrl": "https://example.com/.well-known/ard.json" } ], … }</code></pre>
+    <pre class="snippet" id="snip-js" hidden><code>const { resources } = await
+  (await fetch("https://nessgate.com/discover/example.com")).json();</code></pre>
+    <pre class="snippet" id="snip-py" hidden><code>import requests
+
+resources = requests.get(
+  "https://nessgate.com/discover/example.com").json()["resources"]</code></pre>
+    <p class="hint">Prefer MCP? The same lookup is a tool (<code>discover_domain</code>) at
+      <code>/mcp</code>. Or run the resolver yourself — an embeddable, dependency-free library
+      (preview) that fetches domains directly with no dependency on nessgate.com:</p>
+    <pre class="snippet"><code>import { resolve } from "https://nessgate.com/resolver.mjs";
+const { resources } = await resolve("example.com");</code></pre>
+    <p class="hint">Or install it from npm:</p>
+    <pre class="snippet"><code>npm i @nessgate/resolver</code></pre>
+    <p class="hint src-links"><strong><a href="https://github.com/NessGate/nessgate" rel="noopener">View on GitHub&nbsp;↗</a></strong> · <a href="https://www.npmjs.com/package/@nessgate/resolver" rel="noopener">View on npm&nbsp;↗</a></p>
+    <p class="hint dev-links"><a href="/api">API reference</a> · <a href="/spec">Specification</a> ·
+      <a href="/openapi.json">OpenAPI</a> · <a href="/charter">Charter</a> · <a href="/llms.txt">llms.txt</a></p>
+  </section>
+  </div>
+
+  <section class="why" aria-label="Why NessGate">
+    <div>
+      <h3>Reads what you publish</h3>
+      <p>NessGate never asks you to adopt a new format. It reads the standards you already use
+         (ARD, A2A, llms.txt, API catalogs) and normalizes them. A new standard is just a
+         new adapter, never a competitor.</p>
+    </div>
+    <div>
+      <h3>One interface</h3>
+      <p>Every domain, one normalized answer, with a link back to each source. Agents stop
+         probing ten locations and guessing which one is official.</p>
+    </div>
+    <div>
+      <h3>No lock-in</h3>
+      <p>Open protocol, open-source resolver, no accounts, no fees, no ranking. Run it yourself
+         or call ours — the domain always stays the authority.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <nav aria-label="Footer">
+    <a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/charter">Charter</a><a href="/changelog">Changelog</a><a href="/blog">Blog</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a>
+  </nav>
+  <p class="foot-src"><a href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a> &middot; <a href="https://www.npmjs.com/package/@nessgate/resolver" rel="noopener">npm</a></p>
+  <p>© 2026 NessGate</p>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>

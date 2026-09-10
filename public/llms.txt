@@ -1,0 +1,21 @@
+# NessGate
+
+> The open, neutral compatibility resolver for the agentic web. Give it a domain and NessGate reads the machine-readable resources that domain publishes at the standard discovery locations, and returns one normalized answer with a link back to each source. It reads on demand, stores nothing, and makes no ownership or safety claim. No accounts, no API keys, open CORS.
+
+## Resolve
+- Resolve a domain: `GET https://nessgate.com/discover/{domain}` → `{"domain", "provenance", "note", "discovered", "resources", "checked"}`. `discovered` lists which mechanisms the domain publishes and where; `resources` is the normalized union of what those documents contain, each record carrying `source` (which mechanism it came from) and `sourceUrl` (the document it was read from — authoritative; follow it to verify against the domain). `type` is an open label — do not assume a closed set. `checked` lists every mechanism probed, so an empty `discovered` is still a successful `200` observation. `400` for an invalid domain, `429` if rate-limited. Answers are computed on demand and cached at the edge for up to 10 minutes.
+- Mechanisms read: `llms.txt`, ARD / `ai-catalog.json` (`/.well-known/ard.json`), A2A agent card (`/.well-known/agent-card.json`), RFC 9727 api-catalog (`/.well-known/api-catalog`), `ai-info.json`, OpenAPI (`/openapi.json`), Open Resource Discovery, host-meta. NessGate reads these; it does not define or replace them.
+- MCP server: `https://nessgate.com/mcp` (Model Context Protocol, Streamable HTTP transport, no auth) exposing one tool, `discover_domain`, which returns the same answer as `/discover`.
+- Run it yourself: the dependency-free `@nessgate/resolver` library (npm) or `https://nessgate.com/resolver.mjs` fetches the target domain directly, with no dependency on nessgate.com.
+- API contract and stability guarantees: https://nessgate.com/spec · OpenAPI: https://nessgate.com/openapi.json
+
+## About the data
+Resources live on each domain's own infrastructure (or its subdomains) and follow no required schema — read them directly from the resolved URLs (`sourceUrl`). NessGate reports what a domain serves and links back to it; it never stores, analyzes, rehosts, ranks, or vouches for that content. There is nothing to register with NessGate: publish the standard files on your own domain and NessGate (and any AI agent) reads them directly.
+
+## Docs
+- [The State of AI Discovery — September 2026](https://nessgate.com/blog/state-of-ai-discovery-september-2026) — sourced data report on discovery-mechanism adoption
+- [What is ARD?](https://nessgate.com/blog/what-is-ard-ai-catalog-json) — plain-English ard.json guide
+- [API documentation](https://nessgate.com/api)
+- [Guide: make your domain AI-discoverable](https://nessgate.com/guide)
+- [About / principles](https://nessgate.com/about)
+- Contact: contact@nessgate.com

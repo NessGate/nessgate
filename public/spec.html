@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The NessGate Resolver Specification</title>
+<meta name="description" content="The NessGate Resolver Specification: a minimal, format-neutral resolution layer. Given a domain, read the machine-readable resources it publishes across ARD, A2A, llms.txt, API catalogs and more, and return one normalized answer — response format, sources read, stability guarantees, and how to implement it independently.">
+<link rel="canonical" href="https://nessgate.com/spec">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#0F2D4A">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0F2D4A">
+<meta property="og:site_name" content="NessGate">
+<meta property="og:type" content="website">
+<meta property="og:title" content="The NessGate Resolver Specification">
+<meta property="og:description" content="The NessGate resolver specification: response format, the standards it reads, stability guarantees, and how anyone can implement it independently.">
+<meta property="og:url" content="https://nessgate.com/spec">
+<meta property="og:image" content="https://nessgate.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/style.css?v=10">
+</head>
+<body>
+<header class="site-head"><a class="brand" href="/"><img src="/logo-horizontal.svg" alt="NessGate" width="143" height="28" class="brand-logo"></a><nav class="top-nav" aria-label="Primary"><a href="/check">Check</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/about">About</a><a class="nav-gh" href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a></nav></header>
+<main>
+<h1>The NessGate Resolver Specification</h1>
+<p class="meta">Specification version 1.0 · Governed by the <a href="/charter">Charter</a></p>
+<p>NessGate resolves one thing:</p>
+<pre><code>a domain  →  the machine-readable resources it already publishes,
+             read on demand and normalized into one answer</code></pre>
+<p>NessGate is a neutral, format-neutral resolver. It reads whatever a domain publishes at the
+standard machine-discovery locations, normalizes it into one list, and links every record back to
+the source document it came from. It defines no format of its own, hosts nothing, and stores
+nothing: the resources always live on the domain's own infrastructure, under the domain's control,
+in whatever structure the domain chooses. NessGate reports what it read and where — never the truth,
+correctness, or safety of what is behind a link.</p>
+
+<h2>0. Scope, interoperability, and openness</h2>
+<p>NessGate is intentionally the <strong>smallest useful primitive</strong>: a resolution layer,
+not a catalog, search engine, directory, or crawler. It does not describe, rank, index, or store
+resources — it reads what a domain publishes and returns it normalized, with a link back to each
+source. This keeps it <strong>complementary</strong> to the discovery formats and standards a domain
+already uses — <code>llms.txt</code>, ARD / <code>ai-catalog.json</code>, A2A, RFC 9727 API
+catalogs, OpenAPI, Open Resource Discovery, host-meta, or custom and future formats. NessGate takes
+no position on the format; it only reads it. A new standard is a new adapter, never a competing
+format.</p>
+<p>The specification is <strong>open and independently implementable</strong>. The rules below are
+sufficient to build a compatible resolver with no permission and no dependency on nessgate.com; the
+reference implementation is open source under Apache-2.0, and the embeddable
+<a href="https://www.npmjs.com/package/@nessgate/resolver" rel="noopener"><code>@nessgate/resolver</code></a>
+library talks to target domains directly. The neutrality and free-forever commitments that make this
+a shared specification rather than one vendor's service are set out in the
+<a href="/charter">NessGate Charter</a>.</p>
+
+<h2>1. Resolution</h2>
+<pre><code>GET https://nessgate.com/discover/{domain}</code></pre>
+<table>
+<tr><th>Field</th><th>Type</th><th>Meaning</th></tr>
+<tr><td><code>domain</code></td><td>string</td><td>The normalized domain that was queried.</td></tr>
+<tr><td><code>provenance</code></td><td>string</td><td>Always <code>"self-published"</code>: the resources were read from the domain itself, not asserted by NessGate.</td></tr>
+<tr><td><code>discovered</code></td><td>array</td><td>The routing map — one <code>{"type", "url"}</code> per standard the domain publishes, and where.</td></tr>
+<tr><td><code>resources</code></td><td>array</td><td>The normalized union of what those documents contain (see §2), flattened into one list, capped for safety.</td></tr>
+<tr><td><code>checked</code></td><td>array</td><td>The full list of standards NessGate probed for, so a client knows what was looked at even when nothing was found.</td></tr>
+<tr><td><code>note</code></td><td>string</td><td>Human-readable reminder that these are self-published locations, reported as-is, verifiable via each <code>sourceUrl</code>.</td></tr>
+</table>
+<p><strong>Status codes:</strong> <code>200</code> (a successful observation — <code>discovered</code>
+may be empty) · <code>400</code> invalid domain · <code>429</code> rate limited.</p>
+<p><strong>Normalization:</strong> input is lowercased; scheme, path, query, port, trailing dots, and
+a leading <code>www.</code> are stripped. Internationalized domains use their ASCII/punycode form.
+Answers are computed fresh and cached at the edge for 10 minutes; nothing is stored beyond that
+cache.</p>
+
+<h2>2. The normalized resource record</h2>
+<p>Each entry in <code>resources</code> is a thin, uniform record. NessGate reuses each source's own
+labels and never invents a taxonomy of its own:</p>
+<table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><code>source</code></td><td>Which standard this record came from (e.g. <code>ard-catalog</code>, <code>api-catalog</code>, <code>host-meta</code>).</td></tr>
+<tr><td><code>sourceUrl</code></td><td>The native document the record was read from. <strong>Always authoritative</strong> — follow it to verify the record against the domain itself.</td></tr>
+<tr><td><code>type</code></td><td>An open label, taken from the source where possible (an ARD media type, a link <code>rel</code>, an AWP protocol key). Clients must not assume a closed set.</td></tr>
+<tr><td><code>url</code></td><td>The resource URL.</td></tr>
+<tr><td><code>name</code>, <code>id</code>, <code>rel</code>, <code>raw</code></td><td>Optional — a display name, the source identifier, a link relation, or the original record — included where the source provides them.</td></tr>
+</table>
+<p>NessGate imposes no schema beyond what is needed to merge these sources. A malformed source
+document is simply skipped; it can never break resolution.</p>
+
+<h2>3. Sources read</h2>
+<p>The resolver reads the following standard, well-known locations. Each is READ, never defined by
+NessGate; adding support for a new standard is a new entry here, never a change to any domain:</p>
+<table>
+<tr><th>Standard</th><th>Location(s)</th></tr>
+<tr><td><code>llms.txt</code></td><td><code>/llms.txt</code></td></tr>
+<tr><td>ARD / Agentic Resource Discovery</td><td><code>/.well-known/ard.json</code>, <code>/.well-known/ai-catalog.json</code></td></tr>
+<tr><td>A2A agent card</td><td><code>/.well-known/agent-card.json</code>, <code>/.well-known/agent.json</code></td></tr>
+<tr><td>RFC 9727 API catalog</td><td><code>/.well-known/api-catalog</code></td></tr>
+<tr><td><code>ai-info.json</code></td><td><code>/ai-info.json</code></td></tr>
+<tr><td>OpenAPI</td><td><code>/openapi.json</code></td></tr>
+<tr><td>Open Resource Discovery</td><td><code>/.well-known/open-resource-discovery</code></td></tr>
+<tr><td>AWP manifest (provisional)</td><td><code>/.well-known/awp.json</code></td></tr>
+<tr><td>RFC 6415 host-meta</td><td><code>/.well-known/host-meta.json</code></td></tr>
+</table>
+<p>For each standard, the first candidate location returning valid content wins. Fetches are HTTPS
+only, size- and redirect-capped, on-domain, and identify as <code>NessGate-Discover/1.0</code>.</p>
+
+<h2>4. What NessGate does not do</h2>
+<ul>
+<li><strong>No storage.</strong> Each answer is computed on request and dies with its 10-minute edge
+    cache. There is no registry, no database of domains, and no record of who queried what.</li>
+<li><strong>No crawling or indexing.</strong> NessGate fetches only the specific well-known paths
+    above, only for the domain in the request, only when asked.</li>
+<li><strong>No trust or safety claim.</strong> <code>provenance</code> is <code>self-published</code>:
+    NessGate reports what a domain serves and links back to it. Whether a resource is correct, safe,
+    or truly the owner's is for the client to judge from the <code>sourceUrl</code>.</li>
+<li><strong>No ranking.</strong> Results are returned in discovery order. There is nothing to buy.</li>
+</ul>
+
+<h2>5. Stability and versioning</h2>
+<p>The <strong>specification version</strong> (this document) is versioned separately from the
+<strong>reference-software version</strong>. Within a major specification version:</p>
+<ul>
+<li>The <code>/discover/{domain}</code> response shape — the fields in §1 and the record shape in §2
+    — is stable. Changes are <strong>additive only</strong>: new optional fields may appear, and
+    clients must ignore fields they do not recognize.</li>
+<li>The set of <code>type</code> labels is open by design and will never become a closed enum.</li>
+<li>The list of sources read (§3) may grow — that is additive and expected.</li>
+<li>If a breaking change is ever unavoidable, it will live under a new path (e.g. <code>/v2/…</code>)
+    with the v1 endpoint maintained, announced in the <a href="/changelog">changelog</a>.</li>
+</ul>
+
+<h2>6. Machine endpoints</h2>
+<table>
+<tr><td><code>/discover/{domain}</code></td><td>The resolver (CORS open, no auth).</td></tr>
+<tr><td><code>/mcp</code></td><td>Model Context Protocol server (Streamable HTTP, no auth) exposing <code>discover_domain</code> as a tool, so AI agents can call the resolver natively.</td></tr>
+<tr><td><code>resolver.mjs</code> · <code>@nessgate/resolver</code></td><td>The embeddable, dependency-free resolver library — same normalization, run in your own process, no dependency on nessgate.com.</td></tr>
+<tr><td><code>/openapi.json</code></td><td>OpenAPI 3.0 description of this API.</td></tr>
+<tr><td><code>/llms.txt</code></td><td>Guidance for AI agents.</td></tr>
+<tr><td><code>/sitemap.xml</code>, <code>/robots.txt</code></td><td>Crawler discovery.</td></tr>
+<tr><td><code>/.well-known/security.txt</code></td><td>Security contact (RFC 9116).</td></tr>
+<tr><td><code>/.well-known/api-catalog</code></td><td>NessGate's own RFC 9727 API catalog, dogfooding a standard it reads.</td></tr>
+</table>
+</main>
+<footer>
+  <nav aria-label="Footer"><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/charter">Charter</a><a href="/changelog">Changelog</a><a href="/blog">Blog</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></nav>
+  <p class="foot-src"><a href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a> &middot; <a href="https://www.npmjs.com/package/@nessgate/resolver" rel="noopener">npm</a></p>
+  <p>© 2026 NessGate</p>
+</footer>
+</body>
+</html>

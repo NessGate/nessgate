@@ -1,0 +1,31 @@
+name = "nessgate"
+main = "src/worker.js"
+compatibility_date = "2026-08-01"
+
+routes = [
+  { pattern = "nessgate.com", custom_domain = true },
+  { pattern = "www.nessgate.com", custom_domain = true }
+]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = true
+
+[vars]
+# Canonical public base URL of this service
+BASE_URL = "https://nessgate.com"
+
+# KV holds only rate-limit counters (no registry, no stored data).
+[[kv_namespaces]]
+binding = "NESSGATE_KV"
+id = "1493373c316641ceb49c075609863b10"
+
+# Native edge rate limiting (burst control; KV enforces the hourly cap)
+[[ratelimits]]
+name = "API_RL"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }
+
+# No D1, no cron, no secrets: NessGate is a stateless resolver. It reads what a
+# domain publishes on each request and stores nothing.
