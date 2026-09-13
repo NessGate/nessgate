@@ -1,10 +1,10 @@
 # NessGate
 
 **The open, neutral compatibility resolver for the agentic web.** Give NessGate a domain and it
-reads whatever that domain already publishes — across ARD, A2A, `llms.txt`, RFC 9727
-api-catalog, Open Resource Discovery, RFC 6415 host-meta, OpenAPI and more — and returns
-**one normalized answer**, with a link back to each source so an agent can always verify
-against the domain itself.
+reads whatever that domain already publishes — across ARD (all three surfaces), A2A, `llms.txt`,
+RFC 9727 api-catalog, Open Resource Discovery, RFC 6415 host-meta, OpenAPI, Agent Network Protocol
+(ANP), Universal Commerce Protocol (UCP), DNS-AID and more — and returns **one normalized answer**,
+with a link back to each source so an agent can always verify against the domain itself.
 
 ```
 company.com  →  { resources: [
@@ -58,11 +58,30 @@ still stand on the domain itself.
   (`public/`, via the assets binding with `run_worker_first`), the resolver API, the MCP
   server, the per-domain pages, and the sitemap. There is no database.
 - **The resolver** (`GET /discover/{domain}`, and the embeddable `public/resolver.mjs`) reads
-  what a domain publishes at the standard well-known locations, normalizes it into one answer,
-  fetches the domain directly, and stores nothing. Answers are computed fresh and cached at the
-  edge for 10 minutes. A parity test keeps the worker's and the library's normalization
-  byte-identical, and keeps `packages/resolver/index.mjs` (the npm package) byte-identical to
-  `public/resolver.mjs`.
+  what a domain publishes, normalizes it into one answer, fetches the domain directly, and stores
+  nothing. Answers are computed fresh and cached at the edge for 10 minutes. A parity test keeps
+  the worker's and the library's normalization byte-identical, and keeps
+  `packages/resolver/index.mjs` (the npm package) byte-identical to `public/resolver.mjs`.
+- **Adapter architecture — four discovery channels.** Each supported standard is a small,
+  independent adapter, and every adapter uses one of four channels to locate its document:
+  - **well-known** — GET a fixed path (or paths) on the domain: `llms.txt`, `ard-catalog`
+    (ARD / `ai-catalog`), `a2a-agent-card` (A2A), `api-catalog` (RFC 9727), `ai-info.json`,
+    `openapi`, `ord` (Open Resource Discovery), `awp` (draft), `host-meta` (RFC 6415),
+    `anp` (Agent Network Protocol `/.well-known/agent-descriptions`), and `ucp` (Universal
+    Commerce Protocol `/.well-known/ucp`).
+  - **link-rel** — parse `<link rel="ard">` in the homepage, then GET the target (`ard-link`).
+  - **robots** — parse an `Agentmap:` directive in `/robots.txt`, then GET the target
+    (`ard-agentmap`).
+  - **dns** — a DoH TXT lookup at `_agent.<domain>` (`dns-aid`: `v=aid1;u=<uri>;p=<proto>;a=<auth>`).
+
+  **Complete ARD support** means all three ARD surfaces: the well-known paths, the
+  `<link rel="ard">` tag, and the robots.txt `Agentmap:` directive. ANP and UCP are emerging;
+  DNS-AID/AID and AWP are drafts, described as such and read as-is with no adoption claim.
+- **GB/Z 185.4 / 185.5 is not implemented.** China's 智能体互联 agent description/discovery standards
+  are not supported: the discovery mechanism is defined only in the paywalled Chinese national
+  standard and appears to be a federated discovery service rather than a domain-native path, so
+  there is no concrete surface to probe. The adapter architecture is ready to host it once the
+  endpoint is verified; NessGate makes no GB/Z claim in the meantime.
 - **Cloudflare KV** (`NESSGATE_KV`) holds only approximate, IP-keyed hourly rate-limit counters
   that expire within the hour. Nothing else is stored.
 - **Rate limiting**: a Cloudflare-native edge limiter (burst, per-colo and eventually
@@ -78,7 +97,7 @@ still stand on the domain itself.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /discover/{domain}` | **The resolver.** Reads what the domain publishes across the supported standards (llms.txt, ARD/ai-catalog, A2A agent card, RFC 9727 api-catalog, ai-info.json, OpenAPI, ORD, AWP, host-meta) and returns one normalized answer — `{domain, provenance, note, discovered[], resources[], checked[]}`, each resource carrying its `source` and native `sourceUrl`. CORS open, no auth; nothing stored or crawled; 10-min cache, 120/hr/IP. |
+| `GET /discover/{domain}` | **The resolver.** Reads what the domain publishes across the supported adapters (llms.txt, ARD/ai-catalog via well-known paths, `rel="ard"` link, and robots `Agentmap:`; A2A agent card, RFC 9727 api-catalog, ai-info.json, OpenAPI, ORD, AWP, host-meta, ANP, UCP, DNS-AID) and returns one normalized answer — `{domain, provenance, note, discovered[], resources[], checked[]}`, each resource carrying its `source` and native `sourceUrl`. CORS open, no auth; nothing stored or crawled; 10-min cache, 120/hr/IP. |
 | `POST /mcp` | Model Context Protocol server (Streamable HTTP, stateless, no auth) exposing one tool, `discover_domain`, that returns the same answer as `/discover`. |
 | `GET /{domain}` | Human-readable domain page — the resolver rendered for humans (live discovery). |
 | `GET /resolver.mjs` | The embeddable resolver library (also on npm as `@nessgate/resolver`). |

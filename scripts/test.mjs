@@ -5,13 +5,16 @@ import {
   escapeHtml,
   validateProbeContent,
   probeShapeOk,
+  parseLinkRel,
+  parseAgentmap,
+  parseAidRecord,
   isPrivateIp,
   hostAllowedForDomain,
   isForbiddenHost,
   apiCatalog,
   mcpTools,
   normalizeResources,
-  discoverProbes,
+  adapters,
 } from "../src/worker.js";
 
 const API_CATALOG = apiCatalog();
@@ -98,14 +101,42 @@ is(probeShapeOk("openapi", "json", "{}"), false, "empty {} at /openapi.json reje
 is(probeShapeOk("host-meta", "json", '{"links":[]}'), true, "host-meta with links accepted");
 is(probeShapeOk("ai-info.json", "json", "{}"), true, "ai-info.json (informal) accepts any object");
 is(probeShapeOk("llms.txt", "text", "# anything"), true, "text probes always pass shape check");
+is(probeShapeOk("anp", "json", '{"items":[]}'), true, "ANP with items[] accepted");
+is(probeShapeOk("anp", "json", '{"@type":"CollectionPage"}'), true, "ANP CollectionPage accepted");
+is(probeShapeOk("anp", "json", "{}"), false, "empty {} at ANP path rejected");
+is(probeShapeOk("ucp", "json", '{"ucp_version":"2026-01"}'), true, "UCP with ucp_version accepted");
+is(probeShapeOk("ucp", "json", '{"capabilities":[]}'), true, "UCP with capabilities[] accepted");
+is(probeShapeOk("ucp", "json", "{}"), false, "empty {} at UCP path rejected");
 
-console.log("--- discovery probe set (the adapter list)");
+console.log("--- adapter set (universal-resolver channels)");
 {
-  const probes = discoverProbes();
-  is(probes.length, 9, "nine standards probed");
-  is(probes.every((p) => p.type && Array.isArray(p.paths) && p.paths.length >= 1 && (p.kind === "json" || p.kind === "text")), true, "every probe has a type, at least one path, and a valid kind");
-  is(probes.find((p) => p.type === "ard-catalog").paths.includes("/.well-known/ard.json"), true, "ARD probe checks /.well-known/ard.json");
-  is(probes.find((p) => p.type === "a2a-agent-card").paths.length, 2, "A2A probe checks both known agent-card locations");
+  const A = adapters();
+  const CHANNELS = new Set(["well-known", "link-rel", "robots", "dns"]);
+  is(A.length, 14, "fourteen active adapters");
+  is(A.every((a) => a.id && CHANNELS.has(a.channel)), true, "every adapter has an id and a known channel");
+  is(A.find((a) => a.id === "ard-catalog").paths.includes("/.well-known/ard.json"), true, "ARD well-known path present");
+  is(A.find((a) => a.id === "ard-link").channel, "link-rel", "ARD <link rel> is a link-rel adapter");
+  is(A.find((a) => a.id === "ard-agentmap").channel, "robots", "ARD Agentmap is a robots adapter");
+  is(A.find((a) => a.id === "anp").paths[0], "/.well-known/agent-descriptions", "ANP well-known path");
+  is(A.find((a) => a.id === "ucp").paths.includes("/.well-known/ucp"), true, "UCP well-known path");
+  is(A.find((a) => a.id === "dns-aid").channel, "dns", "DNS-AID is a dns adapter");
+  is(A.find((a) => a.id === "dns-aid").node, "_agent", "DNS-AID queries _agent node");
+  is(A.some((a) => a.id === "gbz-185"), false, "GB/Z is NOT active (unverified spec — no fake conformance)");
+}
+
+console.log("--- new-channel parsers (ARD link-rel / robots Agentmap / DNS-AID)");
+is(parseLinkRel('<link rel="ard" href="/c.json"><link rel=stylesheet href=x.css><link rel="ai-catalog" href="https://x.com/d.json">', ["ard", "ai-catalog"]), ["/c.json", "https://x.com/d.json"], "link-rel: extracts ard + ai-catalog, skips stylesheet");
+is(parseLinkRel("<p>no links</p>", ["ard"]), [], "link-rel: none when absent");
+is(parseAgentmap("User-agent: *\nAgentmap: https://x.com/entries.json\nAllow: /", "agentmap"), ["https://x.com/entries.json"], "Agentmap: URL extracted (case-insensitive)");
+is(parseAgentmap("Sitemap: https://x.com/sitemap.xml", "agentmap"), [], "Agentmap: none when only a Sitemap present");
+{
+  const aid = parseAidRecord("v=aid1;u=https://api.example.com/mcp;p=mcp;a=pat;s=Example Tools");
+  is(aid.version, "aid1", "AID: version");
+  is(aid.uri, "https://api.example.com/mcp", "AID: uri");
+  is(aid.proto, "mcp", "AID: proto");
+  is(parseAidRecord("version=aid1;uri=https://x/y;proto=a2a").uri, "https://x/y", "AID: long-form keys accepted");
+  is(parseAidRecord("just some text"), null, "AID: garbage → null");
+  is(parseAidRecord("p=mcp;a=pat"), null, "AID: missing version+uri → null");
 }
 
 console.log("--- resolver normalization (thin, source-labelled, never invents semantics)");
@@ -155,6 +186,18 @@ console.log("--- resolver normalization (thin, source-labelled, never invents se
   // Never throws on garbage.
   is(N("ard-catalog", "json", "{not json", "https://x.com/a").length, 0, "malformed JSON → empty, never throws");
   is(N("host-meta", "json", { links: "not-an-array" }, "https://x.com/h").length, 0, "unexpected shape → empty");
+  // ANP: CollectionPage items[] → one record per agent description.
+  const anp = N("anp", "json", { "@type": "CollectionPage", items: [{ "@type": "ad:AgentDescription", name: "Bot", "@id": "https://x.com/agents/bot.json" }, { name: "no id" }] }, "https://x.com/.well-known/agent-descriptions");
+  is(anp.length, 1, "ANP: only items with @id emitted");
+  is(anp[0].url, "https://x.com/agents/bot.json", "ANP: @id becomes the url");
+  is(anp[0].type, "agent-description", "ANP: labelled agent-description");
+  is(anp[0].name, "Bot", "ANP: name preserved");
+  // UCP: capabilities[] with transport bindings.
+  const ucp = N("ucp", "json", { ucp_version: "2026-01", capabilities: [{ name: "checkout", transports: [{ type: "mcp", url: "https://x.com/mcp" }, { type: "rest", endpoint: "https://x.com/api" }] }] }, "https://x.com/.well-known/ucp");
+  is(ucp.length, 2, "UCP: one record per transport binding");
+  is(ucp[0].url, "https://x.com/mcp", "UCP: transport url");
+  is(ucp.find((r) => r.type === "rest").url, "https://x.com/api", "UCP: transport endpoint alias");
+  is(N("ucp", "json", { ucp_version: "2026-01", capabilities: [] }, "https://x.com/.well-known/ucp")[0].url, "https://x.com/.well-known/ucp", "UCP: no endpoints → points to the profile");
 
   // Parity: the embeddable library (public/resolver.mjs) must normalize
   // IDENTICALLY to the reference worker, or the standard forks silently.
@@ -170,6 +213,8 @@ console.log("--- resolver normalization (thin, source-labelled, never invents se
     ["ord", "json", JSON.stringify({ openResourceDiscoveryV1: {} }), "https://x.com/.well-known/open-resource-discovery"],
     ["a2a-agent-card", "json", JSON.stringify({ name: "Ag", supportedInterfaces: [{ url: "https://x.com/a2a", transport: "JSONRPC" }] }), "https://x.com/.well-known/agent-card.json"],
     ["ard-catalog", "json", JSON.stringify({ entries: [{ identifier: "urn:x:1", displayName: "Inline", type: "application/json", data: { a: 1 } }] }), "https://x.com/.well-known/ard.json"],
+    ["anp", "json", JSON.stringify({ "@type": "CollectionPage", items: [{ "@id": "https://x.com/a.json", name: "B" }] }), "https://x.com/.well-known/agent-descriptions"],
+    ["ucp", "json", JSON.stringify({ ucp_version: "2026-01", capabilities: [{ name: "c", transports: [{ type: "mcp", url: "https://x.com/mcp" }] }] }), "https://x.com/.well-known/ucp"],
   ];
   for (const [t, k, x, u] of samples) {
     is(
@@ -178,14 +223,19 @@ console.log("--- resolver normalization (thin, source-labelled, never invents se
       `library/worker normalization parity for ${t}`
     );
   }
-  // Probe lists must match too (same standards, same paths, same order).
-  is(JSON.stringify(lib.PROBES), JSON.stringify(discoverProbes()), "library probe list matches worker");
+  // The adapter table must match (same ids, channels, paths, order).
+  is(JSON.stringify(lib.ADAPTERS), JSON.stringify(adapters()), "library adapter table matches worker");
+  // The new-channel parsers must match too.
+  is(JSON.stringify(lib.parseLinkRel('<link rel="ard" href="/c.json">', ["ard"])), JSON.stringify(parseLinkRel('<link rel="ard" href="/c.json">', ["ard"])), "parseLinkRel parity");
+  is(JSON.stringify(lib.parseAgentmap("Agentmap: https://x/e.json", "agentmap")), JSON.stringify(parseAgentmap("Agentmap: https://x/e.json", "agentmap")), "parseAgentmap parity");
+  is(JSON.stringify(lib.parseAidRecord("v=aid1;u=https://x/mcp;p=mcp")), JSON.stringify(parseAidRecord("v=aid1;u=https://x/mcp;p=mcp")), "parseAidRecord parity");
   // probeShapeOk must match the worker too (false-positive guard can't fork).
   const shapeSamples = [
     ["ard-catalog", "json", "{}"], ["ard-catalog", "json", '{"entries":[]}'],
     ["a2a-agent-card", "json", "{}"], ["a2a-agent-card", "json", '{"supportedInterfaces":[]}'],
     ["api-catalog", "json", "{}"], ["openapi", "json", "{}"], ["openapi", "json", '{"openapi":"3.0.0"}'],
     ["ai-info.json", "json", "{}"], ["llms.txt", "text", "# x"],
+    ["anp", "json", "{}"], ["anp", "json", '{"items":[]}'], ["ucp", "json", "{}"], ["ucp", "json", '{"ucp_version":"2026-01"}'],
   ];
   for (const [t, k, x] of shapeSamples) {
     is(lib.probeShapeOk(t, k, x), probeShapeOk(t, k, x), `library/worker probeShapeOk parity for ${t} ${k}`);

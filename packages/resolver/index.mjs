@@ -1,19 +1,17 @@
 // NessGate resolver — embeddable, dependency-free, decentralized.
 //
-// Give it a domain; it reads the standard machine-discovery files the domain
-// ITSELF publishes and returns one normalized list of that domain's official
+// Give it a domain; it reads the standard machine-discovery surfaces the domain
+// ITSELF publishes and returns one normalized list of that domain's
 // machine-readable resources. There is NO runtime dependency on nessgate.com:
-// this code fetches the target domain directly. Bring your own `fetch`
-// (defaults to the global one), so it runs in browsers, Node, Deno, Workers,
-// and agent runtimes.
+// this code fetches the target domain directly (DNS lookups use a public DoH
+// endpoint). Bring your own `fetch` (defaults to the global one), so it runs in
+// browsers, Node, Deno, Workers, and agent runtimes.
 //
-// It reads (never defines) these standards and reuses each one's OWN labels —
-// NessGate invents no taxonomy: llms.txt, ARD / ai-catalog.json, A2A agent
-// card, RFC 9727 api-catalog, ai-info.json, OpenAPI, Open Resource Discovery,
-// an /.well-known/awp.json manifest, and RFC 6415 host-meta.
-//
-// The normalization below is identical to the NessGate reference resolver
-// (src/worker.js); a parity test in the test suite keeps them from drifting.
+// It reads (never defines) these mechanisms and reuses each one's OWN labels —
+// NessGate invents no taxonomy. Channels: fixed well-known paths, an ARD
+// <link rel="ard">, an ARD robots.txt Agentmap directive, and a DNS-AID TXT
+// record. The adapter table and normalization below are identical to the
+// reference resolver (src/worker.js); a parity test keeps them from drifting.
 //
 // SSRF WARNING: this library fetches the domain you pass in and follows normal
 // redirects. In browsers the network sandbox applies, but in Node/server
@@ -21,20 +19,26 @@
 // (reject private/reserved addresses, keep redirects on-host). The hosted
 // resolver at https://nessgate.com/discover/{domain} performs these checks.
 
-export const PROBES = [
-  { type: "llms.txt", paths: ["/llms.txt"], kind: "text" },
-  { type: "ard-catalog", paths: ["/.well-known/ard.json", "/.well-known/ai-catalog.json"], kind: "json" },
-  { type: "a2a-agent-card", paths: ["/.well-known/agent-card.json", "/.well-known/agent.json"], kind: "json" },
-  { type: "api-catalog", paths: ["/.well-known/api-catalog"], kind: "json" },
-  { type: "ai-info.json", paths: ["/ai-info.json"], kind: "json" },
-  { type: "openapi", paths: ["/openapi.json"], kind: "json" },
-  { type: "ord", paths: ["/.well-known/open-resource-discovery"], kind: "json" },
-  { type: "awp", paths: ["/.well-known/awp.json"], kind: "json" },
-  { type: "host-meta", paths: ["/.well-known/host-meta.json"], kind: "json" },
+export const ADAPTERS = [
+  { id: "llms.txt", channel: "well-known", paths: ["/llms.txt"], kind: "text" },
+  { id: "ard-catalog", channel: "well-known", paths: ["/.well-known/ard.json", "/.well-known/ai-catalog.json"], kind: "json" },
+  { id: "a2a-agent-card", channel: "well-known", paths: ["/.well-known/agent-card.json", "/.well-known/agent.json"], kind: "json" },
+  { id: "api-catalog", channel: "well-known", paths: ["/.well-known/api-catalog"], kind: "json" },
+  { id: "ai-info.json", channel: "well-known", paths: ["/ai-info.json"], kind: "json" },
+  { id: "openapi", channel: "well-known", paths: ["/openapi.json"], kind: "json" },
+  { id: "ord", channel: "well-known", paths: ["/.well-known/open-resource-discovery"], kind: "json" },
+  { id: "awp", channel: "well-known", paths: ["/.well-known/awp.json"], kind: "json" },
+  { id: "host-meta", channel: "well-known", paths: ["/.well-known/host-meta.json"], kind: "json" },
+  { id: "anp", channel: "well-known", paths: ["/.well-known/agent-descriptions"], kind: "json" },
+  { id: "ucp", channel: "well-known", paths: ["/.well-known/ucp", "/.well-known/ucp/manifest.json"], kind: "json" },
+  { id: "ard-link", channel: "link-rel", rels: ["ard", "ai-catalog"], normalizeAs: "ard-catalog" },
+  { id: "ard-agentmap", channel: "robots", directive: "agentmap", normalizeAs: "ard-catalog" },
+  { id: "dns-aid", channel: "dns", node: "_agent" },
 ];
 
 const MAX_DISCOVER_RESOURCES = 200;
 const MAX_PER_SOURCE = 50;
+const MAX_LINKED_CATALOGS = 5;
 
 // Reject catch-all rewrites: SPA hosts return 200 + their HTML shell for every
 // path. (Identical to the reference resolver.)
@@ -52,7 +56,7 @@ export function validateProbeContent(kind, text) {
   return !head.startsWith("<!doctype") && !head.startsWith("<html");
 }
 
-// Confirm the document looks like the standard we probed for, so a JSON
+// Confirm the document looks like the mechanism we probed for, so a JSON
 // catch-all ({} for every unknown path) is not a false positive. IDENTICAL to
 // src/worker.js (kept in sync by a parity test).
 export function probeShapeOk(type, kind, text) {
@@ -67,12 +71,62 @@ export function probeShapeOk(type, kind, text) {
     case "awp": return obj.protocols !== undefined;
     case "host-meta": return Array.isArray(obj.links);
     case "openapi": return typeof obj.openapi === "string" || typeof obj.swagger === "string";
+    case "anp": return Array.isArray(obj.items) || obj["@type"] === "CollectionPage";
+    case "ucp": return Array.isArray(obj.capabilities) || typeof obj.ucp_version === "string";
     default: return true;
   }
 }
 
-// Normalize one fetched standard document into a flat list of resource records.
-// Thin by design; reuses each source's own labels; never throws. IDENTICAL to
+// Extract href values from <link rel="..."> tags whose rel matches any of `rels`.
+export function parseLinkRel(html, rels) {
+  if (typeof html !== "string") return [];
+  const want = new Set(rels.map((r) => r.toLowerCase()));
+  const out = [];
+  const tags = html.match(/<link\b[^>]*>/gi) || [];
+  for (const tag of tags) {
+    const relM = tag.match(/\brel\s*=\s*["']?([^"'>]+)["']?/i);
+    const hrefM = tag.match(/\bhref\s*=\s*["']([^"']+)["']/i);
+    if (!relM || !hrefM) continue;
+    const relTokens = relM[1].trim().toLowerCase().split(/\s+/);
+    if (relTokens.some((t) => want.has(t))) out.push(hrefM[1].trim());
+  }
+  return out;
+}
+
+// Extract URLs from a robots.txt directive (ARD's `Agentmap: <url>`).
+export function parseAgentmap(robots, directive) {
+  if (typeof robots !== "string") return [];
+  const re = new RegExp("^\\s*" + directive + "\\s*:\\s*(\\S+)", "i");
+  const out = [];
+  for (const line of robots.split(/\r?\n/)) {
+    const m = line.match(re);
+    if (m) out.push(m[1].trim());
+  }
+  return out;
+}
+
+// Parse an AID / DNS-AID TXT record: a semicolon-delimited string of key=value
+// pairs (draft-nemethi-aid). Keys have short aliases (v/version, u/uri, p/proto,
+// a/auth, s/desc, d/docs). Returns null unless it carries a version and a uri.
+export function parseAidRecord(txt) {
+  if (typeof txt !== "string") return null;
+  const kv = {};
+  for (const part of txt.split(";")) {
+    const i = part.indexOf("=");
+    if (i < 1) continue;
+    const k = part.slice(0, i).trim().toLowerCase();
+    const v = part.slice(i + 1).trim();
+    if (k) kv[k] = v;
+  }
+  const pick = (a, b) => (kv[a] !== undefined ? kv[a] : kv[b]);
+  const version = pick("v", "version");
+  const uri = pick("u", "uri");
+  if (!version || !uri) return null;
+  return { version, uri, proto: pick("p", "proto"), auth: pick("a", "auth"), desc: pick("s", "desc"), docs: pick("d", "docs"), raw: kv };
+}
+
+// Normalize one fetched document into a flat list of resource records. Thin by
+// design; reuses each source's own labels; never throws. IDENTICAL to
 // src/worker.js normalizeResources (kept in sync by a parity test).
 export function normalizeResources(type, kind, text, sourceUrl) {
   try {
@@ -141,13 +195,37 @@ export function normalizeResources(type, kind, text, sourceUrl) {
         return cap(out);
       }
       case "a2a-agent-card": {
-        // A2A v1.0 moved endpoints from a top-level `url` into supportedInterfaces[].
         const ifaces = Array.isArray(obj.supportedInterfaces) ? obj.supportedInterfaces : [];
         const ifaceUrl = ifaces.map((i) => (i ? str(i.url) : undefined)).find(Boolean);
         return [rec({ type: "a2a-agent-card", name: str(obj.name), url: str(obj.url) || ifaceUrl || sourceUrl, raw: { name: str(obj.name), description: str(obj.description), version: str(obj.version), url: str(obj.url), supportedInterfaces: ifaces.length ? ifaces : undefined } })];
       }
       case "openapi": {
         return [rec({ type: "openapi", name: obj.info && str(obj.info.title), url: sourceUrl })];
+      }
+      case "anp": {
+        const items = Array.isArray(obj.items) ? obj.items : [];
+        return cap(
+          items.map((it) =>
+            it && str(it["@id"]) ? rec({ type: "agent-description", name: str(it.name), url: it["@id"], raw: it }) : null
+          )
+        );
+      }
+      case "ucp": {
+        const caps = Array.isArray(obj.capabilities) ? obj.capabilities : [];
+        const out = [];
+        for (const c of caps) {
+          if (!c || typeof c !== "object") continue;
+          const label = str(c.name) || str(c.id) || str(c.type) || "ucp-capability";
+          const transports = Array.isArray(c.transports) ? c.transports : [];
+          let emitted = false;
+          for (const t of transports) {
+            const url = t && (str(t.url) || str(t.endpoint));
+            if (url) { out.push(rec({ type: str(t.type) || label, name: str(c.name), url, raw: c })); emitted = true; }
+          }
+          const direct = str(c.url) || str(c.endpoint);
+          if (!emitted && direct) out.push(rec({ type: label, name: str(c.name), url: direct, raw: c }));
+        }
+        return out.length ? cap(out) : [rec({ type: "ucp", url: sourceUrl, raw: { ucp_version: str(obj.ucp_version) } })];
       }
       default:
         return [rec({ type, url: sourceUrl })];
@@ -167,6 +245,11 @@ export function normalizeDomain(input) {
   return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(d) ? d : null;
 }
 
+function onDomain(host, domain) {
+  host = String(host).toLowerCase().replace(/\.+$/, "");
+  return host === domain || host === "www." + domain || host.endsWith("." + domain);
+}
+
 async function fetchText(fetchImpl, url, timeoutMs, maxBytes) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -184,8 +267,90 @@ async function fetchText(fetchImpl, url, timeoutMs, maxBytes) {
   }
 }
 
-// resolve(domain) -> { domain, discovered, resources, checked, provenance }
-// discovered = which standards the domain publishes and where (the routing map)
+async function dohTxt(fetchImpl, name, timeoutMs) {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let res;
+    try {
+      res = await fetchImpl("https://cloudflare-dns.com/dns-query?name=" + encodeURIComponent(name) + "&type=TXT", {
+        signal: controller.signal,
+        headers: { Accept: "application/dns-json" },
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!res.ok) return [];
+    const data = await res.json();
+    const out = [];
+    for (const a of data.Answer || []) {
+      if (a.type !== 16) continue;
+      out.push(String(a.data).replace(/"\s+"/g, "").replace(/^"|"$/g, ""));
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+// Run one adapter over its channel. Failures collapse to empty.
+async function runAdapter(a, domain, fetchImpl, timeoutMs, maxBytes) {
+  const get = (pathOrUrl) => {
+    const url = /^https?:\/\//i.test(pathOrUrl) ? pathOrUrl : "https://" + domain + pathOrUrl;
+    return fetchText(fetchImpl, url, timeoutMs, maxBytes);
+  };
+  try {
+    if (a.channel === "well-known") {
+      for (const path of a.paths) {
+        let text;
+        try { text = await get(path); } catch { continue; }
+        if (validateProbeContent(a.kind, text) && probeShapeOk(a.id, a.kind, text)) {
+          const url = "https://" + domain + path;
+          return { discovered: [{ type: a.id, url }], resources: normalizeResources(a.id, a.kind, text, url) };
+        }
+      }
+      return { discovered: [], resources: [] };
+    }
+    if (a.channel === "link-rel" || a.channel === "robots") {
+      const src = a.channel === "link-rel" ? "/" : "/robots.txt";
+      let doc;
+      try { doc = await get(src); } catch { return { discovered: [], resources: [] }; }
+      const targets = a.channel === "link-rel" ? parseLinkRel(doc, a.rels) : parseAgentmap(doc, a.directive);
+      const discovered = [], resources = [];
+      for (const t of targets.slice(0, MAX_LINKED_CATALOGS)) {
+        let abs;
+        try { abs = new URL(t, "https://" + domain + "/"); } catch { continue; }
+        if (abs.protocol !== "https:" || !onDomain(abs.hostname, domain)) continue; // on-domain only
+        let text;
+        try { text = await get(abs.toString()); } catch { continue; }
+        if (validateProbeContent("json", text) && probeShapeOk(a.normalizeAs, "json", text)) {
+          discovered.push({ type: a.id, url: abs.toString() });
+          resources.push(...normalizeResources(a.normalizeAs, "json", text, abs.toString()));
+        }
+      }
+      return { discovered, resources };
+    }
+    if (a.channel === "dns") {
+      const name = a.node + "." + domain;
+      const records = await dohTxt(fetchImpl, name, timeoutMs);
+      const discovered = [], resources = [];
+      for (const r of records) {
+        const aid = parseAidRecord(r);
+        if (aid) {
+          discovered.push({ type: a.id, url: aid.uri });
+          resources.push({ source: "dns-aid", sourceUrl: "dns:" + name, type: aid.proto || "aid", name: aid.desc, url: aid.uri, raw: aid });
+        }
+      }
+      return { discovered, resources };
+    }
+    return { discovered: [], resources: [] };
+  } catch {
+    return { discovered: [], resources: [] };
+  }
+}
+
+// resolve(domain) -> { domain, provenance, discovered, resources, checked }
+// discovered = which mechanisms the domain publishes and where (the routing map)
 // resources  = the normalized union of what those documents contain
 // Every resource carries `source`, `sourceUrl` (fetch it to verify against the
 // domain directly), `url`, and, where useful, name/rel/id/raw.
@@ -197,27 +362,10 @@ export async function resolve(domain, opts = {}) {
   const d = normalizeDomain(domain);
   if (!d) throw new Error("invalid domain");
 
-  const hits = (
-    await Promise.all(
-      PROBES.map(async (p) => {
-        for (const path of p.paths) {
-          const url = "https://" + d + path;
-          let text;
-          try {
-            text = await fetchText(fetchImpl, url, timeoutMs, maxBytes);
-          } catch {
-            continue;
-          }
-          if (validateProbeContent(p.kind, text) && probeShapeOk(p.type, p.kind, text)) return { type: p.type, url, kind: p.kind, text };
-        }
-        return null;
-      })
-    )
-  ).filter(Boolean);
-
-  const discovered = hits.map((h) => ({ type: h.type, url: h.url }));
-  const resources = hits.flatMap((h) => normalizeResources(h.type, h.kind, h.text, h.url)).slice(0, MAX_DISCOVER_RESOURCES);
-  return { domain: d, provenance: "self-published", discovered, resources, checked: PROBES.map((p) => p.type) };
+  const results = await Promise.all(ADAPTERS.map((a) => runAdapter(a, d, fetchImpl, timeoutMs, maxBytes)));
+  const discovered = results.flatMap((r) => r.discovered);
+  const resources = results.flatMap((r) => r.resources).slice(0, MAX_DISCOVER_RESOURCES);
+  return { domain: d, provenance: "self-published", discovered, resources, checked: ADAPTERS.map((a) => a.id) };
 }
 
-export default { resolve, normalizeResources, normalizeDomain, validateProbeContent, probeShapeOk, PROBES };
+export default { resolve, normalizeResources, normalizeDomain, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, ADAPTERS };

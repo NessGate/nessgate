@@ -48,6 +48,36 @@ const PROBE_INFO = {
     what: "A well-known links document (/.well-known/host-meta.json).",
     ifMissing: "Legacy web-linking mechanism; rarely required today.",
   },
+  anp: {
+    label: "Agent Network Protocol",
+    what: "An ANP agent-descriptions document (/.well-known/agent-descriptions).",
+    ifMissing: "Emerging agent standard; only relevant if you adopt ANP.",
+    core: false,
+  },
+  ucp: {
+    label: "Universal Commerce Protocol",
+    what: "A UCP merchant profile (/.well-known/ucp).",
+    ifMissing: "Emerging commerce standard from Google and Shopify; only relevant for merchants adopting UCP.",
+    core: false,
+  },
+  "ard-link": {
+    label: "ARD via rel=ard link",
+    what: "An ARD catalog discovered through a <link rel=\"ard\"> tag in your homepage.",
+    ifMissing: "Optional extra ARD surface; the well-known ard.json path is the primary one.",
+    core: false,
+  },
+  "ard-agentmap": {
+    label: "ARD via robots Agentmap",
+    what: "An ARD catalog discovered through an Agentmap: directive in /robots.txt.",
+    ifMissing: "Optional extra ARD surface; the well-known ard.json path is the primary one.",
+    core: false,
+  },
+  "dns-aid": {
+    label: "DNS-AID (TXT record)",
+    what: "A DNS-AID TXT record at _agent.<domain> pointing to your agent (draft AID spec).",
+    ifMissing: "Draft DNS-based discovery; optional and not yet widely adopted.",
+    core: false,
+  },
 };
 
 function row(found, label, detail, url) {

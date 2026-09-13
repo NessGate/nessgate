@@ -1,7 +1,7 @@
 {
   "name": "@nessgate/resolver",
-  "version": "1.1.0",
-  "description": "Open, neutral resolver for the agentic web: give it a domain and get one normalized answer with the machine-readable resources the domain publishes across ARD, A2A, llms.txt, api-catalog, ORD, host-meta and OpenAPI. Dependency-free; fetches the domain directly.",
+  "version": "1.2.0",
+  "description": "Open, neutral universal resolver for the agentic web: give it a domain and get one normalized answer with the machine-readable resources it publishes across ARD (well-known, rel=ard, robots Agentmap), A2A, llms.txt, API catalogs, OpenAPI, ORD, host-meta, Agent Network Protocol, Universal Commerce Protocol and DNS-AID. Adapter architecture; dependency-free; fetches the domain directly.",
   "type": "module",
   "exports": {
     ".": "./index.mjs"

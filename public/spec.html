@@ -87,21 +87,48 @@ labels and never invents a taxonomy of its own:</p>
 document is simply skipped; it can never break resolution.</p>
 
 <h2>3. Sources read</h2>
-<p>The resolver reads the following standard, well-known locations. Each is READ, never defined by
-NessGate; adding support for a new standard is a new entry here, never a change to any domain:</p>
+<p>The resolver reads what a domain publishes through an <strong>adapter architecture</strong>. Each
+adapter is a small, independent reader for one standard, and every adapter uses one of four
+discovery <strong>channels</strong> to find its document:</p>
+<ul>
+<li><strong>well-known</strong> — GET a fixed path (or paths) on the domain.</li>
+<li><strong>link-rel</strong> — parse a <code>&lt;link rel="ard"&gt;</code> (or
+    <code>rel="ai-catalog"</code>) in the domain's homepage, then GET the target.</li>
+<li><strong>robots</strong> — parse an <code>Agentmap:</code> directive in <code>/robots.txt</code>,
+    then GET the target.</li>
+<li><strong>dns</strong> — a DNS-over-HTTPS TXT lookup at a well-known node.</li>
+</ul>
+<p>Each adapter is READ, never defined by NessGate; adding support for a new standard is a new
+adapter here, never a change to any domain. The active adapters:</p>
 <table>
-<tr><th>Standard</th><th>Location(s)</th></tr>
-<tr><td><code>llms.txt</code></td><td><code>/llms.txt</code></td></tr>
-<tr><td>ARD / Agentic Resource Discovery</td><td><code>/.well-known/ard.json</code>, <code>/.well-known/ai-catalog.json</code></td></tr>
-<tr><td>A2A agent card</td><td><code>/.well-known/agent-card.json</code>, <code>/.well-known/agent.json</code></td></tr>
-<tr><td>RFC 9727 API catalog</td><td><code>/.well-known/api-catalog</code></td></tr>
-<tr><td><code>ai-info.json</code></td><td><code>/ai-info.json</code></td></tr>
-<tr><td>OpenAPI</td><td><code>/openapi.json</code></td></tr>
-<tr><td>Open Resource Discovery</td><td><code>/.well-known/open-resource-discovery</code></td></tr>
-<tr><td>AWP manifest (provisional)</td><td><code>/.well-known/awp.json</code></td></tr>
-<tr><td>RFC 6415 host-meta</td><td><code>/.well-known/host-meta.json</code></td></tr>
+<tr><th>Adapter</th><th>Channel</th><th>Location</th></tr>
+<tr><td><code>llms.txt</code></td><td>well-known</td><td><code>/llms.txt</code></td></tr>
+<tr><td><code>ard-catalog</code> — Agentic Resource Discovery</td><td>well-known</td><td><code>/.well-known/ard.json</code>, <code>/.well-known/ai-catalog.json</code></td></tr>
+<tr><td><code>a2a-agent-card</code> — A2A</td><td>well-known</td><td><code>/.well-known/agent-card.json</code>, <code>/.well-known/agent.json</code></td></tr>
+<tr><td><code>api-catalog</code> — RFC 9727</td><td>well-known</td><td><code>/.well-known/api-catalog</code></td></tr>
+<tr><td><code>ai-info.json</code> — informal convention</td><td>well-known</td><td><code>/ai-info.json</code></td></tr>
+<tr><td><code>openapi</code></td><td>well-known</td><td><code>/openapi.json</code></td></tr>
+<tr><td><code>ord</code> — Open Resource Discovery</td><td>well-known</td><td><code>/.well-known/open-resource-discovery</code></td></tr>
+<tr><td><code>awp</code> — AWP manifest (provisional)</td><td>well-known</td><td><code>/.well-known/awp.json</code></td></tr>
+<tr><td><code>host-meta</code> — RFC 6415</td><td>well-known</td><td><code>/.well-known/host-meta.json</code></td></tr>
+<tr><td><code>anp</code> — Agent Network Protocol (emerging)</td><td>well-known</td><td><code>/.well-known/agent-descriptions</code> (JSON-LD CollectionPage)</td></tr>
+<tr><td><code>ucp</code> — Universal Commerce Protocol (emerging; Google + Shopify)</td><td>well-known</td><td><code>/.well-known/ucp</code>, <code>/.well-known/ucp/manifest.json</code></td></tr>
+<tr><td><code>ard-link</code> — additional ARD surface</td><td>link-rel</td><td><code>&lt;link rel="ard"&gt;</code> in the homepage</td></tr>
+<tr><td><code>ard-agentmap</code> — additional ARD surface</td><td>robots</td><td><code>Agentmap:</code> directive in <code>/robots.txt</code></td></tr>
+<tr><td><code>dns-aid</code> — DNS-AID / AID (draft)</td><td>dns</td><td>TXT record at <code>_agent.&lt;domain&gt;</code>: <code>v=aid1;u=&lt;uri&gt;;p=&lt;proto&gt;;a=&lt;auth&gt;</code></td></tr>
 </table>
-<p>For each standard, the first candidate location returning valid content wins. Fetches are HTTPS
+<p><strong>Complete ARD support</strong> means all three ARD surfaces: the well-known paths
+(<code>ard-catalog</code>), the <code>&lt;link rel="ard"&gt;</code> tag (<code>ard-link</code>), and
+the robots.txt <code>Agentmap:</code> directive (<code>ard-agentmap</code>).</p>
+<p><code>anp</code> and <code>ucp</code> are emerging; <code>dns-aid</code>/AID and <code>awp</code>
+are drafts. Publishing one is not a guarantee of anything on its own — NessGate reads whatever is
+there and reports it as-is.</p>
+<p><strong>Not yet implemented — GB/Z 185.4 / 185.5.</strong> China's 智能体互联 agent description and
+discovery standards are not supported. Their discovery mechanism is defined only in the paywalled
+Chinese national standard and appears to be a federated discovery service rather than a
+domain-native path, so there is no concrete surface to probe. The adapter architecture is ready to
+host it once the endpoint is verified; until then NessGate makes no GB/Z claim.</p>
+<p>For each adapter, the first candidate location returning valid content wins. Fetches are HTTPS
 only, size- and redirect-capped, on-domain, and identify as <code>NessGate-Discover/1.0</code>.</p>
 
 <h2>4. What NessGate does not do</h2>

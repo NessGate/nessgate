@@ -6,7 +6,7 @@
 //
 // - NessGate defines nothing and stores nothing: it reads the standards a
 //   domain already publishes and normalizes them. A new standard is just a new
-//   adapter (DISCOVER_PROBES entry), never a competing format.
+//   adapter (an ADAPTERS entry), never a competing format.
 // - Nothing is crawled, indexed, or persisted. Each answer is computed fresh
 //   and dies with its short edge cache.
 // - Cloudflare KV is used ONLY for rate-limit counters.
@@ -170,24 +170,43 @@ async function route(request, env, ctx) {
 // candidate paths (some standards have more than one known location); the first
 // that returns valid content wins. NessGate READS these — it does not define
 // them — so a new standard is just a new entry here, never a competing format.
-const DISCOVER_PROBES = [
-  { type: "llms.txt", paths: ["/llms.txt"], kind: "text" },
-  { type: "ard-catalog", paths: ["/.well-known/ard.json", "/.well-known/ai-catalog.json"], kind: "json" }, // Agentic Resource Discovery
-  { type: "a2a-agent-card", paths: ["/.well-known/agent-card.json", "/.well-known/agent.json"], kind: "json" }, // A2A (both known locations)
-  { type: "api-catalog", paths: ["/.well-known/api-catalog"], kind: "json" }, // RFC 9727
-  { type: "ai-info.json", paths: ["/ai-info.json"], kind: "json" },
-  { type: "openapi", paths: ["/openapi.json"], kind: "json" },
-  { type: "ord", paths: ["/.well-known/open-resource-discovery"], kind: "json" }, // Open Resource Discovery (SAP / Linux Foundation)
-  { type: "awp", paths: ["/.well-known/awp.json"], kind: "json" }, // Agent Web Protocol
-  { type: "host-meta", paths: ["/.well-known/host-meta.json"], kind: "json" }, // RFC 6415
+// The universal-resolver adapter set. Each adapter reads ONE discovery channel
+// and normalizes what it finds. NessGate READS these; it never defines them, so
+// a new mechanism is a new adapter, never a competing format. Channels:
+//   well-known — GET fixed path(s) on the domain
+//   link-rel   — parse <link rel> in the domain's homepage, then GET the target
+//   robots     — parse an Agentmap directive in /robots.txt, then GET the target
+//   dns        — DoH query a well-known TXT node
+const ADAPTERS = [
+  { id: "llms.txt", channel: "well-known", paths: ["/llms.txt"], kind: "text" },
+  { id: "ard-catalog", channel: "well-known", paths: ["/.well-known/ard.json", "/.well-known/ai-catalog.json"], kind: "json" }, // Agentic Resource Discovery
+  { id: "a2a-agent-card", channel: "well-known", paths: ["/.well-known/agent-card.json", "/.well-known/agent.json"], kind: "json" }, // A2A
+  { id: "api-catalog", channel: "well-known", paths: ["/.well-known/api-catalog"], kind: "json" }, // RFC 9727
+  { id: "ai-info.json", channel: "well-known", paths: ["/ai-info.json"], kind: "json" },
+  { id: "openapi", channel: "well-known", paths: ["/openapi.json"], kind: "json" },
+  { id: "ord", channel: "well-known", paths: ["/.well-known/open-resource-discovery"], kind: "json" }, // Open Resource Discovery
+  { id: "awp", channel: "well-known", paths: ["/.well-known/awp.json"], kind: "json" }, // AWP manifest (provisional)
+  { id: "host-meta", channel: "well-known", paths: ["/.well-known/host-meta.json"], kind: "json" }, // RFC 6415
+  { id: "anp", channel: "well-known", paths: ["/.well-known/agent-descriptions"], kind: "json" }, // Agent Network Protocol
+  { id: "ucp", channel: "well-known", paths: ["/.well-known/ucp", "/.well-known/ucp/manifest.json"], kind: "json" }, // Universal Commerce Protocol
+  { id: "ard-link", channel: "link-rel", rels: ["ard", "ai-catalog"], normalizeAs: "ard-catalog" }, // ARD via <link rel="ard">
+  { id: "ard-agentmap", channel: "robots", directive: "agentmap", normalizeAs: "ard-catalog" }, // ARD via robots.txt Agentmap:
+  { id: "dns-aid", channel: "dns", node: "_agent" }, // DNS-AID / AID: TXT record at _agent.<domain>
 ];
+// GB/Z 185.4 / 185.5 (China, 智能体互联) is deliberately NOT in the active set.
+// Its discovery mechanism is defined only in the paywalled national standard and
+// appears to be a federated discovery service, not a domain-native path — there
+// is no concrete surface to probe. A guessed /.well-known path would be fake
+// conformance; the architecture above can host a real GB/Z adapter once the
+// discovery endpoint is verified.
 const DISCOVER_CACHE_SECONDS = 600;
 const DISCOVER_RATE_LIMIT_PER_HOUR = 120;
 const DISCOVER_UA = "NessGate-Discover/1.0 (+https://nessgate.com)";
 const MAX_DISCOVER_RESOURCES = 200; // cap on the normalized resource list
 const MAX_PER_SOURCE = 50; // cap per source document (defends against huge files)
+const MAX_LINKED_CATALOGS = 5; // cap on link-rel / Agentmap catalog follows
 const DISCOVER_NOTE =
-  "These locations are published by the domain itself at standard, well-known paths. " +
+  "These locations are published by the domain itself at standard discovery surfaces. " +
   "NessGate reads them as-is and links back to each source (sourceUrl) so a client can " +
   "always verify against the domain directly. NessGate makes no ownership or safety claim.";
 
@@ -224,6 +243,8 @@ function probeShapeOk(type, kind, text) {
     case "awp": return obj.protocols !== undefined;
     case "host-meta": return Array.isArray(obj.links);
     case "openapi": return typeof obj.openapi === "string" || typeof obj.swagger === "string";
+    case "anp": return Array.isArray(obj.items) || obj["@type"] === "CollectionPage";
+    case "ucp": return Array.isArray(obj.capabilities) || typeof obj.ucp_version === "string";
     default: return true;
   }
 }
@@ -237,6 +258,94 @@ async function selfProbe(path, env, ctx) {
   const res = await route(new Request(`https://${SELF_DOMAIN}${path}`), env, ctx);
   if (res.status !== 200) throw new Error(`the URL returned HTTP ${res.status}`);
   return res.text();
+}
+
+/* --- Pure parsers for the non-well-known channels (parity-tested) --- */
+
+// Extract href values from <link rel="..."> tags whose rel matches any of `rels`.
+function parseLinkRel(html, rels) {
+  if (typeof html !== "string") return [];
+  const want = new Set(rels.map((r) => r.toLowerCase()));
+  const out = [];
+  const tags = html.match(/<link\b[^>]*>/gi) || [];
+  for (const tag of tags) {
+    const relM = tag.match(/\brel\s*=\s*["']?([^"'>]+)["']?/i);
+    const hrefM = tag.match(/\bhref\s*=\s*["']([^"']+)["']/i);
+    if (!relM || !hrefM) continue;
+    const relTokens = relM[1].trim().toLowerCase().split(/\s+/);
+    if (relTokens.some((t) => want.has(t))) out.push(hrefM[1].trim());
+  }
+  return out;
+}
+
+// Extract URLs from a robots.txt directive (ARD's `Agentmap: <url>`).
+function parseAgentmap(robots, directive) {
+  if (typeof robots !== "string") return [];
+  const re = new RegExp("^\\s*" + directive + "\\s*:\\s*(\\S+)", "i");
+  const out = [];
+  for (const line of robots.split(/\r?\n/)) {
+    const m = line.match(re);
+    if (m) out.push(m[1].trim());
+  }
+  return out;
+}
+
+// Parse an AID / DNS-AID TXT record: a semicolon-delimited string of key=value
+// pairs (draft-nemethi-aid). Keys have short aliases (v/version, u/uri, p/proto,
+// a/auth, s/desc, d/docs). Returns null unless it carries a version and a uri.
+function parseAidRecord(txt) {
+  if (typeof txt !== "string") return null;
+  const kv = {};
+  for (const part of txt.split(";")) {
+    const i = part.indexOf("=");
+    if (i < 1) continue;
+    const k = part.slice(0, i).trim().toLowerCase();
+    const v = part.slice(i + 1).trim();
+    if (k) kv[k] = v;
+  }
+  const pick = (a, b) => (kv[a] !== undefined ? kv[a] : kv[b]);
+  const version = pick("v", "version");
+  const uri = pick("u", "uri");
+  if (!version || !uri) return null;
+  return { version, uri, proto: pick("p", "proto"), auth: pick("a", "auth"), desc: pick("s", "desc"), docs: pick("d", "docs"), raw: kv };
+}
+
+/* --- Worker fetch helpers (centralised SSRF via safeFetch / self-dispatch) --- */
+
+// Fetch a path (or an absolute on-domain URL) as text. safeFetch enforces
+// on-domain hosts (incl. subdomains), HTTPS, public DNS, size and redirect caps.
+async function getOnDomain(domain, pathOrUrl, env, ctx) {
+  const isUrl = /^https?:\/\//i.test(pathOrUrl);
+  if (domain === SELF_DOMAIN) {
+    if (isUrl) {
+      const u = new URL(pathOrUrl);
+      if (u.hostname.toLowerCase().replace(/\.+$/, "") !== SELF_DOMAIN) throw new Error("off-domain");
+      return selfProbe(u.pathname + u.search, env, ctx);
+    }
+    return selfProbe(pathOrUrl, env, ctx);
+  }
+  const url = isUrl ? pathOrUrl : `https://${domain}${pathOrUrl}`;
+  return safeFetch(url, domain, MAX_JSON_BYTES, false, DISCOVER_UA);
+}
+
+// DoH TXT lookup for the DNS channel. Queries Cloudflare's public resolver.
+async function dohTxt(name) {
+  try {
+    const res = await fetch(
+      `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=TXT`,
+      { headers: { Accept: "application/dns-json" }, cf: { cacheTtl: 60 } }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const out = [];
+    for (const a of data.Answer || []) {
+      if (a.type !== 16) continue; // TXT
+      out.push(String(a.data).replace(/"\s+"/g, "").replace(/^"|"$/g, ""));
+    }
+    return out;
+  } catch {
+    return [];
+  }
 }
 
 // Normalize one fetched standard document into a flat list of resource records.
@@ -331,6 +440,33 @@ function normalizeResources(type, kind, text, sourceUrl) {
       case "openapi": {
         return [rec({ type: "openapi", name: obj.info && str(obj.info.title), url: sourceUrl })];
       }
+      case "anp": {
+        // ANP agent-descriptions: JSON-LD CollectionPage {items:[{@id, name}]}.
+        const items = Array.isArray(obj.items) ? obj.items : [];
+        return cap(
+          items.map((it) =>
+            it && str(it["@id"]) ? rec({ type: "agent-description", name: str(it.name), url: it["@id"], raw: it }) : null
+          )
+        );
+      }
+      case "ucp": {
+        // UCP merchant profile: {capabilities:[...]} with transport bindings.
+        const caps = Array.isArray(obj.capabilities) ? obj.capabilities : [];
+        const out = [];
+        for (const c of caps) {
+          if (!c || typeof c !== "object") continue;
+          const label = str(c.name) || str(c.id) || str(c.type) || "ucp-capability";
+          const transports = Array.isArray(c.transports) ? c.transports : [];
+          let emitted = false;
+          for (const t of transports) {
+            const url = t && (str(t.url) || str(t.endpoint));
+            if (url) { out.push(rec({ type: str(t.type) || label, name: str(c.name), url, raw: c })); emitted = true; }
+          }
+          const direct = str(c.url) || str(c.endpoint);
+          if (!emitted && direct) out.push(rec({ type: label, name: str(c.name), url: direct, raw: c }));
+        }
+        return out.length ? cap(out) : [rec({ type: "ucp", url: sourceUrl, raw: { ucp_version: str(obj.ucp_version) } })];
+      }
       // ai-info.json (loose), ord (rich enterprise schema): point to the file
       // itself rather than impose an interpretation on it.
       default:
@@ -344,6 +480,59 @@ function normalizeResources(type, kind, text, sourceUrl) {
 // Core resolver: returns the normalized answer object for a domain (or an
 // {error} object). Shared by the REST endpoint, the MCP tool, and the
 // human-readable domain page so all three can never disagree.
+// Run one adapter over its channel and return {discovered, resources}. Every
+// failure collapses to [] so a single bad channel never breaks resolution.
+async function runAdapter(a, domain, env, ctx) {
+  try {
+    if (a.channel === "well-known") {
+      for (const path of a.paths) {
+        let text;
+        try { text = await getOnDomain(domain, path, env, ctx); } catch { continue; }
+        if (validateProbeContent(a.kind, text) && probeShapeOk(a.id, a.kind, text)) {
+          const url = `https://${domain}${path}`;
+          return { discovered: [{ type: a.id, url }], resources: normalizeResources(a.id, a.kind, text, url) };
+        }
+      }
+      return { discovered: [], resources: [] };
+    }
+    if (a.channel === "link-rel" || a.channel === "robots") {
+      const src = a.channel === "link-rel" ? "/" : "/robots.txt";
+      let doc;
+      try { doc = await getOnDomain(domain, src, env, ctx); } catch { return { discovered: [], resources: [] }; }
+      const targets = a.channel === "link-rel" ? parseLinkRel(doc, a.rels) : parseAgentmap(doc, a.directive);
+      const discovered = [], resources = [];
+      for (const t of targets.slice(0, MAX_LINKED_CATALOGS)) {
+        let abs;
+        try { abs = new URL(t, `https://${domain}/`).toString(); } catch { continue; }
+        let text;
+        try { text = await getOnDomain(domain, abs, env, ctx); } catch { continue; } // safeFetch keeps it on-domain
+        if (validateProbeContent("json", text) && probeShapeOk(a.normalizeAs, "json", text)) {
+          discovered.push({ type: a.id, url: abs });
+          resources.push(...normalizeResources(a.normalizeAs, "json", text, abs));
+        }
+      }
+      return { discovered, resources };
+    }
+    if (a.channel === "dns") {
+      const name = `${a.node}.${domain}`;
+      let records = [];
+      try { records = await dohTxt(name); } catch { records = []; }
+      const discovered = [], resources = [];
+      for (const rec of records) {
+        const aid = parseAidRecord(rec);
+        if (aid) {
+          discovered.push({ type: a.id, url: aid.uri });
+          resources.push({ source: "dns-aid", sourceUrl: `dns:${name}`, type: aid.proto || "aid", name: aid.desc, url: aid.uri, raw: aid });
+        }
+      }
+      return { discovered, resources };
+    }
+    return { discovered: [], resources: [] };
+  } catch {
+    return { discovered: [], resources: [] };
+  }
+}
+
 async function discoverData(raw, env, ctx, request) {
   const domain = normalizeDomain(raw, true);
   if (!domain) return { status: 400, body: { error: "Invalid domain" } };
@@ -354,42 +543,19 @@ async function discoverData(raw, env, ctx, request) {
   if (!(await rateLimit(env, request, "disc", DISCOVER_RATE_LIMIT_PER_HOUR))) {
     return { status: 429, body: { error: "Too many requests. Please try again later." } };
   }
-  const settled = await Promise.allSettled(
-    DISCOVER_PROBES.map(async (p) => {
-      // Try each candidate location; first valid one wins. strictHosts=false:
-      // apex→www redirects are legitimate for description. SSRF protections
-      // inherited from safeFetch.
-      for (const path of p.paths) {
-        const url = `https://${domain}${path}`;
-        let text;
-        try {
-          text = domain === SELF_DOMAIN
-            ? await selfProbe(path, env, ctx)
-            : await safeFetch(url, domain, MAX_JSON_BYTES, false, DISCOVER_UA);
-        } catch {
-          continue; // this location missing/unreachable — try the next
-        }
-        if (validateProbeContent(p.kind, text) && probeShapeOk(p.type, p.kind, text)) return { type: p.type, url, kind: p.kind, text };
-      }
-      return null;
-    })
-  );
-  const hits = settled.filter((r) => r.status === "fulfilled" && r.value).map((r) => r.value);
-  // discovered = the routing map (which standards this domain publishes, where).
-  const discovered = hits.map((h) => ({ type: h.type, url: h.url }));
-  // resources = the normalized union of what those documents actually contain,
-  // flattened into one list. Each record keeps the source standard, the native
-  // source URL, and (where useful) the raw record.
-  const resources = hits
-    .flatMap((h) => normalizeResources(h.type, h.kind, h.text, h.url))
-    .slice(0, MAX_DISCOVER_RESOURCES);
+  // Run every adapter in parallel; merge the routing map (discovered) and the
+  // normalized union (resources). Each adapter is self-contained per channel.
+  const settled = await Promise.allSettled(ADAPTERS.map((a) => runAdapter(a, domain, env, ctx)));
+  const results = settled.map((r) => (r.status === "fulfilled" && r.value ? r.value : { discovered: [], resources: [] }));
+  const discovered = results.flatMap((r) => r.discovered);
+  const resources = results.flatMap((r) => r.resources).slice(0, MAX_DISCOVER_RESOURCES);
   const body = {
     domain,
     provenance: "self-published",
     note: DISCOVER_NOTE,
     discovered,
     resources,
-    checked: DISCOVER_PROBES.map((p) => p.type),
+    checked: ADAPTERS.map((a) => a.id),
   };
   const res = new Response(JSON.stringify(body), {
     headers: { "Content-Type": "application/json", "Cache-Control": `max-age=${DISCOVER_CACHE_SECONDS}` },
@@ -412,7 +578,7 @@ async function apiDiscover(raw, env, ctx, request) {
 // (the tool dispatches to the same handler).
 
 const MCP_SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26"];
-const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.1.0" };
+const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.2.0" };
 const MCP_INSTRUCTIONS =
   "Use discover_domain to resolve a domain to the machine-readable resources it publishes " +
   "across the supported discovery locations (ARD, A2A, llms.txt, API catalogs, OpenAPI, and " +
@@ -924,5 +1090,5 @@ function escapeHtml(s) {
 function selfDomain() { return SELF_DOMAIN; }
 function apiCatalog() { return API_CATALOG; }
 function mcpTools() { return MCP_TOOLS; }
-function discoverProbes() { return DISCOVER_PROBES; }
-export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, selfDomain, apiCatalog, mcpTools, discoverProbes };
+function adapters() { return ADAPTERS; }
+export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, selfDomain, apiCatalog, mcpTools, adapters };
