@@ -31,6 +31,33 @@ with the previous version supported through a long transition.
   never charges to participate, never favors a provider, never stores resource
   content, and never claims adoption it does not have.
 
+## Adding an adapter (support a new standard)
+
+Each standard NessGate reads is a small, independent **adapter** on one of four discovery
+**channels**: `well-known` (a fixed path), `link-rel` (a `<link rel>` on the homepage), `robots`
+(a `robots.txt` directive), or `dns` (a DoH TXT lookup). Adding support is usually a small PR:
+
+1. **Confirm a concrete, domain-native discovery surface first.** NessGate only reads a location a
+   domain itself publishes at a verifiable path. If the discovery mechanism is federated,
+   undocumented, or paywalled (so a path would be *guessed*), it does **not** get an adapter — a
+   guessed path is fake conformance. This is a firm honesty rule (see the GB/Z note in `README.md`).
+2. Add an entry to the `ADAPTERS` array in `src/worker.js` (`id`, `channel`, and the channel's
+   locator — e.g. `paths` for `well-known`).
+3. If the document has a shape not already covered, extend `probeShapeOk` (reject a generic `{}`
+   from being a false-positive discovery) and add a `case` to `normalizeResources` that maps the
+   document into `{ source, type, url, sourceUrl }` records — **reuse the source's own type labels;
+   invent no taxonomy**.
+4. Mirror the exact same pure logic into `public/resolver.mjs`, then copy it to
+   `packages/resolver/index.mjs` (the npm package is a single self-contained file). A parity test
+   keeps all three byte-identical — run it.
+5. Add a conformance test (a sample document → expected records) and update the docs that list the
+   supported set: `README.md`, the spec/api pages under `public/`, `public/openapi.json`
+   (`checked[]`), `public/llms.txt`, and `public/ai-info.json`.
+6. `npm test` and `npm run smoke` must pass.
+
+New standards are **outputs of the architecture, never competitors** — a new adapter, not a new
+format NessGate defines.
+
 ## Independent implementations
 You do not need to contribute here to use the specification. Anyone may build a
 compatible resolver from the spec, under the
