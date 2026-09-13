@@ -25,8 +25,11 @@ Live at **https://nessgate.com** · [Specification](https://nessgate.com/spec) �
 ## Use it
 
 **Embeddable library** — dependency-free, fetches the target domain directly (no runtime
-dependency on nessgate.com), runs in browsers, Node, Deno, Workers, and agent runtimes.
-Published as [`@nessgate/resolver`](https://www.npmjs.com/package/@nessgate/resolver):
+dependency on nessgate.com), runs anywhere with `fetch` — Node, Deno, Workers, and agent runtimes.
+(It runs in a browser too, but a browser can only read *other* domains that send CORS headers, and
+most `.well-known` files don't — so from a browser, resolve arbitrary domains via the hosted
+endpoint below, which sends open CORS.) Published as
+[`@nessgate/resolver`](https://www.npmjs.com/package/@nessgate/resolver):
 
 ```js
 import { resolve } from "@nessgate/resolver";      // or "https://nessgate.com/resolver.mjs"

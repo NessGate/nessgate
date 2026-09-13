@@ -23,11 +23,15 @@ const { resources } = await resolve("example.com");
 for (const r of resources) console.log(r.type, r.url, "←", r.sourceUrl);
 ```
 
-Runs in Node ≥18, Deno, Bun, browsers, Cloudflare Workers, and agent runtimes.
+Runs anywhere with `fetch`: Node ≥18, Deno, Bun, Cloudflare Workers, and agent runtimes.
 
-> Server-side callers passing **untrusted** domains: the embeddable library does no SSRF guarding
-> (it has to run in browsers too). Validate the domain yourself, or use the hosted endpoint below,
-> which applies HTTPS-only, private-IP, redirect and size protections.
+> **In a browser:** the code runs, but a browser can only fetch *other* domains that return CORS
+> headers — most `.well-known` files don't — so browser code resolving **arbitrary** domains should
+> use the hosted endpoint (path 2 below, open CORS). Resolving your **own** domain works directly.
+
+> **Untrusted domains, server-side:** the embeddable library does no SSRF guarding (it has to run
+> in browsers too). Validate the domain yourself, or use the hosted endpoint below, which applies
+> HTTPS-only, private-IP, redirect and size protections.
 
 ## 2. HTTP endpoint — any language
 

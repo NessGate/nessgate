@@ -40,9 +40,9 @@ no crawling, no index, no ranking, no fee, and it makes no ownership or safety c
 Three ways to use it, all no-auth:
 
 - Library: `npm i @nessgate/resolver` → `const { resources } = await resolve("example.com")`
-  (dependency-free; runs in browsers, Node, Deno, Workers, agent runtimes; fetches the domain
-  directly, so no runtime dependency on nessgate.com).
-- HTTP: `curl https://nessgate.com/discover/example.com` (open CORS).
+  (dependency-free; runs anywhere with `fetch` — Node, Deno, Workers, agent runtimes; fetches the
+  domain directly, so no runtime dependency on nessgate.com).
+- HTTP: `curl https://nessgate.com/discover/example.com` (open CORS — use this from a browser).
 - MCP: the same lookup as a `discover_domain` tool at `https://nessgate.com/mcp`, listed in the
   official MCP Registry as `com.nessgate/nessgate`.
 
