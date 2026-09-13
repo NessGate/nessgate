@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.nessgate/nessgate",
   "title": "NessGate",
-  "description": "Universal resolver for the agentic web. Give it a domain; it reads the machine-readable resources that domain publishes across the standard discovery mechanisms (ARD, A2A, llms.txt, RFC 9727 api-catalog, OpenAPI, ORD, host-meta, ANP, UCP, DNS-AID) and returns one normalized answer, each record linking back to its source. Reads on demand, stores nothing, makes no ownership or safety claim.",
+  "description": "Universal resolver for the agentic web: give a domain, get one normalized discovery answer.",
   "version": "1.2.0",
   "repository": {
     "url": "https://github.com/NessGate/nessgate",

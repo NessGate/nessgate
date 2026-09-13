@@ -39,7 +39,26 @@ const { resources } = await resolve("example.com");
 curl https://nessgate.com/discover/example.com
 ```
 
-**MCP** — the same lookup as a tool (`discover_domain`) at `https://nessgate.com/mcp`.
+**MCP** — the same lookup as a tool (`discover_domain`) at `https://nessgate.com/mcp`. Listed in the
+[official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=com.nessgate/nessgate)
+as `com.nessgate/nessgate` (domain-verified remote server), so MCP-aware clients can install it directly.
+
+### Integrate it (≈5 lines)
+
+Give an agent a domain, get back what to use — no per-standard code. Drop this into a tool,
+a retrieval step, or an onboarding flow:
+
+```js
+import { resolve } from "@nessgate/resolver";           // dependency-free, no key, no account
+const { resources } = await resolve(domain);            // reads the domain directly
+for (const r of resources)
+  console.log(r.type, r.url, "←", r.sourceUrl);         // normalized record + where it came from
+// each r: { source, type, url, sourceUrl } — pick the one your agent needs (OpenAPI, A2A, MCP, …)
+```
+
+No SDK? The hosted endpoint is one HTTP GET (`GET https://nessgate.com/discover/{domain}`, open
+CORS, no auth), and the MCP tool `discover_domain` returns the same shape. Adding a new standard
+is a new adapter upstream — integrations don't change.
 
 ## Principles
 

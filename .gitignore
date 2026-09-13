@@ -16,3 +16,5 @@ wordpress-plugin/
 
 # MCP Registry publishing — Ed25519 private key for domain (HTTP) auth. Never commit.
 /mcp-key.pem
+# Downloaded mcp-publisher binary (not source).
+/.tools/
