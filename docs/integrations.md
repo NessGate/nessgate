@@ -10,7 +10,8 @@ verify against the domain itself.
 ## 1. Library — embed it in your runtime
 
 Dependency-free ESM. Fetches the target domain **directly**, so there is no runtime dependency on
-nessgate.com (nessgate.com just runs the same code as a hosted convenience).
+nessgate.com (the hosted endpoint below offers the same lookup as a convenience, plus SSRF
+guarding — see the note).
 
 ```bash
 npm i @nessgate/resolver
