@@ -60,6 +60,9 @@ No SDK? The hosted endpoint is one HTTP GET (`GET https://nessgate.com/discover/
 CORS, no auth), and the MCP tool `discover_domain` returns the same shape. Adding a new standard
 is a new adapter upstream — integrations don't change.
 
+Full integration guide — library, HTTP, and MCP client config (including the `mcp-remote` bridge
+for stdio-only clients): [`docs/integrations.md`](docs/integrations.md).
+
 ## Principles
 
 NessGate is free, neutral infrastructure — see the [Charter](https://nessgate.com/charter). It
