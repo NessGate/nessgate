@@ -13,3 +13,6 @@ wordpress-plugin/
 # Local operator tools — kept out of the public repo (read only the public registry.json)
 /NessGate-Stats.bat
 /dashboard.html
+
+# MCP Registry publishing — Ed25519 private key for domain (HTTP) auth. Never commit.
+/mcp-key.pem

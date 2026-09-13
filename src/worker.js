@@ -104,6 +104,17 @@ async function route(request, env, ctx) {
     });
   }
 
+  // /.well-known/mcp-registry-auth — proves control of nessgate.com to the
+  // official MCP Registry (HTTP domain auth) so the "com.nessgate/*" namespace
+  // can be published. Holds only the Ed25519 PUBLIC key; the private key never
+  // leaves the operator's machine. Served with no extension, hence an explicit
+  // route (static assets need a recognized type).
+  if (path === "/.well-known/mcp-registry-auth") {
+    return new Response("v=MCPv1; k=ed25519; p=4Ym9jOpNgUjB1AW/PPjoqzMaVycCLlcoxNFQuYkOZW4=\n", {
+      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=86400" },
+    });
+  }
+
   // MCP server (Streamable HTTP, stateless). One read-only tool, so GET has no
   // stream to offer and every POST is answered with a single JSON response.
   if (path === "/mcp") {
