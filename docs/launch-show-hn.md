@@ -21,7 +21,7 @@ An agent that lands on a domain has to guess where the machine-readable stuff is
 `/.well-known/ai-catalog.json`? an A2A agent card? an OpenAPI file? an api-catalog linkset? a DNS
 record? Every standard put it somewhere different, and more keep appearing.
 
-NessGate is a resolver for that. You give it a domain and it reads whatever that domain already
+NessGate is that resolver. Give it a domain and it reads whatever the domain already
 publishes — across ARD (all three surfaces: well-known, `rel="ard"`, robots `Agentmap:`), A2A,
 `llms.txt`, RFC 9727 api-catalog, OpenAPI, Open Resource Discovery, RFC 6415 host-meta, ANP, UCP,
 DNS-AID and more — and returns one normalized answer, with a link back to each source so the agent
