@@ -15,6 +15,6 @@ wordpress-plugin/
 /dashboard.html
 
 # MCP Registry publishing — Ed25519 private key for domain (HTTP) auth. Never commit.
-/mcp-key.pem
+/mcp-key*.pem
 # Downloaded mcp-publisher binary (not source).
 /.tools/

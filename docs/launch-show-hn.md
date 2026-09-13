@@ -15,6 +15,8 @@ Show HN: NessGate – one call to find what a domain publishes for AI agents
 
 ## Show HN body
 
+**NessGate is a zero-registration, domain-native universal discovery resolver for the agentic web.**
+
 An agent that lands on a domain has to guess where the machine-readable stuff is: `llms.txt`?
 `/.well-known/ai-catalog.json`? an A2A agent card? an OpenAPI file? an api-catalog linkset? a DNS
 record? Every standard put it somewhere different, and more keep appearing.
