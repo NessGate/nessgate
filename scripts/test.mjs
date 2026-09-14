@@ -253,12 +253,12 @@ console.log("--- Explore v2 Organization Discovery (opt-in, bounded, verified-on
   is(parseSameOrgHosts(html, "other.org"), [], "parseSameOrgHosts: wrong domain → empty");
   const orgLlms = orgRecordsFromDoc("https://developers.example.com/llms.txt", "# Dev docs\n- [API](https://developers.example.com/api.md)", "conventional");
   is(orgLlms.length, 1, "org: a real llms.txt on a related host is reported");
-  is(orgLlms[0].evidence, "same-org-host", "org: labelled same-org-host");
+  is(orgLlms[0].evidence, "same-domain-host", "org: labelled same-domain-host");
   is(JSON.stringify(orgLlms[0].provenance), JSON.stringify(["org:conventional", "https://developers.example.com/llms.txt"]), "org: provenance records how the host was found");
   is(orgRecordsFromDoc("https://docs.example.com/llms.txt", "<!doctype html><html>SPA shell</html>", "conventional").length, 0, "org: an SPA catch-all shell is NOT reported (wildcard-DNS guard)");
   const orgArd = orgRecordsFromDoc("https://developers.example.com/.well-known/ard.json", JSON.stringify({ entries: [{ type: "application/json", url: "https://developers.example.com/a.json" }] }), "homepage-link");
   is(orgArd.length, 1, "org: an ARD catalog on a related host is normalized");
-  is(orgArd[0].evidence, "same-org-host", "org: ARD entries labelled same-org-host");
+  is(orgArd[0].evidence, "same-domain-host", "org: ARD entries labelled same-domain-host");
   is(orgRecordsFromDoc("https://api.example.com/page.json", '{"random":true}', "conventional").length, 0, "org: unrecognized JSON is not reported");
 }
 

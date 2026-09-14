@@ -73,7 +73,7 @@ Every resource carries exactly one class — no vague numeric scores:
 5. **Organization Discovery (opt-in, `?org=1`)** — probes a *bounded* set of plausible
    same-registrable-domain hosts: subdomains the homepage itself links to, plus a small fixed
    conventional shortlist (`developers`, `docs`, `api`, …; at most 4 hosts × 2 paths). Only
-   resources that actually verify are reported, as evidence class **`same-org-host`** — shared DNS
+   resources that actually verify are reported, as evidence class **`same-domain-host`** — shared DNS
    control implies the organizational relationship; it is not independently verified. This solves
    the "resources live on `developers.example.com`" case. It deliberately does **not** solve
    cross-registrable-domain cases (`github.io` ≠ `microsoft.com`) — those need caller-supplied

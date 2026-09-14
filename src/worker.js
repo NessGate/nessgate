@@ -672,7 +672,7 @@ const MAX_CANDIDATES = 10; // cap on opt-in caller-supplied candidate URLs to ve
 // than the apex. Org mode probes a BOUNDED set of plausible same-organization
 // hosts — subdomains the homepage itself links to, plus a small fixed
 // conventional shortlist — and reports ONLY verified machine-readable resources,
-// each labelled evidence:"same-org-host" (same registrable domain controls the
+// each labelled evidence:"same-domain-host" (same registrable domain controls the
 // DNS; the relationship is organizational, not independently verified). This is
 // not crawling: at most ORG_MAX_HOSTS hosts × ORG_PROBE_PATHS paths, sharing the
 // same request/host/byte budget, content-validated before being reported.
@@ -680,7 +680,7 @@ const ORG_SUBDOMAIN_SHORTLIST = ["developers", "developer", "docs", "api", "ai",
 const ORG_MAX_HOSTS = 4;
 const ORG_PROBE_PATHS = ["/llms.txt", "/.well-known/ard.json"];
 const ORG_NOTE =
-  "Organization Discovery results (evidence \"same-org-host\") are machine-readable resources " +
+  "Organization Discovery results (evidence \"same-domain-host\") are machine-readable resources " +
   "verified on hosts under the same registrable domain — subdomains the homepage links to, or a " +
   "small conventional shortlist. The organizational relationship is implied by shared DNS control, " +
   "not independently verified. Explore a related host directly for its full resource graph.";
@@ -704,17 +704,17 @@ function parseSameOrgHosts(html, domain) {
   return out;
 }
 
-// Pure: turn one fetched org-host document into same-org-host records — empty
+// Pure: turn one fetched org-host document into same-domain-host records — empty
 // unless it is genuinely a recognized machine-readable resource.
 function orgRecordsFromDoc(url, text, via) {
   const prov = ["org:" + via, url];
   if (isLlmsPath(url)) {
     if (!validateProbeContent("text", text)) return [];
-    return [{ source: "llms.txt", sourceUrl: url, type: "llms.txt", url, evidence: "same-org-host", provenance: prov, depth: 1 }];
+    return [{ source: "llms.txt", sourceUrl: url, type: "llms.txt", url, evidence: "same-domain-host", provenance: prov, depth: 1 }];
   }
   const t = classifyJson(text);
   if (!t) return [];
-  return normalizeResources(t, "json", text, url).map((rec) => ({ ...rec, evidence: "same-org-host", provenance: prov, depth: 1 }));
+  return normalizeResources(t, "json", text, url).map((rec) => ({ ...rec, evidence: "same-domain-host", provenance: prov, depth: 1 }));
 }
 const EXPLORE_UA = "NessGate-Explore/1.0 (+https://nessgate.com)";
 const EXPLORE_RATE_LIMIT_PER_HOUR = 60;
@@ -1021,7 +1021,7 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false)
   // Phase 5 — Organization Discovery (opt-in via ?org=1). Probe a bounded set of
   // plausible same-organization hosts: subdomains the homepage itself links to
   // (publisher evidence) plus a small fixed conventional shortlist. Only verified
-  // machine-readable resources are reported (evidence "same-org-host"); a host
+  // machine-readable resources are reported (evidence "same-domain-host"); a host
   // that serves nothing recognized is simply absent. Shares the global budget.
   let orgChecked = null;
   if (org) {
@@ -1067,7 +1067,7 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false)
       publisherDeclared: resources.filter((r) => r.evidence === "publisher-declared").length,
       namespaceVerified: resources.filter((r) => r.evidence === "namespace-verified").length,
       candidate: resources.filter((r) => r.evidence === "candidate").length,
-      ...(org ? { sameOrgHost: resources.filter((r) => r.evidence === "same-org-host").length } : {}),
+      ...(org ? { sameDomainHost: resources.filter((r) => r.evidence === "same-domain-host").length } : {}),
       requests: budget.requests,
       hosts: budget.hosts.size,
       bytes: budget.bytes,
