@@ -1277,7 +1277,22 @@ async function safeFetch(url, allowedDomain, maxBytes, strictHosts = false, user
   throw new Error("too many redirects");
 }
 
+// Isolate-scoped DNS check cache. Every safeFetch validates the host's IPs, and
+// a single /discover or /explore touches the same host across many adapters — 2
+// DoH lookups each would blow Cloudflare's 50-subrequest-per-invocation cap. A
+// short-TTL cache collapses repeats to one check (the DNS-rebinding window this
+// opens is already documented and immaterial: Worker egress has no private
+// network, and probes assert nothing).
+const DNS_CHECK_CACHE = new Map(); // host -> { ok, err, expires }
+const DNS_CHECK_TTL_MS = 60_000;
+
 async function assertPublicDns(host) {
+  const now = Date.now();
+  const cached = DNS_CHECK_CACHE.get(host);
+  if (cached && cached.expires > now) {
+    if (!cached.ok) throw new Error(cached.err);
+    return;
+  }
   const ips = [];
   for (const type of ["A", "AAAA"]) {
     try {
@@ -1294,10 +1309,13 @@ async function assertPublicDns(host) {
       // DNS lookup failure for one record type is not fatal by itself
     }
   }
-  if (ips.length === 0) throw new Error("the domain does not resolve to a public address");
-  for (const ip of ips) {
-    if (isPrivateIp(ip)) throw new Error("the domain resolves to a non-public address");
-  }
+  let ok = true;
+  let err = "";
+  if (ips.length === 0) { ok = false; err = "the domain does not resolve to a public address"; }
+  else if (ips.some((ip) => isPrivateIp(ip))) { ok = false; err = "the domain resolves to a non-public address"; }
+  if (DNS_CHECK_CACHE.size > 500) DNS_CHECK_CACHE.delete(DNS_CHECK_CACHE.keys().next().value);
+  DNS_CHECK_CACHE.set(host, { ok, err, expires: now + DNS_CHECK_TTL_MS });
+  if (!ok) throw new Error(err);
 }
 
 function isPrivateIp(ip) {
