@@ -225,6 +225,18 @@ console.log("--- Explore v2 candidate verification (opt-in; AI suggests, NessGat
   is(ard[0].evidence, "candidate", "candidate: JSON resource labelled candidate");
   is(verifyCandidateRecords("https://x.com/page.json", '{"random":true}').length, 0, "candidate: unrecognized JSON is NOT accepted (relationship never invented)");
   is(verifyCandidateRecords("https://x.com/notes.txt", "just text").length, 0, "candidate: a non-llms .txt is not accepted as a resource");
+  // Redirect provenance: the original suggested URL AND the final URL are both kept.
+  const redir = verifyCandidateRecords(
+    "https://b.com/final/llms.txt",
+    "# x",
+    ["https://a.com/suggested/llms.txt", "https://b.com/final/llms.txt"]
+  );
+  is(
+    JSON.stringify(redir[0].provenance),
+    JSON.stringify(["ai-candidate", "https://a.com/suggested/llms.txt", "https://b.com/final/llms.txt"]),
+    "candidate: full original→final redirect chain preserved in provenance"
+  );
+  is(redir[0].url, "https://b.com/final/llms.txt", "candidate: record points to the FINAL url (where the content is)");
 }
 
 console.log("--- resolver normalization (thin, source-labelled, never invents semantics)");

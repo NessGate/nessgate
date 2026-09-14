@@ -727,12 +727,13 @@ function classifyJson(text) {
 // empty unless it is genuinely a recognized machine-readable resource (an
 // llms.txt index or a classifiable JSON standard). NessGate confirms the
 // resource's existence/type, never its relationship to any domain.
-function verifyCandidateRecords(url, text) {
-  const prov = ["ai-candidate", url];
-  if (isLlmsPath(url)) return [{ source: "llms.txt", sourceUrl: url, type: "llms.txt", url, evidence: "candidate", provenance: prov, depth: 1 }];
+function verifyCandidateRecords(finalUrl, text, chain) {
+  // Preserve the full original→final redirect path the caller's suggestion took.
+  const prov = ["ai-candidate", ...(Array.isArray(chain) && chain.length ? chain : [finalUrl])];
+  if (isLlmsPath(finalUrl)) return [{ source: "llms.txt", sourceUrl: finalUrl, type: "llms.txt", url: finalUrl, evidence: "candidate", provenance: prov, depth: 1 }];
   const t = classifyJson(text);
   if (!t) return [];
-  return normalizeResources(t, "json", text, url).map((rec) => ({ ...rec, evidence: "candidate", provenance: prov, depth: 1 }));
+  return normalizeResources(t, "json", text, finalUrl).map((rec) => ({ ...rec, evidence: "candidate", provenance: prov, depth: 1 }));
 }
 
 // Attributed MCP Registry federation. The official registry domain-authenticates
@@ -840,9 +841,10 @@ async function exploreData(raw, env, ctx, request, candidates = []) {
   const registryPromise = namespace ? fetchMcpRegistry(namespace) : Promise.resolve("");
 
   // Bounded, SSRF-safe fetch of a single delegated URL (cross-host allowed because
-  // the publisher named it; self is dispatched in-process).
-  // Returns { text, finalUrl } (finalUrl may differ from url after redirects) or
-  // null. Counts requests, and — via exploreBudgetAllows — every host touched
+  // the publisher named it; self is dispatched in-process). Returns
+  // { text, finalUrl, chain } — `chain` is the full ordered list of URLs fetched
+  // (original → …redirects… → final), so provenance can preserve the whole path —
+  // or null. Counts requests, and — via exploreBudgetAllows — every host touched
   // (including redirect hops) and the bytes fetched against the global budgets.
   async function fetchDoc(url) {
     let host;
@@ -858,12 +860,12 @@ async function exploreData(raw, env, ctx, request, candidates = []) {
         const text = await selfProbe(u.pathname + u.search, env, ctx);
         exploreBudgetAllows(budget, { hosts: [host], bytes: text.length }, EXPLORE_LIMITS);
         budget.seen.add(u.toString());
-        return { text, finalUrl: u.toString() };
+        return { text, finalUrl: u.toString(), chain: [u.toString()] };
       }
       const meta = await safeFetch(url, domain, MAX_JSON_BYTES, false, EXPLORE_UA, true, true);
       exploreBudgetAllows(budget, meta, EXPLORE_LIMITS); // counts redirect hosts + bytes
       budget.seen.add(meta.finalUrl); // the resolved URL is now accounted for
-      return { text: meta.text, finalUrl: meta.finalUrl };
+      return { text: meta.text, finalUrl: meta.finalUrl, chain: meta.redirectChain };
     } catch {
       return null;
     }
@@ -960,7 +962,7 @@ async function exploreData(raw, env, ctx, request, candidates = []) {
       if (cu.protocol !== "https:") continue;
       const doc = await fetchDoc(cand);
       if (!doc) continue;
-      for (const rec of verifyCandidateRecords(doc.finalUrl, doc.text)) out.push(rec);
+      for (const rec of verifyCandidateRecords(doc.finalUrl, doc.text, doc.chain)) out.push(rec);
     }
   }
 
