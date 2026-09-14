@@ -103,7 +103,7 @@
                           {
                             "type": "object",
                             "properties": {
-                              "evidence": { "type": "string", "enum": ["publisher-hosted", "publisher-declared", "namespace-verified"] },
+                              "evidence": { "type": "string", "enum": ["publisher-hosted", "publisher-declared", "namespace-verified", "candidate"], "description": "candidate = a caller-suggested URL (via POST {\"candidates\":[...]}) that NessGate fetched and confirmed is machine-readable; relationship to the domain is unverified." },
                               "provenance": { "type": "array", "items": { "type": "string" }, "description": "The chain of URLs/registry hops by which this record was reached." },
                               "depth": { "type": "integer", "example": 0 },
                               "attribution": { "type": "string", "description": "For namespace-verified records: who verified the namespace (attributed to the registry, not NessGate)." }

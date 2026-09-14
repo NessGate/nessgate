@@ -97,7 +97,15 @@ an <code>evidence</code> class and a <code>provenance</code> chain:</p>
 <tr><td><code>publisher-hosted</code></td><td>Served directly by the entered domain.</td></tr>
 <tr><td><code>publisher-declared</code></td><td>A pointer a hosted document explicitly names (possibly on another host).</td></tr>
 <tr><td><code>namespace-verified</code></td><td>An external registry (the MCP Registry) verified control of the namespace — <em>attributed to the registry</em>, not re-claimed by NessGate.</td></tr>
+<tr><td><code>candidate</code></td><td>A caller-suggested URL (opt-in, below) that NessGate fetched and confirmed is a real machine-readable resource. Its <em>relationship</em> to the domain is unverified — NessGate makes no ownership claim.</td></tr>
 </table>
+<p><strong>Opt-in candidate verification.</strong> <code>POST /explore/{domain}</code> with a JSON body
+<code>{"candidates":["https://…", …]}</code> lets your own AI/search <em>suggest</em> resource URLs;
+NessGate fetches each (bounded, SSRF-checked), verifies it is genuinely machine-readable, and returns
+only those, labelled <code>evidence:"candidate"</code> with <code>["ai-candidate", url]</code>
+provenance. <strong>NessGate runs no AI and stores nothing</strong> — the principle is <em>AI
+suggests, NessGate verifies</em>; NessGate never decides ownership. Up to 10 candidates per request;
+these responses are never cached. The plain <code>GET</code> stays fully deterministic.</p>
 <p>Response adds <code>federated</code>, per-record <code>evidence</code>/<code>provenance</code>/<code>depth</code>,
 and <code>stats</code> (counts, requests, hosts, bytes, <code>truncated</code>). It is strictly
 bounded — depth&nbsp;≤2, ≤8 hosts, ≤24 requests, a global byte cap, and the same SSRF checks on
