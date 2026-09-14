@@ -117,11 +117,13 @@ adapter here, never a change to any domain. The active adapters:</p>
 <tr><td><code>ard-agentmap</code> — additional ARD surface</td><td>robots</td><td><code>Agentmap:</code> directive in <code>/robots.txt</code></td></tr>
 <tr><td><code>aid</code> — AID (draft)</td><td>dns</td><td>TXT record at <code>_agent.&lt;domain&gt;</code>: <code>v=aid1;u=&lt;uri&gt;;p=&lt;proto&gt;;a=&lt;auth&gt;</code></td></tr>
 </table>
-<p>NessGate reads <strong>three of ARD v0.91's five publication surfaces</strong> (§5.1): the
-well-known paths (<code>ard-catalog</code>), the <code>&lt;link rel="ard"&gt;</code> tag
-(<code>ard-link</code>), and the robots.txt <code>Agentmap:</code> directive
-(<code>ard-agentmap</code>). ARD's in-page JSON-LD and DNS-Service-Binding surfaces are not yet
-read.</p>
+<p>NessGate implements <strong>ARD's normative domain resolution</strong> — it fetches
+<code>/.well-known/ard.json</code> (<code>ard-catalog</code>) and honours the
+<code>&lt;link rel="ard"&gt;</code> relation (<code>ard-link</code>), both <strong>MUST</strong> in
+ARD v0.91 §5.1 — plus the robots.txt <code>Agentmap:</code> surface (<code>ard-agentmap</code>).
+ARD's optional in-page JSON-LD is found only by general web crawling, which NessGate does not do; its
+DNS mechanism is described in §5.1 but not yet normatively specified (no record type or parameters).
+Neither is implemented — a guessed record would be fake conformance.</p>
 <p><code>anp</code> and <code>ucp</code> are emerging; <code>aid</code> and <code>awp</code> are
 drafts. Publishing one is not a guarantee of anything on its own — NessGate reads whatever is there
 and reports it as-is. <strong>Note:</strong> the <code>aid</code> adapter is the AID TXT mechanism

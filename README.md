@@ -99,12 +99,15 @@ still stand on the domain itself.
     (`ard-agentmap`).
   - **dns** — a DoH TXT lookup at `_agent.<domain>` (`aid`: `v=aid1;u=<uri>;p=<proto>;a=<auth>`).
 
-  NessGate reads **three of ARD's five publication surfaces** (ARD v0.91 §5.1): the well-known
-  paths, the `<link rel="ard">` tag, and the robots.txt `Agentmap:` directive. ARD's in-page
-  JSON-LD and DNS-Service-Binding surfaces are **not yet read**. ANP and UCP are emerging; the AID
-  TXT record (`v=aid1` at `_agent`) and AWP are drafts, read as-is with no adoption claim. **Note:
-  the `aid` adapter is the AID TXT mechanism, which is *not* the IETF DNS-AID draft** — DNS-AID uses
-  SVCB records at `_agents.<domain>` and is a separate mechanism, not implemented here.
+  **ARD:** NessGate implements ARD's **normative domain resolution** — it fetches
+  `/.well-known/ard.json` and honours the `<link rel="ard">` relation (both **MUST** in ARD v0.91
+  §5.1) — plus the robots `Agentmap:` surface. ARD's optional in-page JSON-LD is found only by
+  general web crawling, which NessGate does not do; ARD's DNS mechanism is *described* in §5.1 but
+  not yet normatively specified (no record type or parameters). Neither is implemented — publishing
+  a guessed record would be fake conformance. ANP and UCP are emerging; the AID TXT record (`v=aid1`
+  at `_agent`) and AWP are drafts, read as-is with no adoption claim. **Note:** the `aid` adapter is
+  the AID TXT mechanism, *not* the IETF DNS-AID draft (SVCB at `_agents.<domain>` — a separate,
+  unimplemented mechanism).
 - **GB/Z 185 (China, 智能体互联) — 185.4 yes, 185.5 gated.** NessGate **normalizes GB/Z 185.4
   agent descriptions ("ACS")**: an ACS is an A2A-family card with GB/Z extensions (an agent
   identity code `aic`, an mTLS scheme, a `certificate` block), recognized **by content** and

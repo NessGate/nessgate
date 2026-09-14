@@ -773,12 +773,14 @@ async function domainPage(raw, origin, env, ctx, request) {
       pageHtml({
         title: `${safeDomain} — NessGate`,
         canonical,
-        description: `NessGate found no standard machine-readable discovery files published by ${safeDomain}.`,
+        description: `${safeDomain} publishes no supported discovery files on this exact host; related product hosts or external registries may publish more.`,
         body:
           `<h1>${safeDomain}</h1>` +
-          `<div class="panel"><p class="status no">No machine-readable discovery files found</p>` +
-          `<p class="meta">NessGate checked the standard well-known locations (ARD, A2A, llms.txt, ` +
-          `API catalogs, OpenAPI and more) and this domain does not publish any of them yet.</p></div>` +
+          `<div class="panel"><p class="status no">No supported resources found on this exact host</p>` +
+          `<p class="meta">NessGate checked the standard discovery locations on ${safeDomain} itself ` +
+          `(ARD, A2A, llms.txt, API catalogs, OpenAPI and more) and found none. This is an exact-host ` +
+          `result — related product hosts (e.g. a developer or docs subdomain) or external registries ` +
+          `may still publish machine-readable resources.</p></div>` +
           `<p class="meta"><a href="/check">How to make a domain AI-discoverable →</a></p>`,
       }),
       200,
