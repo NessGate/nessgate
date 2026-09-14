@@ -679,9 +679,16 @@ function looksMachineReadable(url) {
 // Pure: classify a fetched JSON document as one known standard type (or null).
 // Most-specific first so a card that also carries a name isn't mislabelled.
 function classifyJson(text) {
-  for (const t of ["ard-catalog", "api-catalog", "openapi", "anp", "ucp", "host-meta", "awp", "gbz-185-4", "a2a-agent-card"]) {
+  let obj;
+  try { obj = JSON.parse(text); } catch { return null; }
+  if (!obj || typeof obj !== "object") return null;
+  for (const t of ["ard-catalog", "api-catalog", "openapi", "anp", "ucp", "host-meta", "awp", "gbz-185-4"]) {
     if (probeShapeOk(t, "json", text)) return t;
   }
+  // A2A only when the doc has A2A-specific structure. A bare {name}/{url} document
+  // (e.g. an ai-info.json profile) must NOT be mislabelled as an agent card — for
+  // a followed document, missing it is far better than inventing a wrong type.
+  if (Array.isArray(obj.supportedInterfaces) || (obj.capabilities && Array.isArray(obj.skills))) return "a2a-agent-card";
   return null;
 }
 
