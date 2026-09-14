@@ -803,6 +803,16 @@ async function exploreData(raw, env, ctx, request) {
   const out = [];
   const rootUrl = `https://${domain}/`;
 
+  // Phase 0 — attributed MCP Registry federation FIRST. It is one cheap request,
+  // and running it before exact-host/delegated fetches guarantees it gets a
+  // subrequest slot (Cloudflare caps subrequests per invocation; a busy domain's
+  // later best-effort fetches drop gracefully rather than starving federation).
+  const namespace = domainToNamespace(domain);
+  if (namespace) {
+    const regText = await fetchMcpRegistry(namespace);
+    if (regText) for (const rec of mcpRegistryRecords(regText, namespace, domain)) out.push(rec);
+  }
+
   // Bounded, SSRF-safe fetch of a single delegated URL (cross-host allowed because
   // the publisher named it; self is dispatched in-process).
   // Returns { text, finalUrl } (finalUrl may differ from url after redirects) or
@@ -904,13 +914,6 @@ async function exploreData(raw, env, ctx, request) {
   for (const { url, chain } of targets) {
     if (budget.requests >= EXPLORE_LIMITS.maxRequests) { budget.truncated = true; break; }
     await walk(url, 1, chain);
-  }
-
-  // Phase 3 — attributed MCP Registry federation (namespace-verified evidence).
-  const namespace = domainToNamespace(domain);
-  if (namespace) {
-    const regText = await fetchMcpRegistry(namespace);
-    if (regText) for (const rec of mcpRegistryRecords(regText, namespace, domain)) out.push(rec);
   }
 
   // Dedup (source|url|sourceUrl), keep first (earliest/strongest evidence), cap.
