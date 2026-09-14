@@ -25,6 +25,12 @@ import {
   verifyCandidateRecords,
   parseSameOrgHosts,
   orgRecordsFromDoc,
+  docRecords,
+  isCrossRegistrable,
+  parseRwsDeclaration,
+  rwsReciprocal,
+  parseAssetLinksWeb,
+  nsContained,
   adapters,
 } from "../src/worker.js";
 
@@ -260,6 +266,42 @@ console.log("--- Explore v2 Organization Discovery (opt-in, bounded, verified-on
   is(orgArd.length, 1, "org: an ARD catalog on a related host is normalized");
   is(orgArd[0].evidence, "same-domain-host", "org: ARD entries labelled same-domain-host");
   is(orgRecordsFromDoc("https://api.example.com/page.json", '{"random":true}', "conventional").length, 0, "org: unrecognized JSON is not reported");
+}
+
+console.log("--- Related Discovery (cross-domain; strict evidence model)");
+{
+  is(isCrossRegistrable("googleapis.com", "google.com"), true, "cross: different registrable domain");
+  is(isCrossRegistrable("developers.google.com", "google.com"), false, "cross: subdomain is NOT cross-domain");
+  is(isCrossRegistrable("google.com", "google.com"), false, "cross: apex is not cross-domain");
+  // RWS primary file (queried domain declares its set)
+  const rws = parseRwsDeclaration(
+    JSON.stringify({ primary: "https://google.com", associatedSites: ["https://youtube.com", "https://android.com"], serviceSites: ["https://googleusercontent.com"] }),
+    "google.com"
+  );
+  is(rws.primary, "google.com", "RWS: primary parsed");
+  is(rws.sites.length, 3, "RWS: associated + service sites extracted");
+  is(rws.sites.find((s) => s.host === "youtube.com").role, "associated", "RWS: role preserved");
+  is(rws.sites.find((s) => s.host === "googleusercontent.com").role, "service", "RWS: service role preserved");
+  // Member file (reciprocity)
+  const member = parseRwsDeclaration(JSON.stringify({ primary: "https://google.com" }), "youtube.com");
+  is(member.memberOf, "google.com", "RWS: member file exposes its primary");
+  is(rwsReciprocal(JSON.stringify({ primary: "https://google.com" }), "google.com"), true, "RWS: reciprocity check passes");
+  is(rwsReciprocal(JSON.stringify({ primary: "https://evil.com" }), "google.com"), false, "RWS: non-matching primary is not reciprocal");
+  is(parseRwsDeclaration("not json", "google.com"), null, "RWS: garbage → null");
+  // Digital Asset Links: web statements only
+  const al = parseAssetLinksWeb(JSON.stringify([
+    { relation: ["delegate_permission/common.handle_all_urls"], target: { namespace: "android_app", package_name: "x" } },
+    { relation: ["delegate_permission/common.query_webapk"], target: { namespace: "web", site: "https://related.example" } },
+  ]));
+  is(al, ["related.example"], "assetlinks: web statements extracted, app statements ignored");
+  is(parseAssetLinksWeb("{}").length, 0, "assetlinks: non-array → empty");
+  // NS containment (corroborating only)
+  is(nsContained(["ns1.google.com.", "ns2.google.com."], "google.com"), ["ns1.google.com", "ns2.google.com"], "ns: containment detected (trailing dots normalized)");
+  is(nsContained(["dns1.p08.nsone.net."], "microsoft.com").length, 0, "ns: third-party NS → no containment");
+  // docRecords: evidence class passthrough (used by the related layer)
+  const dr = docRecords("https://youtube.com/llms.txt", "# yt", "publisher-declared-related", ["https://google.com/.well-known/related-website-set.json", "youtube.com"]);
+  is(dr[0].evidence, "publisher-declared-related", "docRecords: related evidence class applied");
+  is(dr[0].provenance[0], "https://google.com/.well-known/related-website-set.json", "docRecords: declaration cited in provenance");
 }
 
 console.log("--- resolver normalization (thin, source-labelled, never invents semantics)");

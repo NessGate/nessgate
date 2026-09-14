@@ -137,19 +137,22 @@ async function route(request, env, ctx) {
   }
   if (path.startsWith("/explore/") && request.method === "GET") {
     const org = url.searchParams.get("org") === "1";
-    return apiExplore(decodeURIComponent(path.slice("/explore/".length)), env, ctx, request, [], org);
+    const related = url.searchParams.get("related") === "1";
+    return apiExplore(decodeURIComponent(path.slice("/explore/".length)), env, ctx, request, [], org, related);
   }
   if (path.startsWith("/explore/") && request.method === "POST") {
     // Opt-in candidate verification: the caller's AI/search POSTs candidate URLs;
     // NessGate verifies them deterministically and labels them evidence:"candidate".
     let candidates = [];
     let org = url.searchParams.get("org") === "1";
+    let related = url.searchParams.get("related") === "1";
     try {
       const b = await request.json();
       if (b && Array.isArray(b.candidates)) candidates = b.candidates;
       if (b && b.org === true) org = true;
+      if (b && b.related === true) related = true;
     } catch {}
-    return apiExplore(decodeURIComponent(path.slice("/explore/".length)), env, ctx, request, candidates, org);
+    return apiExplore(decodeURIComponent(path.slice("/explore/".length)), env, ctx, request, candidates, org, related);
   }
   if (path === "/version" && request.method === "GET") {
     return json({ build: env.BUILD_ID || "dev", spec: "v1" }, 200, cors());
@@ -709,17 +712,116 @@ function parseSameOrgHosts(html, domain) {
   return out;
 }
 
-// Pure: turn one fetched org-host document into same-domain-host records — empty
+// Pure: turn one fetched probe document into evidence-classed records — empty
 // unless it is genuinely a recognized machine-readable resource.
-function orgRecordsFromDoc(url, text, via) {
-  const prov = ["org:" + via, url];
+function docRecords(url, text, evidence, prov) {
   if (isLlmsPath(url)) {
     if (!validateProbeContent("text", text)) return [];
-    return [{ source: "llms.txt", sourceUrl: url, type: "llms.txt", url, evidence: "same-domain-host", provenance: prov, depth: 1 }];
+    return [{ source: "llms.txt", sourceUrl: url, type: "llms.txt", url, evidence, provenance: prov, depth: 1 }];
   }
   const t = classifyJson(text);
   if (!t) return [];
-  return normalizeResources(t, "json", text, url).map((rec) => ({ ...rec, evidence: "same-domain-host", provenance: prov, depth: 1 }));
+  return normalizeResources(t, "json", text, url).map((rec) => ({ ...rec, evidence, provenance: prov, depth: 1 }));
+}
+
+// Pure: turn one fetched org-host document into same-domain-host records.
+function orgRecordsFromDoc(url, text, via) {
+  return docRecords(url, text, "same-domain-host", ["org:" + via, url]);
+}
+
+/* ----- Related Discovery (cross-registrable-domain; see docs/related-discovery-rules.md) ----- */
+// Evidence model: only a purpose-built declaration served by the QUERIED domain
+// (legacy Related Website Set, Digital Asset Links web statements) or a
+// domain-verifying registry naming the specific candidate can produce a strong
+// class (publisher-declared-related / registry-verified-related). Technical
+// signals (NS containment, …) are corroborating ONLY — cited in signals[],
+// never promoted, never "official"/"same organization". Hyperlinks never count.
+const RELATED_MAX_HOSTS = 5;
+const RWS_PATH = "/.well-known/related-website-set.json";
+
+// Pure: is `host` outside the queried registrable domain (approximation:
+// not the apex and not a subdomain of it)?
+function isCrossRegistrable(host, domain) {
+  if (typeof host !== "string" || !host) return false;
+  const h = host.toLowerCase().replace(/\.+$/, "");
+  return h !== domain && !h.endsWith("." + domain);
+}
+
+// Pure: parse a Related Website Set file. If the file's primary is the queried
+// domain, returns the declared member sites with roles; if it names another
+// primary, returns { memberOf } (useful for reciprocity checks); else null.
+function parseRwsDeclaration(text, domain) {
+  let obj;
+  try { obj = JSON.parse(text); } catch { return null; }
+  if (!obj || typeof obj !== "object") return null;
+  const toHost = (v) => {
+    if (typeof v !== "string") return null;
+    try { return new URL(v).hostname.toLowerCase().replace(/^www\./, ""); } catch { return null; }
+  };
+  const primary = toHost(obj.primary);
+  if (!primary) return null;
+  if (primary !== domain) return { memberOf: primary };
+  const sites = [];
+  for (const [key, role] of [["associatedSites", "associated"], ["serviceSites", "service"], ["ccTLDs", "ccTLD"]]) {
+    const v = obj[key];
+    const list = Array.isArray(v) ? v : v && typeof v === "object" ? Object.values(v).flat() : [];
+    for (const s of list) {
+      const h = toHost(s);
+      if (h && !sites.some((x) => x.host === h)) sites.push({ host: h, role });
+    }
+  }
+  return { primary, sites };
+}
+
+// Pure: does a candidate's RWS file reciprocate by naming the queried domain
+// as its primary?
+function rwsReciprocal(text, domain) {
+  const p = parseRwsDeclaration(text, domain);
+  return !!(p && (p.primary === domain || p.memberOf === domain));
+}
+
+// Pure: Digital Asset Links — extract web-namespace target sites (cross-domain
+// association statements; app statements are ignored).
+function parseAssetLinksWeb(text) {
+  let arr;
+  try { arr = JSON.parse(text); } catch { return []; }
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  for (const st of arr) {
+    const t = st && st.target;
+    if (!t || t.namespace !== "web" || typeof t.site !== "string") continue;
+    try {
+      const h = new URL(t.site).hostname.toLowerCase().replace(/^www\./, "");
+      if (h && !out.includes(h)) out.push(h);
+    } catch {}
+  }
+  return out;
+}
+
+// Pure: which of a candidate's authoritative nameservers are hosts UNDER the
+// queried domain (e.g. youtube.com served by ns1.google.com)? Corroborating
+// signal only — inverts for DNS providers, so it never implies ownership.
+function nsContained(nsHosts, domain) {
+  if (!Array.isArray(nsHosts)) return [];
+  const suffix = "." + domain;
+  return nsHosts
+    .map((n) => String(n).toLowerCase().replace(/\.+$/, ""))
+    .filter((n) => n === domain || n.endsWith(suffix));
+}
+
+// DoH NS lookup (Cloudflare resolver), best-effort.
+async function dohNs(name) {
+  try {
+    const res = await fetch(
+      `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=NS`,
+      { headers: { Accept: "application/dns-json" }, cf: { cacheTtl: 300 } }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.Answer || []).filter((a) => a.type === 2).map((a) => String(a.data));
+  } catch {
+    return [];
+  }
 }
 const EXPLORE_UA = "NessGate-Explore/1.0 (+https://nessgate.com)";
 const EXPLORE_RATE_LIMIT_PER_HOUR = 60;
@@ -873,12 +975,12 @@ async function fetchMcpRegistry(namespace) {
   }
 }
 
-async function exploreData(raw, env, ctx, request, candidates = [], org = false) {
+async function exploreData(raw, env, ctx, request, candidates = [], org = false, related = false) {
   const domain = normalizeDomain(raw, true);
   if (!domain) return { status: 400, body: { error: "Invalid domain" } };
   const hasCandidates = Array.isArray(candidates) && candidates.length > 0;
   const cache = caches.default;
-  const key = new Request(`https://resolver-cache.nessgate.com/explore${org ? "-org" : ""}/${domain}`);
+  const key = new Request(`https://resolver-cache.nessgate.com/explore${org ? "-org" : ""}${related ? "-rel" : ""}/${domain}`);
   // Candidate requests are per-body and never cached (input varies per call).
   const hit = hasCandidates ? null : await cache.match(key);
   if (hit) return { status: 200, body: await hit.json(), cached: true };
@@ -1050,6 +1152,99 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false)
     }
   }
 
+  // Phase 6 — Related Discovery (opt-in via ?related=1): cross-registrable-domain
+  // relationships under the strict evidence model of docs/related-discovery-rules.md.
+  // Strong classes only restate a declaration served by the queried domain or an
+  // attributed registry record; NS containment is recorded as a corroborating
+  // signal and never promotes. Bounded: <= RELATED_MAX_HOSTS hosts, 2 declaration
+  // fetches + per-host (1 reciprocity fetch + 2 probes + 1 DoH NS lookup).
+  let relatedOut = null;
+  if (related) {
+    relatedOut = [];
+    const declared = []; // { host, role, declType, declUrl }
+    const rwsUrl = `https://${domain}${RWS_PATH}`;
+    const rwsDoc = await fetchDoc(rwsUrl);
+    if (rwsDoc) {
+      const rws = parseRwsDeclaration(rwsDoc.text, domain);
+      if (rws && Array.isArray(rws.sites)) {
+        for (const s of rws.sites) {
+          if (isCrossRegistrable(s.host, domain)) declared.push({ host: s.host, role: s.role, declType: "related-website-set (legacy)", declUrl: rwsDoc.finalUrl });
+        }
+      }
+    }
+    const alUrl = `https://${domain}/.well-known/assetlinks.json`;
+    const alDoc = await fetchDoc(alUrl);
+    if (alDoc) {
+      for (const h of parseAssetLinksWeb(alDoc.text)) {
+        if (isCrossRegistrable(h, domain) && !declared.some((d) => d.host === h)) {
+          declared.push({ host: h, role: "web-statement", declType: "digital-asset-links", declUrl: alDoc.finalUrl });
+        }
+      }
+    }
+    for (const d of declared.slice(0, RELATED_MAX_HOSTS)) {
+      if (budget.truncated) break;
+      const entry = {
+        host: d.host,
+        class: "publisher-declared-related",
+        declaration: { type: d.declType, role: d.role, url: d.declUrl },
+        signals: [],
+        resources: [],
+      };
+      // Mutuality: does the declared site serve a reciprocal declaration?
+      const recip = await fetchDoc(`https://${d.host}${RWS_PATH}`);
+      entry.declaration.mutual = !!(recip && rwsReciprocal(recip.text, domain));
+      // Corroborating signal (never promotes): NS containment.
+      const ns = nsContained(await dohNs(d.host), domain);
+      if (ns.length) entry.signals.push({ type: "ns-containment", ns, note: "corroborating only; never implies ownership" });
+      // Verified machine-readable resources on the related host.
+      for (const p of ORG_PROBE_PATHS) {
+        const doc = await fetchDoc(`https://${d.host}${p}`);
+        if (!doc) continue;
+        for (const rec of docRecords(doc.finalUrl, doc.text, "publisher-declared-related", [d.declUrl, d.host, doc.finalUrl])) entry.resources.push(rec);
+      }
+      relatedOut.push(entry);
+    }
+    // Registry-verified: MCP Registry entries whose remote lives on a
+    // cross-registrable-domain host (attributed to the registry).
+    for (const r of out) {
+      if (r.source !== "mcp-registry" || !r.url) continue;
+      let h;
+      try { h = new URL(r.url).hostname.toLowerCase().replace(/^www\./, ""); } catch { continue; }
+      if (!isCrossRegistrable(h, domain)) continue;
+      if (relatedOut.some((e) => e.host === h)) continue;
+      relatedOut.push({
+        host: h,
+        class: "registry-verified-related",
+        attribution: r.attribution,
+        signals: [],
+        resources: [{ ...r }],
+      });
+    }
+    // Caller-supplied cross-domain candidates with verified resources: NS signal
+    // may corroborate, producing infrastructure-correlated-candidate; without a
+    // signal they stay as plain candidates in resources[] only.
+    if (hasCandidates) {
+      const candHosts = [];
+      for (const r of out) {
+        if (r.evidence !== "candidate" || !r.url) continue;
+        let h;
+        try { h = new URL(r.url).hostname.toLowerCase().replace(/^www\./, ""); } catch { continue; }
+        if (!isCrossRegistrable(h, domain) || candHosts.includes(h) || relatedOut.some((e) => e.host === h)) continue;
+        candHosts.push(h);
+      }
+      for (const h of candHosts.slice(0, RELATED_MAX_HOSTS)) {
+        const ns = nsContained(await dohNs(h), domain);
+        if (!ns.length) continue;
+        relatedOut.push({
+          host: h,
+          class: "infrastructure-correlated-candidate",
+          signals: [{ type: "ns-containment", ns, note: "corroborating only; never implies ownership" }],
+          resources: out.filter((r) => r.evidence === "candidate" && r.url && r.url.includes("//" + h)).map((r) => ({ ...r })),
+        });
+      }
+    }
+  }
+
   // Dedup (source|url|sourceUrl), keep first (earliest/strongest evidence), cap.
   const seenRec = new Set();
   const resources = [];
@@ -1067,6 +1262,16 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false)
     checked: ADAPTERS.map((a) => a.id),
     ...(orgChecked ? { orgChecked } : {}),
     resources,
+    ...(relatedOut
+      ? {
+          related: relatedOut,
+          relatedNote:
+            "Cross-registrable-domain entries, separate from exact-host results. Strong classes only restate a " +
+            "declaration the queried domain serves (publisher-declared-related) or an attributed registry record " +
+            "(registry-verified-related). Technical signals in signals[] are corroborating only and never imply " +
+            "ownership. See /spec and docs/related-discovery-rules.md.",
+        }
+      : {}),
     federated: ["mcp-registry"],
     stats: {
       publisherHosted: resources.filter((r) => r.evidence === "publisher-hosted").length,
@@ -1074,12 +1279,16 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false)
       namespaceVerified: resources.filter((r) => r.evidence === "namespace-verified").length,
       candidate: resources.filter((r) => r.evidence === "candidate").length,
       ...(org ? { sameDomainHost: resources.filter((r) => r.evidence === "same-domain-host").length } : {}),
+      ...(relatedOut ? { related: relatedOut.length } : {}),
       requests: budget.requests,
       hosts: budget.hosts.size,
       bytes: budget.bytes,
       truncated: budget.truncated,
     },
-    limits: org ? { ...EXPLORE_LIMITS, orgMaxHosts: ORG_MAX_HOSTS } : EXPLORE_LIMITS,
+    limits:
+      org || related
+        ? { ...EXPLORE_LIMITS, ...(org ? { orgMaxHosts: ORG_MAX_HOSTS } : {}), ...(related ? { relatedMaxHosts: RELATED_MAX_HOSTS } : {}) }
+        : EXPLORE_LIMITS,
   };
   const res = new Response(JSON.stringify(body), {
     headers: { "Content-Type": "application/json", "Cache-Control": `max-age=${DISCOVER_CACHE_SECONDS}` },
@@ -1088,8 +1297,8 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false)
   return { status: 200, body };
 }
 
-async function apiExplore(raw, env, ctx, request, candidates = [], org = false) {
-  const { status, body } = await exploreData(raw, env, ctx, request, candidates, org);
+async function apiExplore(raw, env, ctx, request, candidates = [], org = false, related = false) {
+  const { status, body } = await exploreData(raw, env, ctx, request, candidates, org, related);
   const hasCand = Array.isArray(candidates) && candidates.length > 0;
   const extra =
     status === 200
@@ -1654,4 +1863,4 @@ function selfDomain() { return SELF_DOMAIN; }
 function apiCatalog() { return API_CATALOG; }
 function mcpTools() { return MCP_TOOLS; }
 function adapters() { return ADAPTERS; }
-export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, orgRecordsFromDoc, selfDomain, apiCatalog, mcpTools, adapters };
+export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, orgRecordsFromDoc, docRecords, isCrossRegistrable, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters };
