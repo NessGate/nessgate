@@ -20,6 +20,8 @@ import {
   isLlmsPath,
   classifyJson,
   exploreBudgetAllows,
+  domainToNamespace,
+  mcpRegistryRecords,
   adapters,
 } from "../src/worker.js";
 
@@ -188,6 +190,27 @@ console.log("--- Explore v2 budgets: global bytes + redirect-host accounting");
   const b3 = { hosts: new Set(), bytes: 0, truncated: false };
   exploreBudgetAllows(b3, { hosts: ["1", "2", "3", "4", "5", "6", "7", "8", "9"], bytes: 1 }, L);
   is(b3.truncated, true, "exceeding the host budget trips truncation");
+}
+
+console.log("--- Explore v2 registry federation (attributed, namespace-verified)");
+is(domainToNamespace("example.com"), "com.example", "domainToNamespace: example.com → com.example");
+is(domainToNamespace("nessgate.com"), "com.nessgate", "domainToNamespace: nessgate.com → com.nessgate");
+is(domainToNamespace("sub.example.co.uk"), "uk.co.example.sub", "domainToNamespace: exact reverse, no PSL guessing");
+is(domainToNamespace("notadomain"), null, "domainToNamespace: no dot → null");
+{
+  const reg = JSON.stringify({ servers: [
+    { server: { name: "com.example/tools", version: "1.0.0", remotes: [{ type: "streamable-http", url: "https://mcp.example.com/mcp" }] }, _meta: { "io.modelcontextprotocol.registry/official": { status: "active" } } },
+    { server: { name: "com.example/old", remotes: [{ url: "https://x" }] }, _meta: { "io.modelcontextprotocol.registry/official": { status: "deleted" } } },
+    { server: { name: "io.github.example/other", remotes: [{ url: "https://y" }] }, _meta: { "io.modelcontextprotocol.registry/official": { status: "active" } } },
+    { server: { name: "com.examples/lookalike", remotes: [{ url: "https://z" }] } },
+  ] });
+  const recs = mcpRegistryRecords(reg, "com.example", "example.com");
+  is(recs.length, 1, "registry: only the active, exact-namespace com.example/* server is kept");
+  is(recs[0].name, "com.example/tools", "registry: correct server matched (not io.github.*, not com.examples lookalike, not deleted)");
+  is(recs[0].evidence, "namespace-verified", "registry: evidence class namespace-verified");
+  is(recs[0].url, "https://mcp.example.com/mcp", "registry: remote url extracted");
+  is(/domain-authenticated the namespace .* against example.com. NessGate did not verify/.test(recs[0].attribution), true, "registry: attributed to the registry, not re-claimed by NessGate");
+  is(mcpRegistryRecords("not json", "com.example", "example.com").length, 0, "registry: garbage → empty");
 }
 
 console.log("--- resolver normalization (thin, source-labelled, never invents semantics)");

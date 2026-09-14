@@ -712,6 +712,82 @@ function classifyJson(text) {
   return null;
 }
 
+// Attributed MCP Registry federation. The official registry domain-authenticates
+// its "com.<reverse-domain>" namespaces, so a com.<domain>/* server is strong,
+// INDEPENDENT evidence that the domain owner published it. NessGate reports this
+// with class "namespace-verified" and always ATTRIBUTES the verification to the
+// registry — it never re-claims the registry's check as its own.
+const MCP_REGISTRY_API = "https://registry.modelcontextprotocol.io/v0.1/servers";
+
+// Pure: reverse a domain into its MCP Registry reverse-DNS namespace (example.com
+// -> com.example). Only exact-domain namespaces are federated (no PSL/registrable
+// guessing), so a subdomain resolves to its own literal namespace.
+function domainToNamespace(domain) {
+  if (typeof domain !== "string" || !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(domain)) return null;
+  return domain.toLowerCase().split(".").reverse().join(".");
+}
+
+// Pure: extract namespace-verified MCP servers from a registry response for the
+// EXACT namespace. Skips non-active entries. Every record is attributed to the
+// registry; a github-authed (io.github.*) name can never match a com.<domain>
+// namespace, so matches here are genuinely domain-authenticated.
+function mcpRegistryRecords(json, namespace, domain) {
+  let obj = json;
+  if (typeof json === "string") { try { obj = JSON.parse(json); } catch { return []; } }
+  const servers = obj && Array.isArray(obj.servers) ? obj.servers : [];
+  const prefix = namespace + "/";
+  const src = MCP_REGISTRY_API + "?search=" + encodeURIComponent(namespace);
+  const out = [];
+  for (const entry of servers) {
+    const s = (entry && entry.server) || entry;
+    if (!s || typeof s.name !== "string" || !s.name.startsWith(prefix)) continue;
+    const meta = entry && entry._meta && entry._meta["io.modelcontextprotocol.registry/official"];
+    if (meta && meta.status && meta.status !== "active") continue;
+    const remotes = Array.isArray(s.remotes) ? s.remotes : [];
+    const remote = remotes.find((r) => r && typeof r.url === "string");
+    const url = (remote && remote.url) || (s.repository && typeof s.repository.url === "string" ? s.repository.url : null);
+    out.push({
+      source: "mcp-registry",
+      sourceUrl: src,
+      type: "mcp-server",
+      name: s.name,
+      url: url || null,
+      evidence: "namespace-verified",
+      attribution: `Listed in the official MCP Registry, which domain-authenticated the namespace "${namespace}" against ${domain}. NessGate did not verify this itself.`,
+      provenance: [`mcp-registry:${namespace}`, s.name],
+      depth: 0,
+      raw: {
+        version: typeof s.version === "string" ? s.version : undefined,
+        description: typeof s.description === "string" ? s.description : undefined,
+      },
+    });
+  }
+  return out;
+}
+
+// One bounded request to the MCP Registry (a fixed, trusted read API — not a
+// publisher-controlled host, so no SSRF surface). Returns "" on any failure.
+async function fetchMcpRegistry(namespace) {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+    let res;
+    try {
+      res = await fetch(`${MCP_REGISTRY_API}?search=${encodeURIComponent(namespace)}&limit=50`, {
+        headers: { Accept: "application/json", "User-Agent": EXPLORE_UA },
+        signal: ctrl.signal,
+        cf: { cacheTtl: 300 },
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!res.ok) return "";
+    return await res.text();
+  } catch {
+    return "";
+  }
+}
+
 async function exploreData(raw, env, ctx, request) {
   const domain = normalizeDomain(raw, true);
   if (!domain) return { status: 400, body: { error: "Invalid domain" } };
@@ -830,6 +906,13 @@ async function exploreData(raw, env, ctx, request) {
     await walk(url, 1, chain);
   }
 
+  // Phase 3 — attributed MCP Registry federation (namespace-verified evidence).
+  const namespace = domainToNamespace(domain);
+  if (namespace) {
+    const regText = await fetchMcpRegistry(namespace);
+    if (regText) for (const rec of mcpRegistryRecords(regText, namespace, domain)) out.push(rec);
+  }
+
   // Dedup (source|url|sourceUrl), keep first (earliest/strongest evidence), cap.
   const seenRec = new Set();
   const resources = [];
@@ -846,9 +929,11 @@ async function exploreData(raw, env, ctx, request) {
     note: EXPLORE_NOTE,
     checked: ADAPTERS.map((a) => a.id),
     resources,
+    federated: ["mcp-registry"],
     stats: {
       publisherHosted: resources.filter((r) => r.evidence === "publisher-hosted").length,
       publisherDeclared: resources.filter((r) => r.evidence === "publisher-declared").length,
+      namespaceVerified: resources.filter((r) => r.evidence === "namespace-verified").length,
       requests: budget.requests,
       hosts: budget.hosts.size,
       bytes: budget.bytes,
@@ -1408,4 +1493,4 @@ function selfDomain() { return SELF_DOMAIN; }
 function apiCatalog() { return API_CATALOG; }
 function mcpTools() { return MCP_TOOLS; }
 function adapters() { return ADAPTERS; }
-export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, selfDomain, apiCatalog, mcpTools, adapters };
+export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, selfDomain, apiCatalog, mcpTools, adapters };
