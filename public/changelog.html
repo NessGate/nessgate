@@ -31,6 +31,59 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h2>2026</h2>
 
+<h3 id="v1-3-2">v1.3.2 — Evidence-based exploration; version alignment</h3>
+<ul>
+<li><strong><code>GET /explore/{domain}</code> (additive).</strong> Everything <code>/discover</code>
+    returns, plus bounded <em>delegated</em> discovery: NessGate follows the explicit
+    machine-readable pointers a domain declares (an <code>llms.txt</code> index's links, ARD and
+    api-catalog entries) up to depth 2 — cross-host only where the publisher named the target — and
+    federates the official MCP Registry for the domain's verified reverse-DNS namespace. Every
+    record carries an <code>evidence</code> class (<code>publisher-hosted</code> /
+    <code>publisher-declared</code> / <code>namespace-verified</code> / <code>candidate</code>) and a
+    <code>provenance</code> chain. Strictly bounded (depth ≤2, ≤8 hosts, ≤24 requests, global byte
+    cap, SSRF checks on every hop); stateless; no crawling, no guessed subdomains, no ownership
+    claim. <code>/discover</code> is unchanged.</li>
+<li><strong>Opt-in candidate verification.</strong> <code>POST /explore/{domain}</code> with
+    <code>{"candidates":[…]}</code> verifies caller-suggested URLs (from the caller's own AI or
+    search) and labels each <code>evidence:"candidate"</code> — existence and type confirmed,
+    relationship to the domain unverified. NessGate itself runs no AI.</li>
+<li><strong>Honest empty results.</strong> An empty answer now reads "no supported resources found
+    on this exact host", noting that related product hosts or external registries may publish
+    more.</li>
+<li>Version labels aligned across the library, MCP server, registry listing, and this API
+    description. No behavior change.</li>
+</ul>
+
+<h3 id="v1-3-1">v1.3.1 — Accuracy fixes</h3>
+<ul>
+<li><strong>AID, not DNS-AID.</strong> The DNS adapter reads the AID draft's TXT record
+    (<code>v=aid1</code> at <code>_agent</code>); it is not the IETF DNS-AID draft (SVCB at
+    <code>_agents</code>), which is a separate, unimplemented mechanism. The adapter id changed
+    from <code>dns-aid</code> to <code>aid</code>.</li>
+<li><strong>ARD scope narrowed.</strong> NessGate implements ARD's normative domain resolution
+    (well-known catalog + <code>rel="ard"</code>, both MUST in v0.91) plus the robots
+    <code>Agentmap:</code> surface; in-page JSON-LD and the not-yet-specified DNS mechanism are
+    not read.</li>
+</ul>
+
+<h3 id="v1-3-0">v1.3.0 — GB/Z 185.4 agent descriptions</h3>
+<ul>
+<li><strong>GB/Z 185.4 (China, 智能体互联).</strong> ACS agent descriptions are recognized by
+    content and normalized (source <code>gbz-185-4</code>), preserving <code>aic</code>, provider,
+    security schemes, certificate, and skills. No GB/Z-specific path is guessed. The embeddable
+    library adds an optional, Node-only GB/Z 185.5 gateway query against a caller-configured
+    endpoint with caller-supplied authentication.</li>
+</ul>
+
+<h3 id="v1-2-0">v1.2.0 — Universal resolver: adapter architecture</h3>
+<ul>
+<li><strong>Fourteen adapters over four channels</strong> (well-known paths, the ARD
+    <code>rel="ard"</code> link, the robots <code>Agentmap:</code> directive, and a DNS TXT
+    lookup): adds ANP agent descriptions, UCP merchant profiles, the AID TXT record, and the two
+    additional ARD surfaces to the original set. Listed in the official MCP Registry as
+    <code>com.nessgate/nessgate</code>.</li>
+</ul>
+
 <h3 id="v1-1-0">v1.1.0 — Initial public release</h3>
 <ul>
 <li><strong>The neutral resolver.</strong> <code>GET /discover/{domain}</code> reads whatever a

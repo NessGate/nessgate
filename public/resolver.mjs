@@ -305,7 +305,7 @@ async function fetchText(fetchImpl, url, timeoutMs, maxBytes) {
   try {
     const res = await fetchImpl(url, {
       signal: controller.signal,
-      headers: { Accept: "application/json, text/plain;q=0.9, */*;q=0.1", "User-Agent": "NessGate-Resolver/1.1" },
+      headers: { Accept: "application/json, text/plain;q=0.9, */*;q=0.1", "User-Agent": "NessGate-Resolver/1.3" },
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const text = await res.text();

@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "NessGate API",
-    "version": "1.1.0",
+    "version": "1.3.2",
     "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads whatever that domain already publishes across the standard machine-discovery locations (llms.txt, ARD / ai-catalog.json, A2A agent card, RFC 9727 API catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP manifest, RFC 6415 host-meta) and returns one normalized answer, each record carrying a sourceUrl back to the domain. NessGate stores nothing, never crawls or indexes, and makes no ownership or safety claim. Read endpoints are public, unauthenticated, and CORS-open. The response contract is stable and additive: new optional fields may appear; clients must ignore unknown fields.",
     "contact": { "email": "contact@nessgate.com", "url": "https://nessgate.com/contact" },
     "termsOfService": "https://nessgate.com/terms",
