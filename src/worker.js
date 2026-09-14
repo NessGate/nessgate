@@ -687,8 +687,8 @@ const ORG_PROBE_PATHS = ["/llms.txt", "/.well-known/ard.json"];
 const ORG_NOTE =
   "Organization Discovery results (evidence \"same-domain-host\") are machine-readable resources " +
   "verified on hosts under the same registrable domain — subdomains the homepage links to, or a " +
-  "small conventional shortlist. The organizational relationship is implied by shared DNS control, " +
-  "not independently verified. Explore a related host directly for its full resource graph.";
+  "small conventional shortlist. Same registrable domain; the organizational relationship is not " +
+  "independently verified. Explore a related host directly for its full resource graph.";
 
 // Pure: extract same-registrable-domain subdomain hosts referenced anywhere in an
 // HTML page (absolute URLs only). Excludes the apex and www; unique, order kept.
@@ -1236,9 +1236,9 @@ async function domainPage(raw, origin, env, ctx, request) {
         description: `${safeDomain} publishes no supported discovery files on this exact host; related product hosts or external registries may publish more.`,
         body:
           `<h1>${safeDomain}</h1>` +
-          `<div class="panel"><p class="status no">No supported resources found on this exact host</p>` +
+          `<div class="panel"><p class="status no">No supported resources could be confirmed on this exact host</p>` +
           `<p class="meta">NessGate checked the standard discovery locations on ${safeDomain} itself ` +
-          `(ARD, A2A, llms.txt, API catalogs, OpenAPI and more) and found none. This is an exact-host ` +
+          `(ARD, A2A, llms.txt, API catalogs, OpenAPI and more) and could not confirm any. This is an exact-host ` +
           `result — related product hosts (e.g. a developer or docs subdomain) or external registries ` +
           `may still publish machine-readable resources.</p></div>` +
           `<p class="meta"><a href="/check">How to make a domain AI-discoverable →</a></p>`,

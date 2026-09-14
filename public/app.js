@@ -71,7 +71,7 @@ if (resolveForm) {
       // slower related-host check as a separate, explicit action.
       const msg = document.createElement("p");
       msg.textContent =
-        "No supported resources found on " + d + " itself. This is an exact-host check — " +
+        "No supported resources could be confirmed on " + d + " itself. This is an exact-host check — " +
         "related hosts (like a developers. subdomain) or external registries may still publish some.";
       box.append(msg);
       const orgBtn = document.createElement("button");
@@ -108,13 +108,13 @@ if (resolveForm) {
           renderList(related, related.length + " verified resource" + (related.length === 1 ? "" : "s") + " on related hosts under the same domain:");
           const note = document.createElement("p");
           note.className = "meta";
-          note.textContent = "Same registrable domain — the relationship is implied by shared DNS control, not independently verified.";
+          note.textContent = "Same registrable domain; the organizational relationship is not independently verified.";
           box.append(note);
         } else {
           const p = document.createElement("p");
           p.className = "meta";
           p.textContent =
-            "Nothing found on common related hosts either. Note: some sites' bot protection blocks " +
+            "Nothing could be confirmed on common related hosts either. Note: some sites' bot protection blocks " +
             "checks from hosted infrastructure, so published files can be missed here.";
           box.append(p);
         }

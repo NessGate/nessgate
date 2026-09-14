@@ -38,8 +38,8 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
     rather than the apex. Organization Discovery probes a bounded set of plausible
     same-registrable-domain hosts — subdomains the homepage itself links to, plus a small
     conventional shortlist (at most 4 hosts × 2 paths) — and reports <em>only</em> resources that
-    actually verify, labelled evidence <code>same-domain-host</code> with the probe provenance. Shared
-    DNS control implies the organizational relationship; it is not independently verified. Hosts
+    actually verify, labelled evidence <code>same-domain-host</code> with the probe provenance. The
+    registrable domain is shared; the organizational relationship is not independently verified. Hosts
     probed appear in <code>orgChecked</code>. No brute-force scanning; off by default;
     <code>/discover</code> and default <code>/explore</code> unchanged.</li>
 </ul>

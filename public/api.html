@@ -98,7 +98,7 @@ an <code>evidence</code> class and a <code>provenance</code> chain:</p>
 <tr><td><code>publisher-declared</code></td><td>A pointer a hosted document explicitly names (possibly on another host).</td></tr>
 <tr><td><code>namespace-verified</code></td><td>An external registry (the MCP Registry) verified control of the namespace — <em>attributed to the registry</em>, not re-claimed by NessGate.</td></tr>
 <tr><td><code>candidate</code></td><td>A caller-suggested URL (opt-in, below) that NessGate fetched and confirmed is a real machine-readable resource. Its <em>relationship</em> to the domain is unverified — NessGate makes no ownership claim.</td></tr>
-<tr><td><code>same-domain-host</code></td><td>A verified resource on a host under the <em>same registrable domain</em> (Organization Discovery, opt-in below). Shared DNS control implies the organizational relationship; it is not independently verified.</td></tr>
+<tr><td><code>same-domain-host</code></td><td>A verified resource on a host under the <em>same registrable domain</em> (Organization Discovery, opt-in below). Same registrable domain; the organizational relationship is not independently verified.</td></tr>
 </table>
 <p><strong>Organization Discovery (opt-in).</strong> Add <code>?org=1</code> to look beyond the exact
 host: many organizations publish their machine-readable resources on a related subdomain (for

@@ -135,7 +135,7 @@ $("checkForm").addEventListener("submit", async (e) => {
     summary.className = "meta probe-summary";
     summary.textContent =
       foundCount === 0
-        ? "No supported discovery files were found on this exact host. Related product hosts or external registries may still publish some."
+        ? "No supported discovery files could be confirmed on this exact host. Related product hosts or external registries may still publish some."
         : `You support ${foundCount} of ${checked.length} supported discovery mechanisms.`;
     pCard.append(summary);
 
