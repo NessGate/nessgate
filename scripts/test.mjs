@@ -209,7 +209,7 @@ is(domainToNamespace("notadomain"), null, "domainToNamespace: no dot → null");
   is(recs[0].name, "com.example/tools", "registry: correct server matched (not io.github.*, not com.examples lookalike, not deleted)");
   is(recs[0].evidence, "namespace-verified", "registry: evidence class namespace-verified");
   is(recs[0].url, "https://mcp.example.com/mcp", "registry: remote url extracted");
-  is(/domain-authenticated the namespace .* against example.com. NessGate did not verify/.test(recs[0].attribution), true, "registry: attributed to the registry, not re-claimed by NessGate");
+  is(/verified control of the namespace .* NessGate did not verify this itself/.test(recs[0].attribution), true, "registry: attributed to the registry, not re-claimed by NessGate");
   is(mcpRegistryRecords("not json", "com.example", "example.com").length, 0, "registry: garbage → empty");
 }
 

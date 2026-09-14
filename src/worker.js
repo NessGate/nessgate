@@ -753,7 +753,7 @@ function mcpRegistryRecords(json, namespace, domain) {
       name: s.name,
       url: url || null,
       evidence: "namespace-verified",
-      attribution: `Listed in the official MCP Registry, which domain-authenticated the namespace "${namespace}" against ${domain}. NessGate did not verify this itself.`,
+      attribution: `Listed in the official MCP Registry, which verified control of the namespace "${namespace}" (the reverse-DNS of ${domain}). NessGate did not verify this itself.`,
       provenance: [`mcp-registry:${namespace}`, s.name],
       depth: 0,
       raw: {
