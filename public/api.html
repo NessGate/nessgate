@@ -84,6 +84,27 @@ open <code>type</code> label (never a closed set), and, where the source provide
 probed, so an empty <code>discovered</code> is still a successful <code>200</code> observation.
 Answers are cached 10 minutes. See the <a href="/spec">specification</a> for the full contract.</p>
 
+<h2>Explore a domain (evidence-based, v2)</h2>
+<pre><code>GET /explore/{domain}</code></pre>
+<p>Everything <code>/discover</code> returns, plus <strong>bounded delegated discovery</strong>. It
+follows the explicit machine-readable pointers a domain declares — the links inside an
+<code>llms.txt</code> index, ARD and api-catalog entries — up to depth 2, crossing to another host
+<em>only</em> where the publisher itself named the target. It also federates the official
+<strong>MCP Registry</strong> for the domain's verified reverse-DNS namespace. Every resource gains
+an <code>evidence</code> class and a <code>provenance</code> chain:</p>
+<table>
+<tr><th>evidence</th><th>meaning</th></tr>
+<tr><td><code>publisher-hosted</code></td><td>Served directly by the entered domain.</td></tr>
+<tr><td><code>publisher-declared</code></td><td>A pointer a hosted document explicitly names (possibly on another host).</td></tr>
+<tr><td><code>namespace-verified</code></td><td>An external registry (the MCP Registry) verified control of the namespace — <em>attributed to the registry</em>, not re-claimed by NessGate.</td></tr>
+</table>
+<p>Response adds <code>federated</code>, per-record <code>evidence</code>/<code>provenance</code>/<code>depth</code>,
+and <code>stats</code> (counts, requests, hosts, bytes, <code>truncated</code>). It is strictly
+bounded — depth&nbsp;≤2, ≤8 hosts, ≤24 requests, a global byte cap, and the same SSRF checks on
+every cross-host hop — and, like <code>/discover</code>, stores nothing, crawls nothing, guesses no
+subdomains, runs no AI, and makes no ownership claim. <code>/discover</code> is unchanged for
+existing integrations.</p>
+
 <h2>Run the resolver yourself</h2>
 <p>The same normalization is available as a dependency-free library that fetches target domains
 directly, with no runtime dependency on nessgate.com:</p>

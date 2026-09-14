@@ -5,6 +5,7 @@
   "category": "internet infrastructure / AI discovery",
   "api": {
     "discover": "https://nessgate.com/discover/{domain}",
+    "explore": "https://nessgate.com/explore/{domain}",
     "mcp": "https://nessgate.com/mcp",
     "library": "https://www.npmjs.com/package/@nessgate/resolver",
     "docs": "https://nessgate.com/api",

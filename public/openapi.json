@@ -68,6 +68,74 @@
         }
       }
     },
+    "/explore/{domain}": {
+      "get": {
+        "operationId": "exploreDomain",
+        "summary": "Evidence-based delegated resolution across declared pointers and registries",
+        "description": "Everything /discover returns, plus bounded DELEGATED discovery: follows the explicit machine-readable pointers a domain declares (llms.txt index links, ARD/api-catalog entries) up to depth 2 — cross-host only where the publisher named the target — and federates the official MCP Registry for the domain's verified reverse-DNS namespace. Every resource carries an 'evidence' class (publisher-hosted | publisher-declared | namespace-verified) and a 'provenance' chain. Strictly bounded (depth <=2, <=8 hosts, <=24 requests, global byte cap, SSRF checks per hop); stateless, no crawling, no guessed subdomains, no AI, no ownership claim. Rate limited 60/hour/IP; cached 10 minutes.",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "description": "Domain name, e.g. example.com.",
+            "schema": { "type": "string", "example": "example.com" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Evidence-based observation. An empty resources array is still a successful answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "domain": { "type": "string", "example": "example.com" },
+                    "note": { "type": "string" },
+                    "checked": { "type": "array", "items": { "type": "string" } },
+                    "federated": { "type": "array", "items": { "type": "string" }, "example": ["mcp-registry"] },
+                    "resources": {
+                      "type": "array",
+                      "description": "Normalized records, each with an evidence class, a provenance chain, and depth.",
+                      "items": {
+                        "allOf": [
+                          { "$ref": "#/components/schemas/Resource" },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "evidence": { "type": "string", "enum": ["publisher-hosted", "publisher-declared", "namespace-verified"] },
+                              "provenance": { "type": "array", "items": { "type": "string" }, "description": "The chain of URLs/registry hops by which this record was reached." },
+                              "depth": { "type": "integer", "example": 0 },
+                              "attribution": { "type": "string", "description": "For namespace-verified records: who verified the namespace (attributed to the registry, not NessGate)." }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "stats": {
+                      "type": "object",
+                      "properties": {
+                        "publisherHosted": { "type": "integer" },
+                        "publisherDeclared": { "type": "integer" },
+                        "namespaceVerified": { "type": "integer" },
+                        "requests": { "type": "integer" },
+                        "hosts": { "type": "integer" },
+                        "bytes": { "type": "integer" },
+                        "truncated": { "type": "boolean" }
+                      }
+                    },
+                    "limits": { "type": "object" }
+                  },
+                  "required": ["domain", "resources", "checked", "federated", "stats"]
+                }
+              }
+            }
+          },
+          "400": { "description": "Input is not a valid domain.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "429": { "description": "Rate limited (60 requests/hour per IP).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
     "/mcp": {
       "post": {
         "operationId": "mcp",
