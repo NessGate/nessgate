@@ -109,6 +109,11 @@ most 4 hosts, 2 paths each) — and reports <em>only</em> resources it actually 
 <code>same-org-host</code>. Hosts probed are listed in <code>orgChecked</code>. No brute-force
 scanning, no crawling; a host that serves nothing recognized is simply absent. For a related host's
 full resource graph, explore that host directly.</p>
+<p class="note"><strong>Known limitation of the hosted resolver:</strong> some sites' bot protection
+challenges requests from shared cloud infrastructure, so the hosted endpoints can miss files those
+sites do publish (they are reported as not found, never guessed). The embeddable
+<a href="/resolver.mjs">library</a>, running from your own environment, does not share this
+limitation.</p>
 <p><strong>Opt-in candidate verification.</strong> <code>POST /explore/{domain}</code> with a JSON body
 <code>{"candidates":["https://…", …]}</code> lets your own AI/search <em>suggest</em> resource URLs;
 NessGate fetches each (bounded, SSRF-checked), verifies it is genuinely machine-readable, and returns
