@@ -202,7 +202,7 @@ const ADAPTERS = [
   { id: "ucp", channel: "well-known", paths: ["/.well-known/ucp", "/.well-known/ucp/manifest.json"], kind: "json" }, // Universal Commerce Protocol
   { id: "ard-link", channel: "link-rel", rels: ["ard", "ai-catalog"], normalizeAs: "ard-catalog" }, // ARD via <link rel="ard">
   { id: "ard-agentmap", channel: "robots", directive: "agentmap", normalizeAs: "ard-catalog" }, // ARD via robots.txt Agentmap:
-  { id: "dns-aid", channel: "dns", node: "_agent" }, // DNS-AID / AID: TXT record at _agent.<domain>
+  { id: "aid", channel: "dns", node: "_agent" }, // AID: TXT record (v=aid1) at _agent.<domain>. NOT the IETF DNS-AID draft (that is SVCB at _agents.<domain> — a separate mechanism, not implemented here).
 ];
 // GB/Z 185 (China, 智能体互联). NessGate normalizes GB/Z 185.4 agent
 // descriptions ("ACS") by CONTENT (see isAcs/normalizeAcs) — an ACS served at
@@ -304,7 +304,7 @@ function parseAgentmap(robots, directive) {
   return out;
 }
 
-// Parse an AID / DNS-AID TXT record: a semicolon-delimited string of key=value
+// Parse an AID TXT record (v=aid1): a semicolon-delimited string of key=value
 // pairs (draft-nemethi-aid). Keys have short aliases (v/version, u/uri, p/proto,
 // a/auth, s/desc, d/docs). Returns null unless it carries a version and a uri.
 function parseAidRecord(txt) {
@@ -589,7 +589,7 @@ async function runAdapter(a, domain, env, ctx) {
         const aid = parseAidRecord(rec);
         if (aid) {
           discovered.push({ type: a.id, url: aid.uri });
-          resources.push({ source: "dns-aid", sourceUrl: `dns:${name}`, type: aid.proto || "aid", name: aid.desc, url: aid.uri, raw: aid });
+          resources.push({ source: "aid", sourceUrl: `dns:${name}`, type: aid.proto || "aid", name: aid.desc, url: aid.uri, raw: aid });
         }
       }
       return { discovered, resources };
@@ -645,7 +645,7 @@ async function apiDiscover(raw, env, ctx, request) {
 // (the tool dispatches to the same handler).
 
 const MCP_SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26"];
-const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.3.0" };
+const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.3.1" };
 const MCP_INSTRUCTIONS =
   "Use discover_domain to resolve a domain to the machine-readable resources it publishes " +
   "across the supported discovery locations (ARD, A2A, llms.txt, API catalogs, OpenAPI, and " +

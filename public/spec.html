@@ -115,14 +115,18 @@ adapter here, never a change to any domain. The active adapters:</p>
 <tr><td><code>ucp</code> — Universal Commerce Protocol (emerging; Google + Shopify)</td><td>well-known</td><td><code>/.well-known/ucp</code>, <code>/.well-known/ucp/manifest.json</code></td></tr>
 <tr><td><code>ard-link</code> — additional ARD surface</td><td>link-rel</td><td><code>&lt;link rel="ard"&gt;</code> in the homepage</td></tr>
 <tr><td><code>ard-agentmap</code> — additional ARD surface</td><td>robots</td><td><code>Agentmap:</code> directive in <code>/robots.txt</code></td></tr>
-<tr><td><code>dns-aid</code> — DNS-AID / AID (draft)</td><td>dns</td><td>TXT record at <code>_agent.&lt;domain&gt;</code>: <code>v=aid1;u=&lt;uri&gt;;p=&lt;proto&gt;;a=&lt;auth&gt;</code></td></tr>
+<tr><td><code>aid</code> — AID (draft)</td><td>dns</td><td>TXT record at <code>_agent.&lt;domain&gt;</code>: <code>v=aid1;u=&lt;uri&gt;;p=&lt;proto&gt;;a=&lt;auth&gt;</code></td></tr>
 </table>
-<p><strong>Complete ARD support</strong> means all three ARD surfaces: the well-known paths
-(<code>ard-catalog</code>), the <code>&lt;link rel="ard"&gt;</code> tag (<code>ard-link</code>), and
-the robots.txt <code>Agentmap:</code> directive (<code>ard-agentmap</code>).</p>
-<p><code>anp</code> and <code>ucp</code> are emerging; <code>dns-aid</code>/AID and <code>awp</code>
-are drafts. Publishing one is not a guarantee of anything on its own — NessGate reads whatever is
-there and reports it as-is.</p>
+<p>NessGate reads <strong>three of ARD v0.91's five publication surfaces</strong> (§5.1): the
+well-known paths (<code>ard-catalog</code>), the <code>&lt;link rel="ard"&gt;</code> tag
+(<code>ard-link</code>), and the robots.txt <code>Agentmap:</code> directive
+(<code>ard-agentmap</code>). ARD's in-page JSON-LD and DNS-Service-Binding surfaces are not yet
+read.</p>
+<p><code>anp</code> and <code>ucp</code> are emerging; <code>aid</code> and <code>awp</code> are
+drafts. Publishing one is not a guarantee of anything on its own — NessGate reads whatever is there
+and reports it as-is. <strong>Note:</strong> the <code>aid</code> adapter is the AID TXT mechanism
+(<code>v=aid1</code> at <code>_agent</code>); it is <em>not</em> the IETF DNS-AID draft, which uses
+SVCB records at <code>_agents.&lt;domain&gt;</code> and is a separate, unimplemented mechanism.</p>
 <p><strong>GB/Z 185 (China, 智能体互联) — 185.4 normalized, 185.5 gated.</strong> NessGate normalizes
 GB/Z 185.4 agent descriptions ("ACS") — an A2A-family card with GB/Z extensions (an agent identity
 code, an mTLS scheme, a certificate block) — recognized by content and labelled

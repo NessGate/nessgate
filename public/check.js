@@ -72,9 +72,9 @@ const PROBE_INFO = {
     ifMissing: "Optional extra ARD surface; the well-known ard.json path is the primary one.",
     core: false,
   },
-  "dns-aid": {
-    label: "DNS-AID (TXT record)",
-    what: "A DNS-AID TXT record at _agent.<domain> pointing to your agent (draft AID spec).",
+  "aid": {
+    label: "AID (TXT record)",
+    what: "An AID TXT record at _agent.<domain> (v=aid1;u=…) pointing to your agent (draft AID spec). Note: this is distinct from the IETF DNS-AID draft, which uses SVCB records at _agents.<domain>.",
     ifMissing: "Draft DNS-based discovery; optional and not yet widely adopted.",
     core: false,
   },

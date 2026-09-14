@@ -41,7 +41,7 @@ await check("discover returns the normalized answer shape, labeled self-publishe
   if (d.provenance !== "self-published") throw new Error("missing provenance label");
   if (typeof d.note !== "string" || d.note.length < 10) throw new Error("missing note");
   if (!Array.isArray(d.checked) || d.checked.length !== 14) throw new Error(`checked list should have 14 adapters, got ${d.checked && d.checked.length}`);
-  for (const want of ["ard-link", "ard-agentmap", "dns-aid", "anp", "ucp"]) {
+  for (const want of ["ard-link", "ard-agentmap", "aid", "anp", "ucp"]) {
     if (!d.checked.includes(want)) throw new Error(`checked list missing new adapter ${want}`);
   }
   if (!Array.isArray(d.discovered)) throw new Error("discovered not an array");

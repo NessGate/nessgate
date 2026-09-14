@@ -55,7 +55,7 @@
                       "type": "array",
                       "description": "Every standard NessGate probed for, so an empty result is still informative.",
                       "items": { "type": "string" },
-                      "example": ["llms.txt", "ard-catalog", "a2a-agent-card", "api-catalog", "ai-info.json", "openapi", "ord", "awp", "host-meta", "anp", "ucp", "ard-link", "ard-agentmap", "dns-aid"]
+                      "example": ["llms.txt", "ard-catalog", "a2a-agent-card", "api-catalog", "ai-info.json", "openapi", "ord", "awp", "host-meta", "anp", "ucp", "ard-link", "ard-agentmap", "aid"]
                     }
                   },
                   "required": ["domain", "provenance", "discovered", "resources", "checked"]

@@ -24,7 +24,7 @@ record? Every standard put it somewhere different, and more keep appearing.
 NessGate is that resolver. Give it a domain and it reads whatever the domain already
 publishes — across ARD (all three surfaces: well-known, `rel="ard"`, robots `Agentmap:`), A2A,
 `llms.txt`, RFC 9727 api-catalog, OpenAPI, Open Resource Discovery, RFC 6415 host-meta, ANP, UCP,
-DNS-AID and more — and returns one normalized answer, with a link back to each source so the agent
+AID, GB/Z 185.4 and more — and returns one normalized answer, with a link back to each source so the agent
 can verify against the domain itself.
 
     company.com → { resources: [
@@ -54,7 +54,7 @@ keep no accounts, store no domain data).
 Code: https://github.com/NessGate/nessgate · Live: https://nessgate.com ·
 Spec: https://nessgate.com/spec · Charter: https://nessgate.com/charter
 
-Honest about limits: ANP and UCP are emerging and DNS-AID/AWP are drafts (read as-is, labeled as
+Honest about limits: ANP and UCP are emerging and AID/AWP are drafts (read as-is, labeled as
 such). China's GB/Z 185.4/185.5 is deliberately **not** implemented — the discovery mechanism is
 only in the paywalled national standard and looks federated rather than domain-native, so there's
 no concrete surface to probe yet. The adapter architecture is ready to host it once the endpoint

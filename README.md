@@ -3,7 +3,7 @@
 **The open, neutral compatibility resolver for the agentic web.** Give NessGate a domain and it
 reads whatever that domain already publishes — across ARD (all three surfaces), A2A, `llms.txt`,
 RFC 9727 api-catalog, Open Resource Discovery, RFC 6415 host-meta, OpenAPI, Agent Network Protocol
-(ANP), Universal Commerce Protocol (UCP), DNS-AID and more — and returns **one normalized answer**,
+(ANP), Universal Commerce Protocol (UCP), AID, GB/Z 185.4 and more — and returns **one normalized answer**,
 with a link back to each source so an agent can always verify against the domain itself.
 
 ```
@@ -97,11 +97,14 @@ still stand on the domain itself.
   - **link-rel** — parse `<link rel="ard">` in the homepage, then GET the target (`ard-link`).
   - **robots** — parse an `Agentmap:` directive in `/robots.txt`, then GET the target
     (`ard-agentmap`).
-  - **dns** — a DoH TXT lookup at `_agent.<domain>` (`dns-aid`: `v=aid1;u=<uri>;p=<proto>;a=<auth>`).
+  - **dns** — a DoH TXT lookup at `_agent.<domain>` (`aid`: `v=aid1;u=<uri>;p=<proto>;a=<auth>`).
 
-  **Complete ARD support** means all three ARD surfaces: the well-known paths, the
-  `<link rel="ard">` tag, and the robots.txt `Agentmap:` directive. ANP and UCP are emerging;
-  DNS-AID/AID and AWP are drafts, described as such and read as-is with no adoption claim.
+  NessGate reads **three of ARD's five publication surfaces** (ARD v0.91 §5.1): the well-known
+  paths, the `<link rel="ard">` tag, and the robots.txt `Agentmap:` directive. ARD's in-page
+  JSON-LD and DNS-Service-Binding surfaces are **not yet read**. ANP and UCP are emerging; the AID
+  TXT record (`v=aid1` at `_agent`) and AWP are drafts, read as-is with no adoption claim. **Note:
+  the `aid` adapter is the AID TXT mechanism, which is *not* the IETF DNS-AID draft** — DNS-AID uses
+  SVCB records at `_agents.<domain>` and is a separate mechanism, not implemented here.
 - **GB/Z 185 (China, 智能体互联) — 185.4 yes, 185.5 gated.** NessGate **normalizes GB/Z 185.4
   agent descriptions ("ACS")**: an ACS is an A2A-family card with GB/Z extensions (an agent
   identity code `aic`, an mTLS scheme, a `certificate` block), recognized **by content** and
@@ -129,7 +132,7 @@ still stand on the domain itself.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /discover/{domain}` | **The resolver.** Reads what the domain publishes across the supported adapters (llms.txt, ARD/ai-catalog via well-known paths, `rel="ard"` link, and robots `Agentmap:`; A2A agent card, RFC 9727 api-catalog, ai-info.json, OpenAPI, ORD, AWP, host-meta, ANP, UCP, DNS-AID) and returns one normalized answer — `{domain, provenance, note, discovered[], resources[], checked[]}`, each resource carrying its `source` and native `sourceUrl`. CORS open, no auth; nothing stored or crawled; 10-min cache, 120/hr/IP. |
+| `GET /discover/{domain}` | **The resolver.** Reads what the domain publishes across the supported adapters (llms.txt, ARD/ai-catalog via well-known paths, `rel="ard"` link, and robots `Agentmap:`; A2A agent card, RFC 9727 api-catalog, ai-info.json, OpenAPI, ORD, AWP, host-meta, ANP, UCP, AID, GB/Z 185.4) and returns one normalized answer — `{domain, provenance, note, discovered[], resources[], checked[]}`, each resource carrying its `source` and native `sourceUrl`. CORS open, no auth; nothing stored or crawled; 10-min cache, 120/hr/IP. |
 | `POST /mcp` | Model Context Protocol server (Streamable HTTP, stateless, no auth) exposing one tool, `discover_domain`, that returns the same answer as `/discover`. |
 | `GET /{domain}` | Human-readable domain page — the resolver rendered for humans (live discovery). |
 | `GET /resolver.mjs` | The embeddable resolver library (also on npm as `@nessgate/resolver`). |

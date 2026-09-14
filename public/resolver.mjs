@@ -9,8 +9,9 @@
 //
 // It reads (never defines) these mechanisms and reuses each one's OWN labels —
 // NessGate invents no taxonomy. Channels: fixed well-known paths, an ARD
-// <link rel="ard">, an ARD robots.txt Agentmap directive, and a DNS-AID TXT
-// record. The adapter table and normalization below are identical to the
+// <link rel="ard">, an ARD robots.txt Agentmap directive, and an AID TXT
+// record (v=aid1 at _agent — the AID draft, not the IETF DNS-AID SVCB draft).
+// The adapter table and normalization below are identical to the
 // reference resolver (src/worker.js); a parity test keeps them from drifting.
 //
 // GB/Z 185.4 (China): a GB/Z 185.4 agent description ("ACS") is recognised by
@@ -39,7 +40,7 @@ export const ADAPTERS = [
   { id: "ucp", channel: "well-known", paths: ["/.well-known/ucp", "/.well-known/ucp/manifest.json"], kind: "json" },
   { id: "ard-link", channel: "link-rel", rels: ["ard", "ai-catalog"], normalizeAs: "ard-catalog" },
   { id: "ard-agentmap", channel: "robots", directive: "agentmap", normalizeAs: "ard-catalog" },
-  { id: "dns-aid", channel: "dns", node: "_agent" },
+  { id: "aid", channel: "dns", node: "_agent" }, // AID TXT (v=aid1) at _agent — NOT the IETF DNS-AID SVCB draft (_agents), a separate mechanism
 ];
 
 const MAX_DISCOVER_RESOURCES = 200;
@@ -112,7 +113,7 @@ export function parseAgentmap(robots, directive) {
   return out;
 }
 
-// Parse an AID / DNS-AID TXT record: a semicolon-delimited string of key=value
+// Parse an AID TXT record (v=aid1): a semicolon-delimited string of key=value
 // pairs (draft-nemethi-aid). Keys have short aliases (v/version, u/uri, p/proto,
 // a/auth, s/desc, d/docs). Returns null unless it carries a version and a uri.
 export function parseAidRecord(txt) {
@@ -386,7 +387,7 @@ async function runAdapter(a, domain, fetchImpl, timeoutMs, maxBytes) {
         const aid = parseAidRecord(r);
         if (aid) {
           discovered.push({ type: a.id, url: aid.uri });
-          resources.push({ source: "dns-aid", sourceUrl: "dns:" + name, type: aid.proto || "aid", name: aid.desc, url: aid.uri, raw: aid });
+          resources.push({ source: "aid", sourceUrl: "dns:" + name, type: aid.proto || "aid", name: aid.desc, url: aid.uri, raw: aid });
         }
       }
       return { discovered, resources };

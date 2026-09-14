@@ -1,7 +1,7 @@
 {
   "name": "NessGate",
   "url": "https://nessgate.com",
-  "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads the machine-readable resources that domain publishes across the standard discovery mechanisms (llms.txt, ARD / ai-catalog.json incl. rel=ard and robots Agentmap, A2A agent card, RFC 9727 api-catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP, RFC 6415 host-meta, Agent Network Protocol, Universal Commerce Protocol, DNS-AID, and GB/Z 185.4 agent descriptions) and returns one normalized answer, each record linking back to its source on the domain. NessGate reads on demand, stores nothing, and makes no ownership or safety claim.",
+  "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads the machine-readable resources that domain publishes across the standard discovery mechanisms (llms.txt, ARD / ai-catalog.json incl. rel=ard and robots Agentmap, A2A agent card, RFC 9727 api-catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP, RFC 6415 host-meta, Agent Network Protocol, Universal Commerce Protocol, AID (TXT v=aid1 at _agent; distinct from the IETF DNS-AID SVCB draft), and GB/Z 185.4 agent descriptions) and returns one normalized answer, each record linking back to its source on the domain. NessGate reads on demand, stores nothing, and makes no ownership or safety claim.",
   "category": "internet infrastructure / AI discovery",
   "api": {
     "discover": "https://nessgate.com/discover/{domain}",

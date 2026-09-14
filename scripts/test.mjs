@@ -124,8 +124,9 @@ console.log("--- adapter set (universal-resolver channels)");
   is(A.find((a) => a.id === "ard-agentmap").channel, "robots", "ARD Agentmap is a robots adapter");
   is(A.find((a) => a.id === "anp").paths[0], "/.well-known/agent-descriptions", "ANP well-known path");
   is(A.find((a) => a.id === "ucp").paths.includes("/.well-known/ucp"), true, "UCP well-known path");
-  is(A.find((a) => a.id === "dns-aid").channel, "dns", "DNS-AID is a dns adapter");
-  is(A.find((a) => a.id === "dns-aid").node, "_agent", "DNS-AID queries _agent node");
+  is(A.find((a) => a.id === "aid").channel, "dns", "AID is a dns adapter");
+  is(A.find((a) => a.id === "aid").node, "_agent", "AID queries the _agent TXT node (v=aid1) — distinct from the IETF DNS-AID SVCB draft");
+  is(A.some((a) => a.id === "dns-aid"), false, "the old mislabel 'dns-aid' is gone (AID != IETF DNS-AID)");
   is(A.some((a) => a.id === "gbz-185" || a.id === "gbz-185-4" || a.id === "gbz-185-5"), false, "GB/Z has NO discovery adapter (185.4 is content-recognised; 185.5 is library opt-in) — no guessed path");
 }
 

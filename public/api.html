@@ -41,11 +41,14 @@ directly.</p>
 (fixed paths on the domain), <strong>link-rel</strong> (a <code>&lt;link rel="ard"&gt;</code> in the
 homepage), <strong>robots</strong> (an <code>Agentmap:</code> directive in <code>/robots.txt</code>),
 and <strong>dns</strong> (a DoH TXT lookup). The adapters cover <code>llms.txt</code>, ARD /
-<code>ai-catalog</code> across all three ARD surfaces (well-known paths, the <code>rel="ard"</code>
-link, and the robots <code>Agentmap:</code> directive), the A2A agent card, RFC 9727 api-catalog,
-<code>ai-info.json</code>, OpenAPI, Open Resource Discovery, AWP, RFC 6415 host-meta, Agent Network
-Protocol (ANP), Universal Commerce Protocol (UCP), and DNS-AID (a TXT record at
-<code>_agent.&lt;domain&gt;</code>). ANP and UCP are emerging; DNS-AID/AID and AWP are drafts. See the
+<code>ai-catalog</code> across three of ARD's publication surfaces (well-known paths, the
+<code>rel="ard"</code> link, and the robots <code>Agentmap:</code> directive), the A2A agent card,
+RFC 9727 api-catalog, <code>ai-info.json</code>, OpenAPI, Open Resource Discovery, AWP, RFC 6415
+host-meta, Agent Network Protocol (ANP), Universal Commerce Protocol (UCP), AID (a TXT record at
+<code>_agent.&lt;domain&gt;</code>: <code>v=aid1;…</code>), and GB/Z 185.4 agent descriptions. ANP
+and UCP are emerging; AID and AWP are drafts. (ARD's in-page JSON-LD and DNS-Service-Binding
+surfaces, and the separate IETF DNS-AID SVCB draft at <code>_agents.&lt;domain&gt;</code>, are not
+yet read.) See the
 <a href="/spec">specification</a> for the full adapter list.</p>
 <pre><code>$ curl https://nessgate.com/discover/example.com
 
@@ -67,7 +70,7 @@ Protocol (ANP), Universal Commerce Protocol (UCP), and DNS-AID (a TXT record at
   ],
   "checked": ["llms.txt","ard-catalog","a2a-agent-card","api-catalog",
               "ai-info.json","openapi","ord","awp","host-meta",
-              "anp","ucp","ard-link","ard-agentmap","dns-aid"]
+              "anp","ucp","ard-link","ard-agentmap","aid"]
 }
 
 400 Bad Request      — input is not a valid domain
