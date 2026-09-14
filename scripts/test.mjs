@@ -23,6 +23,8 @@ import {
   domainToNamespace,
   mcpRegistryRecords,
   verifyCandidateRecords,
+  parseSameOrgHosts,
+  orgRecordsFromDoc,
   adapters,
 } from "../src/worker.js";
 
@@ -237,6 +239,27 @@ console.log("--- Explore v2 candidate verification (opt-in; AI suggests, NessGat
     "candidate: full original→final redirect chain preserved in provenance"
   );
   is(redir[0].url, "https://b.com/final/llms.txt", "candidate: record points to the FINAL url (where the content is)");
+}
+
+console.log("--- Explore v2 Organization Discovery (opt-in, bounded, verified-only)");
+{
+  const html = '<a href="https://developers.example.com/docs">Docs</a> <a href="https://twitter.com/example">X</a> <img src="https://cdn.example.com/logo.png"> <a href="https://www.example.com/about">About</a> <a href="https://developers.example.com/api">API</a>';
+  is(
+    parseSameOrgHosts(html, "example.com"),
+    ["developers.example.com", "cdn.example.com"],
+    "parseSameOrgHosts: same-domain subdomains only, unique, cross-domain + www/apex excluded"
+  );
+  is(parseSameOrgHosts("no links here", "example.com"), [], "parseSameOrgHosts: none → empty");
+  is(parseSameOrgHosts(html, "other.org"), [], "parseSameOrgHosts: wrong domain → empty");
+  const orgLlms = orgRecordsFromDoc("https://developers.example.com/llms.txt", "# Dev docs\n- [API](https://developers.example.com/api.md)", "conventional");
+  is(orgLlms.length, 1, "org: a real llms.txt on a related host is reported");
+  is(orgLlms[0].evidence, "same-org-host", "org: labelled same-org-host");
+  is(JSON.stringify(orgLlms[0].provenance), JSON.stringify(["org:conventional", "https://developers.example.com/llms.txt"]), "org: provenance records how the host was found");
+  is(orgRecordsFromDoc("https://docs.example.com/llms.txt", "<!doctype html><html>SPA shell</html>", "conventional").length, 0, "org: an SPA catch-all shell is NOT reported (wildcard-DNS guard)");
+  const orgArd = orgRecordsFromDoc("https://developers.example.com/.well-known/ard.json", JSON.stringify({ entries: [{ type: "application/json", url: "https://developers.example.com/a.json" }] }), "homepage-link");
+  is(orgArd.length, 1, "org: an ARD catalog on a related host is normalized");
+  is(orgArd[0].evidence, "same-org-host", "org: ARD entries labelled same-org-host");
+  is(orgRecordsFromDoc("https://api.example.com/page.json", '{"random":true}', "conventional").length, 0, "org: unrecognized JSON is not reported");
 }
 
 console.log("--- resolver normalization (thin, source-labelled, never invents semantics)");

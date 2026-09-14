@@ -98,7 +98,17 @@ an <code>evidence</code> class and a <code>provenance</code> chain:</p>
 <tr><td><code>publisher-declared</code></td><td>A pointer a hosted document explicitly names (possibly on another host).</td></tr>
 <tr><td><code>namespace-verified</code></td><td>An external registry (the MCP Registry) verified control of the namespace — <em>attributed to the registry</em>, not re-claimed by NessGate.</td></tr>
 <tr><td><code>candidate</code></td><td>A caller-suggested URL (opt-in, below) that NessGate fetched and confirmed is a real machine-readable resource. Its <em>relationship</em> to the domain is unverified — NessGate makes no ownership claim.</td></tr>
+<tr><td><code>same-org-host</code></td><td>A verified resource on a host under the <em>same registrable domain</em> (Organization Discovery, opt-in below). Shared DNS control implies the organizational relationship; it is not independently verified.</td></tr>
 </table>
+<p><strong>Organization Discovery (opt-in).</strong> Add <code>?org=1</code> to look beyond the exact
+host: many organizations publish their machine-readable resources on a related subdomain (for
+example <code>developers.openai.com</code> rather than <code>openai.com</code>). Org mode probes a
+<em>bounded</em> set of plausible same-domain hosts — subdomains the homepage itself links to, plus
+a small conventional shortlist (<code>developers</code>, <code>docs</code>, <code>api</code>, …; at
+most 4 hosts, 2 paths each) — and reports <em>only</em> resources it actually verified, labelled
+<code>same-org-host</code>. Hosts probed are listed in <code>orgChecked</code>. No brute-force
+scanning, no crawling; a host that serves nothing recognized is simply absent. For a related host's
+full resource graph, explore that host directly.</p>
 <p><strong>Opt-in candidate verification.</strong> <code>POST /explore/{domain}</code> with a JSON body
 <code>{"candidates":["https://…", …]}</code> lets your own AI/search <em>suggest</em> resource URLs;
 NessGate fetches each (bounded, SSRF-checked), verifies it is genuinely machine-readable, and returns

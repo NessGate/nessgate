@@ -24,8 +24,8 @@ stored directory. ARD registries, AGNTCY, NANDA and the MCP Registry already pla
 crawl/index/directory role. If NessGate stores a global capability map, it (a) breaks its
 no-storage/no-index red line, (b) invites "why is our data in your catalog," and (c) enters a
 crowded, high-kill-risk space. **Decision: v2 is a bounded evidence resolver. No persistent map, no
-global crawl, no guessed subdomains, no AI deciding ownership. Everything is computed per request and
-discarded with the edge cache.**
+global crawl, no brute-force subdomain scanning, no AI deciding ownership. Everything is computed per
+request and discarded with the edge cache.**
 
 ## Model: an evidence *tree*, not a knowledge graph
 
@@ -70,9 +70,15 @@ Every resource carries exactly one class — no vague numeric scores:
    unverified; **AI never establishes ownership.** Kept out of the free hosted deterministic core so
    nessgate.com stays fast, free, and auditable.
 
-Not included: **same-registrable-domain "related-host"** guessing is low-value and does not even
-solve the Microsoft case (`github.io` ≠ `microsoft.com`); if ever added it is `candidate`-class,
-opt-in, clearly labelled. **No brute-force subdomain scanning.**
+5. **Organization Discovery (opt-in, `?org=1`)** — probes a *bounded* set of plausible
+   same-registrable-domain hosts: subdomains the homepage itself links to, plus a small fixed
+   conventional shortlist (`developers`, `docs`, `api`, …; at most 4 hosts × 2 paths). Only
+   resources that actually verify are reported, as evidence class **`same-org-host`** — shared DNS
+   control implies the organizational relationship; it is not independently verified. This solves
+   the "resources live on `developers.example.com`" case. It deliberately does **not** solve
+   cross-registrable-domain cases (`github.io` ≠ `microsoft.com`) — those need caller-supplied
+   candidates (layer 4). **No brute-force subdomain scanning** — the probe set is small, fixed, and
+   verified-only, and off by default.
 
 ## Hard limits (designed in from day one)
 
@@ -119,4 +125,5 @@ All deterministic layers are live in `/explore`: bounded delegated discovery of 
 pointers, the evidence classes and provenance chains, attributed MCP-Registry federation, and the
 opt-in candidate-verification POST. Exact-host empty results say "no supported resources found on
 this exact host" (related hosts or registries may publish more). The design's hard "no"s remain
-binding: no persistent map, no global crawl, no guessed subdomains, no AI-established ownership.
+binding: no persistent map, no global crawl, no brute-force subdomain scanning, no AI-established
+ownership. Organization Discovery (`?org=1`) is live as the opt-in bounded related-host layer.

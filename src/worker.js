@@ -136,17 +136,20 @@ async function route(request, env, ctx) {
     return apiDiscover(decodeURIComponent(path.slice("/discover/".length)), env, ctx, request);
   }
   if (path.startsWith("/explore/") && request.method === "GET") {
-    return apiExplore(decodeURIComponent(path.slice("/explore/".length)), env, ctx, request, []);
+    const org = url.searchParams.get("org") === "1";
+    return apiExplore(decodeURIComponent(path.slice("/explore/".length)), env, ctx, request, [], org);
   }
   if (path.startsWith("/explore/") && request.method === "POST") {
     // Opt-in candidate verification: the caller's AI/search POSTs candidate URLs;
     // NessGate verifies them deterministically and labels them evidence:"candidate".
     let candidates = [];
+    let org = url.searchParams.get("org") === "1";
     try {
       const b = await request.json();
       if (b && Array.isArray(b.candidates)) candidates = b.candidates;
+      if (b && b.org === true) org = true;
     } catch {}
-    return apiExplore(decodeURIComponent(path.slice("/explore/".length)), env, ctx, request, candidates);
+    return apiExplore(decodeURIComponent(path.slice("/explore/".length)), env, ctx, request, candidates, org);
   }
   if (path === "/version" && request.method === "GET") {
     return json({ build: env.BUILD_ID || "dev", spec: "v1" }, 200, cors());
@@ -663,6 +666,56 @@ async function apiDiscover(raw, env, ctx, request) {
 // AI, and makes no ownership claim. /discover is unchanged for existing callers.
 const EXPLORE_LIMITS = { maxDepth: 2, maxHosts: 8, maxRequests: 24, maxTotalBytes: 6_000_000 };
 const MAX_CANDIDATES = 10; // cap on opt-in caller-supplied candidate URLs to verify (subrequest budget)
+
+// Organization Discovery (opt-in, ?org=1). Major organizations publish their
+// machine-readable resources on related hosts (developers.openai.com) rather
+// than the apex. Org mode probes a BOUNDED set of plausible same-organization
+// hosts — subdomains the homepage itself links to, plus a small fixed
+// conventional shortlist — and reports ONLY verified machine-readable resources,
+// each labelled evidence:"same-org-host" (same registrable domain controls the
+// DNS; the relationship is organizational, not independently verified). This is
+// not crawling: at most ORG_MAX_HOSTS hosts × ORG_PROBE_PATHS paths, sharing the
+// same request/host/byte budget, content-validated before being reported.
+const ORG_SUBDOMAIN_SHORTLIST = ["developers", "developer", "docs", "api", "ai", "open"];
+const ORG_MAX_HOSTS = 4;
+const ORG_PROBE_PATHS = ["/llms.txt", "/.well-known/ard.json"];
+const ORG_NOTE =
+  "Organization Discovery results (evidence \"same-org-host\") are machine-readable resources " +
+  "verified on hosts under the same registrable domain — subdomains the homepage links to, or a " +
+  "small conventional shortlist. The organizational relationship is implied by shared DNS control, " +
+  "not independently verified. Explore a related host directly for its full resource graph.";
+
+// Pure: extract same-registrable-domain subdomain hosts referenced anywhere in an
+// HTML page (absolute URLs only). Excludes the apex and www; unique, order kept.
+function parseSameOrgHosts(html, domain) {
+  if (typeof html !== "string") return [];
+  const out = [];
+  const seen = new Set();
+  const suffix = "." + domain;
+  for (const m of html.match(/https?:\/\/[a-z0-9.-]+/gi) || []) {
+    let host;
+    try { host = new URL(m).hostname.toLowerCase().replace(/\.+$/, ""); } catch { continue; }
+    if (!host.endsWith(suffix)) continue;
+    if (host === "www." + domain || host === domain) continue;
+    if (seen.has(host)) continue;
+    seen.add(host);
+    out.push(host);
+  }
+  return out;
+}
+
+// Pure: turn one fetched org-host document into same-org-host records — empty
+// unless it is genuinely a recognized machine-readable resource.
+function orgRecordsFromDoc(url, text, via) {
+  const prov = ["org:" + via, url];
+  if (isLlmsPath(url)) {
+    if (!validateProbeContent("text", text)) return [];
+    return [{ source: "llms.txt", sourceUrl: url, type: "llms.txt", url, evidence: "same-org-host", provenance: prov, depth: 1 }];
+  }
+  const t = classifyJson(text);
+  if (!t) return [];
+  return normalizeResources(t, "json", text, url).map((rec) => ({ ...rec, evidence: "same-org-host", provenance: prov, depth: 1 }));
+}
 const EXPLORE_UA = "NessGate-Explore/1.0 (+https://nessgate.com)";
 const EXPLORE_RATE_LIMIT_PER_HOUR = 60;
 const EXPLORE_NOTE =
@@ -815,12 +868,12 @@ async function fetchMcpRegistry(namespace) {
   }
 }
 
-async function exploreData(raw, env, ctx, request, candidates = []) {
+async function exploreData(raw, env, ctx, request, candidates = [], org = false) {
   const domain = normalizeDomain(raw, true);
   if (!domain) return { status: 400, body: { error: "Invalid domain" } };
   const hasCandidates = Array.isArray(candidates) && candidates.length > 0;
   const cache = caches.default;
-  const key = new Request(`https://resolver-cache.nessgate.com/explore/${domain}`);
+  const key = new Request(`https://resolver-cache.nessgate.com/explore${org ? "-org" : ""}/${domain}`);
   // Candidate requests are per-body and never cached (input varies per call).
   const hit = hasCandidates ? null : await cache.match(key);
   if (hit) return { status: 200, body: await hit.json(), cached: true };
@@ -965,6 +1018,32 @@ async function exploreData(raw, env, ctx, request, candidates = []) {
     }
   }
 
+  // Phase 5 — Organization Discovery (opt-in via ?org=1). Probe a bounded set of
+  // plausible same-organization hosts: subdomains the homepage itself links to
+  // (publisher evidence) plus a small fixed conventional shortlist. Only verified
+  // machine-readable resources are reported (evidence "same-org-host"); a host
+  // that serves nothing recognized is simply absent. Shares the global budget.
+  let orgChecked = null;
+  if (org) {
+    let homepageHosts = [];
+    const home = await fetchDoc(`https://${domain}/`);
+    if (home) homepageHosts = parseSameOrgHosts(home.text, domain);
+    const orgHosts = [
+      ...homepageHosts.map((h) => ({ h, via: "homepage-link" })),
+      ...ORG_SUBDOMAIN_SHORTLIST.map((p) => `${p}.${domain}`).filter((h) => !homepageHosts.includes(h)).map((h) => ({ h, via: "conventional" })),
+    ].slice(0, ORG_MAX_HOSTS);
+    orgChecked = [];
+    for (const { h, via } of orgHosts) {
+      if (budget.truncated) break;
+      orgChecked.push(h);
+      for (const p of ORG_PROBE_PATHS) {
+        const doc = await fetchDoc(`https://${h}${p}`);
+        if (!doc) continue;
+        for (const rec of orgRecordsFromDoc(doc.finalUrl, doc.text, via)) out.push(rec);
+      }
+    }
+  }
+
   // Dedup (source|url|sourceUrl), keep first (earliest/strongest evidence), cap.
   const seenRec = new Set();
   const resources = [];
@@ -978,8 +1057,9 @@ async function exploreData(raw, env, ctx, request, candidates = []) {
 
   const body = {
     domain,
-    note: EXPLORE_NOTE,
+    note: org ? EXPLORE_NOTE + " " + ORG_NOTE : EXPLORE_NOTE,
     checked: ADAPTERS.map((a) => a.id),
+    ...(orgChecked ? { orgChecked } : {}),
     resources,
     federated: ["mcp-registry"],
     stats: {
@@ -987,12 +1067,13 @@ async function exploreData(raw, env, ctx, request, candidates = []) {
       publisherDeclared: resources.filter((r) => r.evidence === "publisher-declared").length,
       namespaceVerified: resources.filter((r) => r.evidence === "namespace-verified").length,
       candidate: resources.filter((r) => r.evidence === "candidate").length,
+      ...(org ? { sameOrgHost: resources.filter((r) => r.evidence === "same-org-host").length } : {}),
       requests: budget.requests,
       hosts: budget.hosts.size,
       bytes: budget.bytes,
       truncated: budget.truncated,
     },
-    limits: EXPLORE_LIMITS,
+    limits: org ? { ...EXPLORE_LIMITS, orgMaxHosts: ORG_MAX_HOSTS } : EXPLORE_LIMITS,
   };
   const res = new Response(JSON.stringify(body), {
     headers: { "Content-Type": "application/json", "Cache-Control": `max-age=${DISCOVER_CACHE_SECONDS}` },
@@ -1001,8 +1082,8 @@ async function exploreData(raw, env, ctx, request, candidates = []) {
   return { status: 200, body };
 }
 
-async function apiExplore(raw, env, ctx, request, candidates = []) {
-  const { status, body } = await exploreData(raw, env, ctx, request, candidates);
+async function apiExplore(raw, env, ctx, request, candidates = [], org = false) {
+  const { status, body } = await exploreData(raw, env, ctx, request, candidates, org);
   const hasCand = Array.isArray(candidates) && candidates.length > 0;
   const extra =
     status === 200
@@ -1018,7 +1099,7 @@ async function apiExplore(raw, env, ctx, request, candidates = []) {
 // (the tool dispatches to the same handler).
 
 const MCP_SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26"];
-const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.3.3" };
+const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.4.0" };
 const MCP_INSTRUCTIONS =
   "Use discover_domain to resolve a domain to the machine-readable resources it publishes " +
   "across the supported discovery locations (ARD, A2A, llms.txt, API catalogs, OpenAPI, and " +
@@ -1567,4 +1648,4 @@ function selfDomain() { return SELF_DOMAIN; }
 function apiCatalog() { return API_CATALOG; }
 function mcpTools() { return MCP_TOOLS; }
 function adapters() { return ADAPTERS; }
-export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, selfDomain, apiCatalog, mcpTools, adapters };
+export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, orgRecordsFromDoc, selfDomain, apiCatalog, mcpTools, adapters };

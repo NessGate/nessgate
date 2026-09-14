@@ -31,6 +31,19 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h2>2026</h2>
 
+<h3 id="v1-4-0">v1.4.0 — Organization Discovery</h3>
+<ul>
+<li><strong><code>GET /explore/{domain}?org=1</code> (opt-in).</strong> Many organizations publish
+    their machine-readable resources on a related subdomain (<code>developers.openai.com</code>)
+    rather than the apex. Organization Discovery probes a bounded set of plausible
+    same-registrable-domain hosts — subdomains the homepage itself links to, plus a small
+    conventional shortlist (at most 4 hosts × 2 paths) — and reports <em>only</em> resources that
+    actually verify, labelled evidence <code>same-org-host</code> with the probe provenance. Shared
+    DNS control implies the organizational relationship; it is not independently verified. Hosts
+    probed appear in <code>orgChecked</code>. No brute-force scanning; off by default;
+    <code>/discover</code> and default <code>/explore</code> unchanged.</li>
+</ul>
+
 <h3 id="v1-3-3">v1.3.3 — Documentation</h3>
 <ul>
 <li>Corrected the npm package README: current mechanism list, accurate export names, browser
