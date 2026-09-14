@@ -109,6 +109,18 @@ most 4 hosts, 2 paths each) — and reports <em>only</em> resources it actually 
 <code>same-domain-host</code>. Hosts probed are listed in <code>orgChecked</code>. No brute-force
 scanning, no crawling; a host that serves nothing recognized is simply absent. For a related host's
 full resource graph, explore that host directly.</p>
+<p><strong>Related Discovery (opt-in).</strong> Add <code>?related=1</code> for a clearly separate
+cross-domain layer, returned in <code>related[]</code> (never mixed with <code>resources[]</code>).
+Classes: <code>publisher-declared-related</code> — the queried domain itself serves a purpose-built
+declaration naming the site (a legacy Related Website Set file or a Digital Asset Links web
+statement; hyperlinks never qualify), with a <code>mutual</code> flag when the site reciprocates;
+<code>registry-verified-related</code> — a domain-verifying registry (the MCP Registry) names the
+specific host, always attributed; <code>infrastructure-correlated-candidate</code> — caller-supplied
+candidates with a cited technical signal. Technical signals (nameserver containment, …) appear in
+<code>signals[]</code> as corroboration only — they never mean "official" or "same organization".
+Bounded (≤5 hosts) and best-effort; full rules in
+<a href="https://github.com/NessGate/nessgate/blob/main/docs/related-discovery-rules.md">docs/related-discovery-rules.md</a>.</p>
+
 <p class="note"><strong>Known limitation of the hosted resolver:</strong> some sites' bot protection
 challenges requests from shared cloud infrastructure, so the hosted endpoints can miss files those
 sites do publish (they are reported as not found, never guessed). The embeddable

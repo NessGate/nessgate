@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "NessGate API",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads whatever that domain already publishes across the standard machine-discovery locations (llms.txt, ARD / ai-catalog.json, A2A agent card, RFC 9727 API catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP manifest, RFC 6415 host-meta) and returns one normalized answer, each record carrying a sourceUrl back to the domain. NessGate stores nothing, never crawls or indexes, and makes no ownership or safety claim. Read endpoints are public, unauthenticated, and CORS-open. The response contract is stable and additive: new optional fields may appear; clients must ignore unknown fields.",
     "contact": { "email": "contact@nessgate.com", "url": "https://nessgate.com/contact" },
     "termsOfService": "https://nessgate.com/terms",
@@ -87,6 +87,13 @@
             "required": false,
             "description": "Set to 1 to enable Organization Discovery: probe a bounded set of plausible same-registrable-domain hosts (homepage-linked subdomains plus a small conventional shortlist, max 4 hosts x 2 paths) and report only verified resources, labelled evidence same-domain-host. Hosts probed are listed in orgChecked.",
             "schema": { "type": "string", "enum": ["1"] }
+          },
+          {
+            "name": "related",
+            "in": "query",
+            "required": false,
+            "description": "Set to 1 for Related Discovery: a separate cross-registrable-domain layer returned in related[] (never mixed with resources[]). Classes: publisher-declared-related (the queried domain serves a purpose-built declaration such as a legacy Related Website Set file; hyperlinks never qualify), registry-verified-related (a domain-verifying registry names the specific host, attributed), infrastructure-correlated-candidate (caller candidates with a cited technical signal). Technical signals are corroborating only and never mean official or same organization. Bounded, max 5 related hosts.",
+            "schema": { "type": "string", "enum": ["1"] }
           }
         ],
         "responses": {
@@ -101,6 +108,8 @@
                     "note": { "type": "string" },
                     "checked": { "type": "array", "items": { "type": "string" } },
                     "federated": { "type": "array", "items": { "type": "string" }, "example": ["mcp-registry"] },
+                    "related": { "type": "array", "description": "Only with ?related=1: cross-registrable-domain entries, each { host, class: publisher-declared-related | registry-verified-related | infrastructure-correlated-candidate, declaration?, attribution?, signals[], resources[] }. Separate from resources[]; signals are corroborating only.", "items": { "type": "object" } },
+                    "relatedNote": { "type": "string" },
                     "resources": {
                       "type": "array",
                       "description": "Normalized records, each with an evidence class, a provenance chain, and depth.",

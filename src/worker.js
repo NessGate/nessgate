@@ -1314,7 +1314,7 @@ async function apiExplore(raw, env, ctx, request, candidates = [], org = false, 
 // (the tool dispatches to the same handler).
 
 const MCP_SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26"];
-const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.4.0" };
+const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.5.0" };
 const MCP_INSTRUCTIONS =
   "Use discover_domain to resolve a domain to the machine-readable resources it publishes " +
   "across the supported discovery locations (ARD, A2A, llms.txt, API catalogs, OpenAPI, and " +

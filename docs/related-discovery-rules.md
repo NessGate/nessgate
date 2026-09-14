@@ -95,3 +95,10 @@ empty; the same-domain layer (`?org=1`) already covers `developers.openai.com` s
 These examples avoid overclaiming by construction: strong classes only restate a declaration or an
 attributed registry record; every technical signal is quoted, labeled corroborating, and never
 promoted.
+
+Corroboration is best-effort: when a mutuality fetch or NS lookup cannot complete (bot-protected
+hosts, request budget), the entry keeps its declaration-derived class with `mutual: false` and no
+signal — degraded honestly, never upgraded. Live production runs (2026-09-14) confirmed:
+google.com returned its three declared sites; microsoft.com returned `github.com` as
+`registry-verified-related` via the registry's `com.microsoft/azure` entry (added to the registry
+after this document's first draft); openai.com returned an empty `related[]`.

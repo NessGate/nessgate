@@ -31,6 +31,21 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h2>2026</h2>
 
+<h3 id="v1-5-0">v1.5.0 — Related Discovery</h3>
+<ul>
+<li><strong><code>GET /explore/{domain}?related=1</code> (opt-in).</strong> A clearly separate
+    cross-registrable-domain layer, returned in <code>related[]</code> and never mixed with
+    exact-host results. <code>publisher-declared-related</code>: the queried domain itself serves a
+    purpose-built declaration naming the site (a legacy Related Website Set file, checked for
+    reciprocity, or a Digital Asset Links web statement) — hyperlinks never qualify.
+    <code>registry-verified-related</code>: a domain-verifying registry names the specific host,
+    always attributed. <code>infrastructure-correlated-candidate</code>: caller-supplied candidates
+    with a cited technical signal. Technical signals (nameserver containment) are recorded in
+    <code>signals[]</code> as corroboration only — they never mean "official" or "same
+    organization", alone or combined. Bounded (≤5 related hosts), deterministic, non-crawling;
+    evidence rules in <code>docs/related-discovery-rules.md</code>.</li>
+</ul>
+
 <h3 id="v1-4-0">v1.4.0 — Organization Discovery</h3>
 <ul>
 <li><strong><code>GET /explore/{domain}?org=1</code> (opt-in).</strong> Many organizations publish
