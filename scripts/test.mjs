@@ -17,7 +17,9 @@ import {
   isAcs,
   parseLlmsLinks,
   looksMachineReadable,
+  isLlmsPath,
   classifyJson,
+  exploreBudgetAllows,
   adapters,
 } from "../src/worker.js";
 
@@ -157,7 +159,12 @@ is(
 is(looksMachineReadable("https://x.com/api/llms.txt"), true, "looksMachineReadable: llms.txt");
 is(looksMachineReadable("https://x.com/.well-known/ard.json"), true, "looksMachineReadable: json / well-known");
 is(looksMachineReadable("https://x.com/guide.html"), false, "looksMachineReadable: html page skipped (not followed)");
+is(looksMachineReadable("https://x.com/security.txt"), false, "looksMachineReadable: generic .txt NOT followed (only llms.txt)");
+is(looksMachineReadable("https://x.com/.well-known/security.txt"), true, "looksMachineReadable: well-known path allowed");
 is(looksMachineReadable("not a url"), false, "looksMachineReadable: garbage → false");
+is(isLlmsPath("https://x.com/llms.txt"), true, "isLlmsPath: /llms.txt");
+is(isLlmsPath("https://x.com/docs/llms-full.txt"), true, "isLlmsPath: llms-full.txt");
+is(isLlmsPath("https://x.com/security.txt"), false, "isLlmsPath: other .txt is NOT llms.txt (no false llms label)");
 is(classifyJson('{"entries":[]}'), "ard-catalog", "classifyJson: ARD catalog");
 is(classifyJson('{"openapi":"3.0.0"}'), "openapi", "classifyJson: OpenAPI");
 is(classifyJson('{"aic":"x","name":"A","certificate":{"requestedValidity":1}}'), "gbz-185-4", "classifyJson: GB/Z ACS recognized");
@@ -165,6 +172,23 @@ is(classifyJson('{"name":"Card","supportedInterfaces":[{"url":"https://x/a"}]}')
 is(classifyJson('{"name":"NessReady","url":"https://x"}'), null, "classifyJson: bare name/url (ai-info-like) NOT mislabelled as A2A");
 is(classifyJson('{"random":true}'), null, "classifyJson: unknown JSON → null");
 is(classifyJson("not json"), null, "classifyJson: non-JSON → null");
+
+console.log("--- Explore v2 budgets: global bytes + redirect-host accounting");
+{
+  const L = { maxHosts: 8, maxTotalBytes: 6_000_000 };
+  const b1 = { hosts: new Set(), bytes: 0, truncated: false };
+  exploreBudgetAllows(b1, { hosts: ["a.com", "b.com"], bytes: 100 }, L); // A→B redirect
+  is(b1.hosts.size, 2, "redirect hosts BOTH counted against the host budget");
+  is(b1.bytes, 100, "bytes accumulated into the global byte budget");
+  const b2 = { hosts: new Set(), bytes: 0, truncated: false };
+  exploreBudgetAllows(b2, { hosts: ["x.com"], bytes: 5_000_000 }, L);
+  is(b2.truncated, false, "under the global byte budget: not truncated");
+  is(exploreBudgetAllows(b2, { hosts: ["y.com"], bytes: 2_000_000 }, L), false, "exceeding the global byte budget returns false");
+  is(b2.truncated, true, "global byte budget trips truncation");
+  const b3 = { hosts: new Set(), bytes: 0, truncated: false };
+  exploreBudgetAllows(b3, { hosts: ["1", "2", "3", "4", "5", "6", "7", "8", "9"], bytes: 1 }, L);
+  is(b3.truncated, true, "exceeding the host budget trips truncation");
+}
 
 console.log("--- resolver normalization (thin, source-labelled, never invents semantics)");
 {

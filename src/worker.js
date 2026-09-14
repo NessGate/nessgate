@@ -651,7 +651,7 @@ async function apiDiscover(raw, env, ctx, request) {
 // bounded (EXPLORE_LIMITS) so a malicious publisher cannot turn NessGate into an
 // SSRF/amplification proxy; it guesses no hosts or paths, stores nothing, runs no
 // AI, and makes no ownership claim. /discover is unchanged for existing callers.
-const EXPLORE_LIMITS = { maxDepth: 2, maxHosts: 8, maxRequests: 24 };
+const EXPLORE_LIMITS = { maxDepth: 2, maxHosts: 8, maxRequests: 24, maxTotalBytes: 6_000_000 };
 const EXPLORE_UA = "NessGate-Explore/1.0 (+https://nessgate.com)";
 const EXPLORE_RATE_LIMIT_PER_HOUR = 60;
 const EXPLORE_NOTE =
@@ -669,11 +669,31 @@ function parseLlmsLinks(text) {
   return [...urls];
 }
 
+// Pure: is this URL specifically an llms.txt index (the only .txt we parse)?
+function isLlmsPath(url) {
+  let p;
+  try { p = new URL(url).pathname.toLowerCase(); } catch { return false; }
+  return p.endsWith("/llms.txt") || p.endsWith("/llms-full.txt");
+}
+
 // Pure: does this URL look like a machine-readable resource worth following?
+// Only JSON, well-known paths, and llms.txt/llms-full.txt — NOT arbitrary .txt
+// (a random security.txt/robots-style file is not a discovery index).
 function looksMachineReadable(url) {
   let p;
   try { p = new URL(url).pathname.toLowerCase(); } catch { return false; }
-  return /\.(json|txt)$/.test(p) || p.includes("/.well-known/") || p.endsWith("/llms.txt") || p.endsWith("/llms-full.txt");
+  return /\.json$/.test(p) || p.includes("/.well-known/") || isLlmsPath(url);
+}
+
+// Pure, testable budget accounting for one Explore fetch. Adds every host the
+// fetch touched (including redirect hops) to the host budget and the bytes to the
+// global byte budget; flips `truncated` when either cap is exceeded. Returns
+// whether exploration may continue.
+function exploreBudgetAllows(budget, meta, limits) {
+  for (const h of meta.hosts || []) budget.hosts.add(h);
+  budget.bytes = (budget.bytes || 0) + (meta.bytes || 0);
+  if (budget.hosts.size > limits.maxHosts || budget.bytes > limits.maxTotalBytes) budget.truncated = true;
+  return !budget.truncated;
 }
 
 // Pure: classify a fetched JSON document as one known standard type (or null).
@@ -703,58 +723,76 @@ async function exploreData(raw, env, ctx, request) {
     return { status: 429, body: { error: "Too many requests. Please try again later." } };
   }
 
-  const budget = { requests: 0, hosts: new Set(), seen: new Set(), truncated: false };
+  const budget = { requests: 0, bytes: 0, hosts: new Set(), seen: new Set(), truncated: false };
   const out = [];
   const rootUrl = `https://${domain}/`;
 
   // Bounded, SSRF-safe fetch of a single delegated URL (cross-host allowed because
   // the publisher named it; self is dispatched in-process).
+  // Returns { text, finalUrl } (finalUrl may differ from url after redirects) or
+  // null. Counts requests, and — via exploreBudgetAllows — every host touched
+  // (including redirect hops) and the bytes fetched against the global budgets.
   async function fetchDoc(url) {
     let host;
     try { host = new URL(url).hostname.toLowerCase().replace(/\.+$/, ""); } catch { return null; }
     if (budget.seen.has(url)) return null;
     budget.seen.add(url);
-    if (budget.requests >= EXPLORE_LIMITS.maxRequests) { budget.truncated = true; return null; }
+    if (budget.truncated || budget.requests >= EXPLORE_LIMITS.maxRequests) { budget.truncated = true; return null; }
     if (!budget.hosts.has(host) && budget.hosts.size >= EXPLORE_LIMITS.maxHosts) { budget.truncated = true; return null; }
     budget.requests++;
-    let text;
     try {
       if (domain === SELF_DOMAIN && host === SELF_DOMAIN) {
         const u = new URL(url);
-        text = await selfProbe(u.pathname + u.search, env, ctx);
-      } else {
-        text = await safeFetch(url, domain, MAX_JSON_BYTES, false, EXPLORE_UA, true);
+        const text = await selfProbe(u.pathname + u.search, env, ctx);
+        exploreBudgetAllows(budget, { hosts: [host], bytes: text.length }, EXPLORE_LIMITS);
+        budget.seen.add(u.toString());
+        return { text, finalUrl: u.toString() };
       }
-    } catch { return null; }
-    budget.hosts.add(host);
-    return text;
+      const meta = await safeFetch(url, domain, MAX_JSON_BYTES, false, EXPLORE_UA, true, true);
+      exploreBudgetAllows(budget, meta, EXPLORE_LIMITS); // counts redirect hosts + bytes
+      budget.seen.add(meta.finalUrl); // the resolved URL is now accounted for
+      return { text: meta.text, finalUrl: meta.finalUrl };
+    } catch {
+      return null;
+    }
   }
 
-  // Add records for one fetched doc and return the pointers it explicitly names.
+  // Add records for one fetched doc (keyed by its FINAL url) and return the
+  // pointers it explicitly names. Only a real llms.txt/llms-full.txt is parsed as
+  // an index; a followed .json is classified; any other followed .txt is recorded
+  // as a plain text pointer (never mislabelled llms.txt), with no link parsing.
   function ingest(url, text, provenance, depth) {
     const follow = [];
-    let path = "";
-    try { path = new URL(url).pathname.toLowerCase(); } catch {}
-    if (path.endsWith(".txt") || path.endsWith("/llms.txt")) {
+    if (isLlmsPath(url)) {
       out.push({ source: "llms.txt", sourceUrl: url, type: "llms.txt", url, evidence: "publisher-declared", provenance, depth });
       for (const link of parseLlmsLinks(text).slice(0, MAX_PER_SOURCE)) if (looksMachineReadable(link)) follow.push(link);
       return follow;
     }
     const t = classifyJson(text);
-    if (!t) return follow;
-    for (const rec of normalizeResources(t, "json", text, url)) {
-      out.push({ ...rec, evidence: "publisher-declared", provenance, depth });
-      if (rec.url && rec.url !== url && looksMachineReadable(rec.url)) follow.push(rec.url);
+    if (t) {
+      for (const rec of normalizeResources(t, "json", text, url)) {
+        out.push({ ...rec, evidence: "publisher-declared", provenance, depth });
+        if (rec.url && rec.url !== url && looksMachineReadable(rec.url)) follow.push(rec.url);
+      }
+      return follow;
+    }
+    let path = "";
+    try { path = new URL(url).pathname.toLowerCase(); } catch {}
+    if (path.endsWith(".txt")) {
+      out.push({ source: "text", sourceUrl: url, type: "generic-text", url, evidence: "publisher-declared", provenance, depth });
     }
     return follow;
   }
 
   async function walk(url, depth, provenance) {
-    const text = await fetchDoc(url);
-    if (text == null) return;
-    const follow = ingest(url, text, provenance, depth);
+    const doc = await fetchDoc(url);
+    if (!doc) return;
+    // If a redirect moved the content to a different final URL, provenance and the
+    // record's source reflect that final URL — never the pre-redirect one.
+    const prov = doc.finalUrl && doc.finalUrl !== url ? [...provenance, doc.finalUrl] : provenance;
+    const follow = ingest(doc.finalUrl, doc.text, prov, depth);
     if (depth < EXPLORE_LIMITS.maxDepth) {
-      for (const t of follow) if (!budget.seen.has(t)) await walk(t, depth + 1, [...provenance, t]);
+      for (const t of follow) if (!budget.seen.has(t)) await walk(t, depth + 1, [...prov, t]);
     }
   }
 
@@ -777,9 +815,9 @@ async function exploreData(raw, env, ctx, request) {
   const targets = []; // { url, chain }
   const llms = discovered.find((d) => d.type === "llms.txt");
   if (llms) {
-    const text = await fetchDoc(llms.url);
-    if (text) for (const link of parseLlmsLinks(text).slice(0, MAX_PER_SOURCE)) {
-      if (looksMachineReadable(link)) targets.push({ url: link, chain: [llms.url, link] });
+    const doc = await fetchDoc(llms.url);
+    if (doc) for (const link of parseLlmsLinks(doc.text).slice(0, MAX_PER_SOURCE)) {
+      if (looksMachineReadable(link)) targets.push({ url: link, chain: [doc.finalUrl, link] });
     }
   }
   for (const rec of exactResources) {
@@ -813,6 +851,7 @@ async function exploreData(raw, env, ctx, request) {
       publisherDeclared: resources.filter((r) => r.evidence === "publisher-declared").length,
       requests: budget.requests,
       hosts: budget.hosts.size,
+      bytes: budget.bytes,
       truncated: budget.truncated,
     },
     limits: EXPLORE_LIMITS,
@@ -1072,8 +1111,10 @@ function hostAllowedForDomain(host, domain) {
 // Fetch constrained to the target domain: HTTPS only, public DNS only,
 // redirects kept on-domain, capped size, short timeout. With strictHosts,
 // every hop (including redirects) must stay on the apex of the domain.
-async function safeFetch(url, allowedDomain, maxBytes, strictHosts = false, userAgent = "NessGate-Discover/1.0 (+https://nessgate.com)", allowCrossHost = false) {
+async function safeFetch(url, allowedDomain, maxBytes, strictHosts = false, userAgent = "NessGate-Discover/1.0 (+https://nessgate.com)", allowCrossHost = false, returnMeta = false) {
   let current = url;
+  const redirectChain = []; // every validated URL actually fetched, in order
+  const hosts = new Set(); // every host touched, including via redirects
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const u = new URL(current);
     if (u.protocol !== "https:") throw new Error("only HTTPS is allowed");
@@ -1091,6 +1132,8 @@ async function safeFetch(url, allowedDomain, maxBytes, strictHosts = false, user
       throw new Error(allowCrossHost ? "target host is not allowed" : "request left the target domain");
     }
     await assertPublicDns(host);
+    redirectChain.push(u.toString());
+    hosts.add(host);
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -1138,7 +1181,13 @@ async function safeFetch(url, allowedDomain, maxBytes, strictHosts = false, user
       buf.set(c, off);
       off += c.length;
     }
-    return new TextDecoder().decode(buf);
+    const text = new TextDecoder().decode(buf);
+    // Explore mode needs the final URL (redirects can move content to another
+    // host), every host touched (so redirect hosts count against the budget) and
+    // the byte count (for the global byte budget). /discover callers get the
+    // string unchanged.
+    if (returnMeta) return { text, finalUrl: u.toString(), redirectChain, hosts: [...hosts], bytes: size };
+    return text;
   }
   throw new Error("too many redirects");
 }
@@ -1359,4 +1408,4 @@ function selfDomain() { return SELF_DOMAIN; }
 function apiCatalog() { return API_CATALOG; }
 function mcpTools() { return MCP_TOOLS; }
 function adapters() { return ADAPTERS; }
-export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, parseLlmsLinks, looksMachineReadable, classifyJson, selfDomain, apiCatalog, mcpTools, adapters };
+export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, selfDomain, apiCatalog, mcpTools, adapters };
