@@ -49,6 +49,17 @@ most this class. Signals, each cited precisely in `signals[]`:
   only; the verified-domain list is not exposed by the public API.
 - **Homepage or document links** — enumeration hints only.
 
+### Directionality
+
+Declarations are directional, and only the **queried domain's** declaration carries authority
+here: anyone can serve a file claiming affiliation with `google.com`, so a declaration served by
+the *candidate* naming the queried domain is **never** equivalent to one served by the queried
+domain. A candidate-side declaration alone yields at most its own class,
+**`counterpart-declared-candidate`** (candidate-tier, provenance citing the candidate's file);
+it reaches `publisher-declared-related` only when the queried domain reciprocates with its own
+qualifying declaration. In the current implementation the strong class is assigned exclusively
+from the queried domain's files, with candidate-side reciprocity recorded as the `mutual` flag.
+
 ## Promotion rules
 
 1. `publisher-declared-related` ⟺ a qualifying declaration served by the queried domain names
