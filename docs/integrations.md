@@ -33,6 +33,25 @@ Runs anywhere with `fetch`: Node ≥18, Deno, Bun, Cloudflare Workers, and agent
 > in browsers too). Validate the domain yourself, or use the hosted endpoint below, which applies
 > HTTPS-only, private-IP, redirect and size protections.
 
+**GB/Z 185.4 (China)** agent descriptions ("ACS") are normalized automatically when encountered
+(source `gbz-185-4`) — no configuration needed. **GB/Z 185.5** gateway discovery is opt-in and
+Node-only (there is no domain-native way to locate a gateway, so nothing is auto-discovered):
+
+```js
+const { resources } = await resolve("example.com", {
+  gbz: {
+    gatewayUrl: "https://your-acps-gateway.example",   // you configure this — never guessed
+    fetch: myAuthenticatedFetch,                        // bring your own mTLS/OIDC-authenticated fetch
+    query: { description: "what you're looking for" },  // the semantic discovery query
+  },
+});
+// ACS records from the gateway carry provenance: "gbz-185-5-gateway"
+```
+
+This POSTs to the reference implementation's real `{gatewayUrl}/acps-adp-v2/discover` endpoint.
+NessGate embeds no credential handling — your `fetch` supplies the certs/tokens. Never runs on the
+hosted endpoint or in a browser.
+
 ## 2. HTTP endpoint — any language
 
 Open CORS, no auth.

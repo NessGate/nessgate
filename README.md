@@ -102,11 +102,18 @@ still stand on the domain itself.
   **Complete ARD support** means all three ARD surfaces: the well-known paths, the
   `<link rel="ard">` tag, and the robots.txt `Agentmap:` directive. ANP and UCP are emerging;
   DNS-AID/AID and AWP are drafts, described as such and read as-is with no adoption claim.
-- **GB/Z 185.4 / 185.5 is not implemented.** China's 智能体互联 agent description/discovery standards
-  are not supported: the discovery mechanism is defined only in the paywalled Chinese national
-  standard and appears to be a federated discovery service rather than a domain-native path, so
-  there is no concrete surface to probe. The adapter architecture is ready to host it once the
-  endpoint is verified; NessGate makes no GB/Z claim in the meantime.
+- **GB/Z 185 (China, 智能体互联) — 185.4 yes, 185.5 gated.** NessGate **normalizes GB/Z 185.4
+  agent descriptions ("ACS")**: an ACS is an A2A-family card with GB/Z extensions (an agent
+  identity code `aic`, an mTLS scheme, a `certificate` block), recognized **by content** and
+  labelled `gbz-185-4`, preserving those fields and provenance. Recognition is domain-first: an
+  ACS served at the agent-description location NessGate already reads is normalized — **no
+  GB/Z-specific `.well-known` path is guessed.** **GB/Z 185.5 discovery is a federated gateway
+  service with no domain-native location**, so it is *not* part of the hosted resolver and is
+  never auto-discovered. The embeddable library exposes it as an **opt-in, Node-only** call
+  (`resolve(domain, { gbz: { gatewayUrl, fetch, query } })`) that POSTs to the reference
+  implementation's real `…/acps-adp-v2/discover` endpoint with a **caller-supplied authenticated
+  fetch** (bring-your-own mTLS/OIDC — NessGate embeds no credentials) and normalizes the ACS
+  records it returns. No guessed endpoints, no fake conformance.
 - **Cloudflare KV** (`NESSGATE_KV`) holds only approximate, IP-keyed hourly rate-limit counters
   that expire within the hour. Nothing else is stored.
 - **Rate limiting**: a Cloudflare-native edge limiter (burst, per-colo and eventually

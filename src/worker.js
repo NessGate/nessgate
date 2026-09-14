@@ -204,12 +204,14 @@ const ADAPTERS = [
   { id: "ard-agentmap", channel: "robots", directive: "agentmap", normalizeAs: "ard-catalog" }, // ARD via robots.txt Agentmap:
   { id: "dns-aid", channel: "dns", node: "_agent" }, // DNS-AID / AID: TXT record at _agent.<domain>
 ];
-// GB/Z 185.4 / 185.5 (China, 智能体互联) is deliberately NOT in the active set.
-// Its discovery mechanism is defined only in the paywalled national standard and
-// appears to be a federated discovery service, not a domain-native path — there
-// is no concrete surface to probe. A guessed /.well-known path would be fake
-// conformance; the architecture above can host a real GB/Z adapter once the
-// discovery endpoint is verified.
+// GB/Z 185 (China, 智能体互联). NessGate normalizes GB/Z 185.4 agent
+// descriptions ("ACS") by CONTENT (see isAcs/normalizeAcs) — an ACS served at
+// the agent-description location above is labelled `gbz-185-4`. There is NO GB/Z
+// discovery adapter here: 185.5 is a FEDERATED gateway service with no
+// domain-native path, so guessing a /.well-known location would be fake
+// conformance. 185.5 gateway querying exists ONLY in the embeddable library
+// (opts.gbz — caller-configured URL + bring-your-own auth, no auto-discovery);
+// it is deliberately never run by this hosted worker.
 const DISCOVER_CACHE_SECONDS = 600;
 const DISCOVER_RATE_LIMIT_PER_HOUR = 120;
 const DISCOVER_UA = "NessGate-Discover/1.0 (+https://nessgate.com)";
@@ -256,6 +258,7 @@ function probeShapeOk(type, kind, text) {
     case "openapi": return typeof obj.openapi === "string" || typeof obj.swagger === "string";
     case "anp": return Array.isArray(obj.items) || obj["@type"] === "CollectionPage";
     case "ucp": return Array.isArray(obj.capabilities) || typeof obj.ucp_version === "string";
+    case "gbz-185-4": return isAcs(obj); // GB/Z 185.4 ACS agent description
     default: return true;
   }
 }
@@ -359,6 +362,51 @@ async function dohTxt(name) {
   }
 }
 
+// GB/Z 185.4 (China, 智能体互联) agent description ("ACS"). Structurally an
+// A2A-family agent card plus GB/Z extensions: an agent identity code (`aic`), an
+// mTLS security scheme, a `certificate` block, and a Chinese-licensed provider.
+// Recognised by CONTENT, never by a guessed path — NessGate normalizes an ACS
+// wherever it legitimately encounters one (at the agent-description location it
+// already reads; and, in the embeddable library only, from a caller-configured
+// GB/Z 185.5 discovery gateway). It defines no GB/Z-specific location of its own.
+function isAcs(obj) {
+  if (!obj || typeof obj !== "object") return false;
+  const marker =
+    Object.prototype.hasOwnProperty.call(obj, "aic") ||
+    (obj.certificate && typeof obj.certificate === "object" && obj.certificate.requestedValidity !== undefined);
+  if (!marker) return false;
+  return !!(typeof obj.name === "string" || Array.isArray(obj.skills) || (obj.capabilities && typeof obj.capabilities === "object"));
+}
+
+// Map a GB/Z 185.4 ACS document into NessGate's normalized record, preserving the
+// GB/Z-specific fields (aic, provider, securitySchemes, certificate, skills) and
+// provenance. One ACS describes one agent → one record.
+function normalizeAcs(obj, sourceUrl) {
+  const str = (v) => (typeof v === "string" ? v : undefined);
+  const eps = Array.isArray(obj.endPoints) ? obj.endPoints : [];
+  const epUrl = eps.map((e) => (e ? str(e.url) || str(e.endpoint) || str(e.address) : undefined)).find(Boolean);
+  return [{
+    source: "gbz-185-4",
+    sourceUrl,
+    type: "gbz-185-4-acs",
+    name: str(obj.name),
+    url: str(obj.webAppUrl) || epUrl || sourceUrl,
+    raw: {
+      aic: str(obj.aic),
+      name: str(obj.name),
+      description: str(obj.description),
+      version: str(obj.version),
+      protocolVersion: str(obj.protocolVersion),
+      provider: obj.provider,
+      securitySchemes: obj.securitySchemes,
+      certificate: obj.certificate,
+      capabilities: obj.capabilities,
+      skills: Array.isArray(obj.skills) ? obj.skills : undefined,
+      endPoints: eps.length ? eps : undefined,
+    },
+  }];
+}
+
 // Normalize one fetched standard document into a flat list of resource records.
 // Deliberately THIN: NessGate reuses each source's OWN labels (ARD media types,
 // host-meta/link rel, AWP protocol keys) and never invents a taxonomy of its
@@ -440,7 +488,15 @@ function normalizeResources(type, kind, text, sourceUrl) {
         }
         return cap(out);
       }
+      case "gbz-185-4":
+        // GB/Z 185.4 ACS agent description (used when the doc arrives already
+        // typed as GB/Z, e.g. from the optional 185.5 gateway in the library).
+        return normalizeAcs(obj, sourceUrl);
       case "a2a-agent-card": {
+        // A GB/Z 185.4 ACS is an A2A-family card with GB/Z extensions and may be
+        // served at the agent-description location NessGate already reads; label
+        // it correctly rather than as plain A2A. No GB/Z-specific path is guessed.
+        if (isAcs(obj)) return normalizeAcs(obj, sourceUrl);
         // A2A agent card. v1.0 removed the top-level `url` and moved endpoints
         // into supportedInterfaces[]; accept either, preferring an explicit
         // top-level url, then the first interface url, then the card itself.
@@ -589,7 +645,7 @@ async function apiDiscover(raw, env, ctx, request) {
 // (the tool dispatches to the same handler).
 
 const MCP_SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26"];
-const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.2.0" };
+const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.3.0" };
 const MCP_INSTRUCTIONS =
   "Use discover_domain to resolve a domain to the machine-readable resources it publishes " +
   "across the supported discovery locations (ARD, A2A, llms.txt, API catalogs, OpenAPI, and " +
@@ -1102,4 +1158,4 @@ function selfDomain() { return SELF_DOMAIN; }
 function apiCatalog() { return API_CATALOG; }
 function mcpTools() { return MCP_TOOLS; }
 function adapters() { return ADAPTERS; }
-export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, selfDomain, apiCatalog, mcpTools, adapters };
+export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, selfDomain, apiCatalog, mcpTools, adapters };

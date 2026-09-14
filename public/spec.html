@@ -123,11 +123,15 @@ the robots.txt <code>Agentmap:</code> directive (<code>ard-agentmap</code>).</p>
 <p><code>anp</code> and <code>ucp</code> are emerging; <code>dns-aid</code>/AID and <code>awp</code>
 are drafts. Publishing one is not a guarantee of anything on its own — NessGate reads whatever is
 there and reports it as-is.</p>
-<p><strong>Not yet implemented — GB/Z 185.4 / 185.5.</strong> China's 智能体互联 agent description and
-discovery standards are not supported. Their discovery mechanism is defined only in the paywalled
-Chinese national standard and appears to be a federated discovery service rather than a
-domain-native path, so there is no concrete surface to probe. The adapter architecture is ready to
-host it once the endpoint is verified; until then NessGate makes no GB/Z claim.</p>
+<p><strong>GB/Z 185 (China, 智能体互联) — 185.4 normalized, 185.5 gated.</strong> NessGate normalizes
+GB/Z 185.4 agent descriptions ("ACS") — an A2A-family card with GB/Z extensions (an agent identity
+code, an mTLS scheme, a certificate block) — recognized by content and labelled
+<code>gbz-185-4</code>, preserving those fields and provenance. Recognition is domain-first: an ACS
+served at the agent-description location NessGate already reads is normalized; no GB/Z-specific path
+is guessed. GB/Z 185.5 discovery is a federated gateway service with no domain-native location, so
+it is not part of this hosted resolver and is never auto-discovered; the embeddable library exposes
+it only as an opt-in, Node-only call against a caller-configured gateway with a caller-supplied
+authenticated fetch. No guessed endpoints, no fake conformance.</p>
 <p>For each adapter, the first candidate location returning valid content wins. Fetches are HTTPS
 only, size- and redirect-capped, on-domain, and identify as <code>NessGate-Discover/1.0</code>.</p>
 

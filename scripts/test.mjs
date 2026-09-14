@@ -14,6 +14,7 @@ import {
   apiCatalog,
   mcpTools,
   normalizeResources,
+  isAcs,
   adapters,
 } from "../src/worker.js";
 
@@ -107,6 +108,10 @@ is(probeShapeOk("anp", "json", "{}"), false, "empty {} at ANP path rejected");
 is(probeShapeOk("ucp", "json", '{"ucp_version":"2026-01"}'), true, "UCP with ucp_version accepted");
 is(probeShapeOk("ucp", "json", '{"capabilities":[]}'), true, "UCP with capabilities[] accepted");
 is(probeShapeOk("ucp", "json", "{}"), false, "empty {} at UCP path rejected");
+is(probeShapeOk("gbz-185-4", "json", '{"aic":"","name":"Svc"}'), true, "GB/Z 185.4 ACS (aic marker) accepted");
+is(probeShapeOk("gbz-185-4", "json", '{"name":"Svc","certificate":{"requestedValidity":365}}'), true, "GB/Z 185.4 ACS (certificate marker) accepted");
+is(probeShapeOk("gbz-185-4", "json", '{"name":"Plain A2A card"}'), false, "plain A2A card is NOT a GB/Z ACS");
+is(probeShapeOk("gbz-185-4", "json", "{}"), false, "empty {} is not an ACS");
 
 console.log("--- adapter set (universal-resolver channels)");
 {
@@ -121,7 +126,7 @@ console.log("--- adapter set (universal-resolver channels)");
   is(A.find((a) => a.id === "ucp").paths.includes("/.well-known/ucp"), true, "UCP well-known path");
   is(A.find((a) => a.id === "dns-aid").channel, "dns", "DNS-AID is a dns adapter");
   is(A.find((a) => a.id === "dns-aid").node, "_agent", "DNS-AID queries _agent node");
-  is(A.some((a) => a.id === "gbz-185"), false, "GB/Z is NOT active (unverified spec — no fake conformance)");
+  is(A.some((a) => a.id === "gbz-185" || a.id === "gbz-185-4" || a.id === "gbz-185-5"), false, "GB/Z has NO discovery adapter (185.4 is content-recognised; 185.5 is library opt-in) — no guessed path");
 }
 
 console.log("--- new-channel parsers (ARD link-rel / robots Agentmap / DNS-AID)");
@@ -199,6 +204,23 @@ console.log("--- resolver normalization (thin, source-labelled, never invents se
   is(ucp.find((r) => r.type === "rest").url, "https://x.com/api", "UCP: transport endpoint alias");
   is(N("ucp", "json", { ucp_version: "2026-01", capabilities: [] }, "https://x.com/.well-known/ucp")[0].url, "https://x.com/.well-known/ucp", "UCP: no endpoints → points to the profile");
 
+  // GB/Z 185.4 ACS recognition + normalization (China 智能体互联).
+  is(isAcs({ aic: "", name: "X" }), true, "isAcs: aic marker + name");
+  is(isAcs({ name: "X", certificate: { requestedValidity: 1825 } }), true, "isAcs: certificate.requestedValidity marker");
+  is(isAcs({ name: "A2A card", url: "https://x/a" }), false, "isAcs: plain A2A card rejected");
+  is(isAcs({ aic: "id" }), false, "isAcs: marker without agent-desc shape rejected");
+  const acs = { aic: "urn:acps:001", protocolVersion: "02.02", name: "registry-service", description: "d", version: "2.2.0", provider: { organization: "ACPs Working Group", url: "https://ioa.pub" }, securitySchemes: { mtls: { type: "mutualTLS" } }, certificate: { requestedValidity: 1825 }, capabilities: { streaming: false, messageQueue: [] }, endPoints: [{ url: "https://x.com/agent" }], skills: [] };
+  const acsRec = N("a2a-agent-card", "json", acs, "https://x.com/.well-known/agent-card.json");
+  is(acsRec.length, 1, "ACS at the agent-card location → one record");
+  is(acsRec[0].source, "gbz-185-4", "ACS labelled gbz-185-4 (not plain A2A) at the agent-description location");
+  is(acsRec[0].type, "gbz-185-4-acs", "ACS: record type");
+  is(acsRec[0].url, "https://x.com/agent", "ACS: url taken from endPoints");
+  is(acsRec[0].raw.aic, "urn:acps:001", "ACS: agent identity code (aic) preserved");
+  is(!!acsRec[0].raw.securitySchemes.mtls, true, "ACS: mTLS security scheme preserved");
+  is(acsRec[0].sourceUrl, "https://x.com/.well-known/agent-card.json", "ACS: provenance (sourceUrl) preserved");
+  is(N("gbz-185-4", "json", acs, "https://gw.example/acps-adp-v2/discover")[0].source, "gbz-185-4", "direct gbz-185-4 normalization (used by the 185.5 gateway path)");
+  is(N("a2a-agent-card", "json", { name: "Ag", url: "https://x.com/a" }, "https://x.com/.well-known/agent-card.json")[0].source, "a2a-agent-card", "a plain A2A card at the same location is still A2A, not GB/Z");
+
   // Parity: the embeddable library (public/resolver.mjs) must normalize
   // IDENTICALLY to the reference worker, or the standard forks silently.
   const lib = await import("../public/resolver.mjs");
@@ -215,6 +237,8 @@ console.log("--- resolver normalization (thin, source-labelled, never invents se
     ["ard-catalog", "json", JSON.stringify({ entries: [{ identifier: "urn:x:1", displayName: "Inline", type: "application/json", data: { a: 1 } }] }), "https://x.com/.well-known/ard.json"],
     ["anp", "json", JSON.stringify({ "@type": "CollectionPage", items: [{ "@id": "https://x.com/a.json", name: "B" }] }), "https://x.com/.well-known/agent-descriptions"],
     ["ucp", "json", JSON.stringify({ ucp_version: "2026-01", capabilities: [{ name: "c", transports: [{ type: "mcp", url: "https://x.com/mcp" }] }] }), "https://x.com/.well-known/ucp"],
+    ["a2a-agent-card", "json", JSON.stringify({ aic: "id-1", name: "Svc", protocolVersion: "02.02", securitySchemes: { mtls: { type: "mutualTLS" } }, certificate: { requestedValidity: 1825 }, capabilities: { messageQueue: [] }, endPoints: [{ url: "https://x.com/a" }] }), "https://x.com/.well-known/agent-card.json"],
+    ["gbz-185-4", "json", JSON.stringify({ aic: "id-2", name: "Svc2", provider: { organization: "O" } }), "https://gw.example/acps-adp-v2/discover"],
   ];
   for (const [t, k, x, u] of samples) {
     is(
@@ -236,10 +260,32 @@ console.log("--- resolver normalization (thin, source-labelled, never invents se
     ["api-catalog", "json", "{}"], ["openapi", "json", "{}"], ["openapi", "json", '{"openapi":"3.0.0"}'],
     ["ai-info.json", "json", "{}"], ["llms.txt", "text", "# x"],
     ["anp", "json", "{}"], ["anp", "json", '{"items":[]}'], ["ucp", "json", "{}"], ["ucp", "json", '{"ucp_version":"2026-01"}'],
+    ["gbz-185-4", "json", '{"aic":"","name":"S"}'], ["gbz-185-4", "json", "{}"], ["gbz-185-4", "json", '{"name":"plain a2a"}'],
   ];
+  // isAcs parity (worker vs library)
+  is(lib.isAcs({ aic: "", name: "X" }), isAcs({ aic: "", name: "X" }), "isAcs parity: ACS");
+  is(lib.isAcs({ name: "plain a2a" }), isAcs({ name: "plain a2a" }), "isAcs parity: non-ACS");
   for (const [t, k, x] of shapeSamples) {
     is(lib.probeShapeOk(t, k, x), probeShapeOk(t, k, x), `library/worker probeShapeOk parity for ${t} ${k}`);
   }
+
+  // GB/Z 185.5 optional discovery gateway — library only, OFF unless configured.
+  const acsEntry = { aic: "id-9", name: "Gateway Agent", certificate: { requestedValidity: 365 }, capabilities: {} };
+  const gwOut = lib.normalizeAcsGatewayResponse(JSON.stringify({ results: [acsEntry, { name: "not an acs" }] }), "https://gw/acps-adp-v2/discover");
+  is(gwOut.length, 1, "gateway: only ACS entries extracted from the response");
+  is(gwOut[0].source, "gbz-185-4", "gateway: ACS normalized with the shared 185.4 normalizer");
+  is(gwOut[0].provenance, "gbz-185-5-gateway", "gateway: records tagged gbz-185-5-gateway provenance (not self-published)");
+  is(lib.normalizeAcsGatewayResponse("not json", "https://gw/x").length, 0, "gateway: non-JSON → empty, never throws");
+  const emptyFetch = async () => ({ ok: false, status: 404, text: async () => "" });
+  const noGbz = await lib.resolve("example.com", { fetch: emptyFetch });
+  is(noGbz.checked.includes("gbz-185-5"), false, "resolve() WITHOUT opts.gbz never queries a gateway");
+  let calledUrl = null, calledMethod = null;
+  const gwFetch = async (url, init) => { calledUrl = url; calledMethod = init && init.method; return { ok: true, status: 200, text: async () => JSON.stringify({ results: [acsEntry] }) }; };
+  const withGbz = await lib.resolve("example.com", { fetch: emptyFetch, gbz: { gatewayUrl: "https://gw.example/", fetch: gwFetch, query: { description: "need x" } } });
+  is(calledUrl, "https://gw.example/acps-adp-v2/discover", "gateway: POSTs the real /acps-adp-v2/discover endpoint (configured base URL, not guessed)");
+  is(calledMethod, "POST", "gateway: uses POST");
+  is(withGbz.checked.includes("gbz-185-5"), true, "resolve() WITH opts.gbz records gbz-185-5 in checked");
+  is(withGbz.resources.some((r) => r.source === "gbz-185-4" && r.provenance === "gbz-185-5-gateway"), true, "gateway ACS records merged into resources with gateway provenance");
 }
 
 console.log("--- npm package parity (packages/resolver)");

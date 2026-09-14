@@ -13,6 +13,12 @@
 // record. The adapter table and normalization below are identical to the
 // reference resolver (src/worker.js); a parity test keeps them from drifting.
 //
+// GB/Z 185.4 (China): a GB/Z 185.4 agent description ("ACS") is recognised by
+// content and normalized (source "gbz-185-4") — no GB/Z-specific path is guessed.
+// GB/Z 185.5 discovery is OPTIONAL and library-only: pass opts.gbz to query a
+// caller-CONFIGURED ACPs gateway with your OWN authenticated fetch. It is never
+// auto-discovered and is not part of the hosted resolver.
+//
 // SSRF WARNING: this library fetches the domain you pass in and follows normal
 // redirects. In browsers the network sandbox applies, but in Node/server
 // environments a caller that passes an UNTRUSTED domain MUST validate it first
@@ -73,6 +79,7 @@ export function probeShapeOk(type, kind, text) {
     case "openapi": return typeof obj.openapi === "string" || typeof obj.swagger === "string";
     case "anp": return Array.isArray(obj.items) || obj["@type"] === "CollectionPage";
     case "ucp": return Array.isArray(obj.capabilities) || typeof obj.ucp_version === "string";
+    case "gbz-185-4": return isAcs(obj); // GB/Z 185.4 ACS agent description
     default: return true;
   }
 }
@@ -123,6 +130,44 @@ export function parseAidRecord(txt) {
   const uri = pick("u", "uri");
   if (!version || !uri) return null;
   return { version, uri, proto: pick("p", "proto"), auth: pick("a", "auth"), desc: pick("s", "desc"), docs: pick("d", "docs"), raw: kv };
+}
+
+// GB/Z 185.4 (China) agent description ("ACS") — an A2A-family card plus GB/Z
+// extensions (aic, mTLS scheme, certificate block). Recognised by content, never
+// a guessed path; normalized wherever legitimately encountered.
+export function isAcs(obj) {
+  if (!obj || typeof obj !== "object") return false;
+  const marker =
+    Object.prototype.hasOwnProperty.call(obj, "aic") ||
+    (obj.certificate && typeof obj.certificate === "object" && obj.certificate.requestedValidity !== undefined);
+  if (!marker) return false;
+  return !!(typeof obj.name === "string" || Array.isArray(obj.skills) || (obj.capabilities && typeof obj.capabilities === "object"));
+}
+
+function normalizeAcs(obj, sourceUrl) {
+  const str = (v) => (typeof v === "string" ? v : undefined);
+  const eps = Array.isArray(obj.endPoints) ? obj.endPoints : [];
+  const epUrl = eps.map((e) => (e ? str(e.url) || str(e.endpoint) || str(e.address) : undefined)).find(Boolean);
+  return [{
+    source: "gbz-185-4",
+    sourceUrl,
+    type: "gbz-185-4-acs",
+    name: str(obj.name),
+    url: str(obj.webAppUrl) || epUrl || sourceUrl,
+    raw: {
+      aic: str(obj.aic),
+      name: str(obj.name),
+      description: str(obj.description),
+      version: str(obj.version),
+      protocolVersion: str(obj.protocolVersion),
+      provider: obj.provider,
+      securitySchemes: obj.securitySchemes,
+      certificate: obj.certificate,
+      capabilities: obj.capabilities,
+      skills: Array.isArray(obj.skills) ? obj.skills : undefined,
+      endPoints: eps.length ? eps : undefined,
+    },
+  }];
 }
 
 // Normalize one fetched document into a flat list of resource records. Thin by
@@ -194,7 +239,10 @@ export function normalizeResources(type, kind, text, sourceUrl) {
         }
         return cap(out);
       }
+      case "gbz-185-4":
+        return normalizeAcs(obj, sourceUrl);
       case "a2a-agent-card": {
+        if (isAcs(obj)) return normalizeAcs(obj, sourceUrl);
         const ifaces = Array.isArray(obj.supportedInterfaces) ? obj.supportedInterfaces : [];
         const ifaceUrl = ifaces.map((i) => (i ? str(i.url) : undefined)).find(Boolean);
         return [rec({ type: "a2a-agent-card", name: str(obj.name), url: str(obj.url) || ifaceUrl || sourceUrl, raw: { name: str(obj.name), description: str(obj.description), version: str(obj.version), url: str(obj.url), supportedInterfaces: ifaces.length ? ifaces : undefined } })];
@@ -349,11 +397,65 @@ async function runAdapter(a, domain, fetchImpl, timeoutMs, maxBytes) {
   }
 }
 
-// resolve(domain) -> { domain, provenance, discovered, resources, checked }
+// GB/Z 185.5 discovery gateway — OPTIONAL, library/Node only, OFF unless the
+// caller configures it. NessGate does NOT auto-discover the gateway (there is no
+// domain-native mechanism) and NEVER runs this on the hosted service. The caller
+// supplies the gateway base URL, their OWN authenticated fetch (for mTLS/OIDC —
+// no credential handling is embedded here), and the semantic query. We POST to
+// the standard {gateway}/acps-adp-v2/discover endpoint (the real path from the
+// ACPs reference implementation) and normalize any GB/Z 185.4 ACS records it
+// returns, tagging each provenance:"gbz-185-5-gateway". No guessed endpoints; no
+// fake conformance.
+export function normalizeAcsGatewayResponse(body, sourceUrl) {
+  let obj = body;
+  if (typeof body === "string") { try { obj = JSON.parse(body); } catch { return []; } }
+  if (!obj || typeof obj !== "object") return [];
+  let entries = [];
+  if (Array.isArray(obj)) entries = obj;
+  else for (const k of ["results", "agents", "items", "data", "matches", "acs"]) {
+    if (Array.isArray(obj[k])) { entries = obj[k]; break; }
+  }
+  const out = [];
+  for (const e of entries) {
+    if (isAcs(e)) for (const r of normalizeAcs(e, sourceUrl)) out.push({ ...r, provenance: "gbz-185-5-gateway" });
+  }
+  return out.slice(0, MAX_PER_SOURCE);
+}
+
+async function queryGbzGateway(gbz, timeoutMs) {
+  const fetchImpl = gbz.fetch || globalThis.fetch;
+  if (typeof fetchImpl !== "function") throw new Error("gbz.fetch required (bring your own authenticated fetch)");
+  const base = String(gbz.gatewayUrl).replace(/\/+$/, "");
+  const url = base + "/acps-adp-v2/discover";
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetchImpl(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", ...(gbz.headers || {}) },
+      body: JSON.stringify(gbz.query || {}),
+      signal: ctrl.signal,
+    });
+    if (!res || !res.ok) return { discovered: [], resources: [] };
+    const text = await res.text();
+    const resources = normalizeAcsGatewayResponse(text, url);
+    return { discovered: resources.length ? [{ type: "gbz-185-5", url }] : [], resources };
+  } catch {
+    return { discovered: [], resources: [] };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// resolve(domain, opts) -> { domain, provenance, discovered, resources, checked }
 // discovered = which mechanisms the domain publishes and where (the routing map)
 // resources  = the normalized union of what those documents contain
 // Every resource carries `source`, `sourceUrl` (fetch it to verify against the
 // domain directly), `url`, and, where useful, name/rel/id/raw.
+// opts.gbz (optional, Node/embedded only): { gatewayUrl, fetch, query, headers }
+//   enables GB/Z 185.5 discovery against a caller-CONFIGURED ACPs gateway with a
+//   caller-supplied authenticated fetch. Never auto-discovered; never used by the
+//   hosted resolver or in a browser.
 export async function resolve(domain, opts = {}) {
   const fetchImpl = opts.fetch || globalThis.fetch;
   if (typeof fetchImpl !== "function") throw new Error("no fetch available; pass opts.fetch");
@@ -364,8 +466,17 @@ export async function resolve(domain, opts = {}) {
 
   const results = await Promise.all(ADAPTERS.map((a) => runAdapter(a, d, fetchImpl, timeoutMs, maxBytes)));
   const discovered = results.flatMap((r) => r.discovered);
-  const resources = results.flatMap((r) => r.resources).slice(0, MAX_DISCOVER_RESOURCES);
-  return { domain: d, provenance: "self-published", discovered, resources, checked: ADAPTERS.map((a) => a.id) };
+  let resources = results.flatMap((r) => r.resources);
+  const checked = ADAPTERS.map((a) => a.id);
+  // Optional GB/Z 185.5 discovery gateway — off unless the caller configures it.
+  if (opts.gbz && opts.gbz.gatewayUrl) {
+    const g = await queryGbzGateway(opts.gbz, timeoutMs);
+    discovered.push(...g.discovered);
+    resources.push(...g.resources);
+    checked.push("gbz-185-5");
+  }
+  resources = resources.slice(0, MAX_DISCOVER_RESOURCES);
+  return { domain: d, provenance: "self-published", discovered, resources, checked };
 }
 
-export default { resolve, normalizeResources, normalizeDomain, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, ADAPTERS };
+export default { resolve, normalizeResources, normalizeDomain, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, ADAPTERS };

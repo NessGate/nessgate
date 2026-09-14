@@ -1,7 +1,7 @@
 {
   "name": "@nessgate/resolver",
-  "version": "1.2.0",
-  "description": "Open, neutral universal resolver for the agentic web: give it a domain and get one normalized answer with the machine-readable resources it publishes across ARD (well-known, rel=ard, robots Agentmap), A2A, llms.txt, API catalogs, OpenAPI, ORD, host-meta, Agent Network Protocol, Universal Commerce Protocol and DNS-AID. Adapter architecture; dependency-free; fetches the domain directly.",
+  "version": "1.3.0",
+  "description": "Open, neutral universal resolver for the agentic web: give it a domain and get one normalized answer with the machine-readable resources it publishes across ARD (well-known, rel=ard, robots Agentmap), A2A, llms.txt, API catalogs, OpenAPI, ORD, host-meta, Agent Network Protocol, Universal Commerce Protocol, DNS-AID, and GB/Z 185.4 agent descriptions. Adapter architecture; dependency-free; fetches the domain directly. Optional Node-only GB/Z 185.5 gateway discovery (bring-your-own auth).",
   "type": "module",
   "exports": {
     ".": "./index.mjs"
@@ -36,6 +36,8 @@
     "discovery",
     "well-known",
     "openapi",
+    "gbz-185",
+    "acps",
     "nessgate"
   ],
   "engines": {
