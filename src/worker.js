@@ -766,11 +766,14 @@ function mcpRegistryRecords(json, namespace, domain) {
 }
 
 // One bounded request to the MCP Registry (a fixed, trusted read API — not a
-// publisher-controlled host, so no SSRF surface). Returns "" on any failure.
+// publisher-controlled host, so no SSRF surface). Its full-text search is slow for
+// very large namespaces (io.github.* can take >20s), so this uses a short timeout
+// and degrades gracefully to "" — federation is best-effort, never a hang.
+const REGISTRY_TIMEOUT_MS = 5000;
 async function fetchMcpRegistry(namespace) {
   try {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+    const timer = setTimeout(() => ctrl.abort(), REGISTRY_TIMEOUT_MS);
     let res;
     try {
       res = await fetch(`${MCP_REGISTRY_API}?search=${encodeURIComponent(namespace)}&limit=50`, {
@@ -803,15 +806,13 @@ async function exploreData(raw, env, ctx, request) {
   const out = [];
   const rootUrl = `https://${domain}/`;
 
-  // Phase 0 — attributed MCP Registry federation FIRST. It is one cheap request,
-  // and running it before exact-host/delegated fetches guarantees it gets a
-  // subrequest slot (Cloudflare caps subrequests per invocation; a busy domain's
-  // later best-effort fetches drop gracefully rather than starving federation).
+  // Attributed MCP Registry federation — ISSUED FIRST (so it grabs an early
+  // subrequest slot before exact-host/delegated fetches can exhaust Cloudflare's
+  // per-invocation cap), run CONCURRENTLY with the rest (no added latency), and
+  // awaited at the end. Short-timeout + best-effort, so a slow namespace never
+  // stalls /explore.
   const namespace = domainToNamespace(domain);
-  if (namespace) {
-    const regText = await fetchMcpRegistry(namespace);
-    if (regText) for (const rec of mcpRegistryRecords(regText, namespace, domain)) out.push(rec);
-  }
+  const registryPromise = namespace ? fetchMcpRegistry(namespace) : Promise.resolve("");
 
   // Bounded, SSRF-safe fetch of a single delegated URL (cross-host allowed because
   // the publisher named it; self is dispatched in-process).
@@ -915,6 +916,10 @@ async function exploreData(raw, env, ctx, request) {
     if (budget.requests >= EXPLORE_LIMITS.maxRequests) { budget.truncated = true; break; }
     await walk(url, 1, chain);
   }
+
+  // Merge the concurrent registry federation (namespace-verified evidence).
+  const regText = await registryPromise;
+  if (namespace && regText) for (const rec of mcpRegistryRecords(regText, namespace, domain)) out.push(rec);
 
   // Dedup (source|url|sourceUrl), keep first (earliest/strongest evidence), cap.
   const seenRec = new Set();
