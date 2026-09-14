@@ -63,6 +63,11 @@ curl https://nessgate.com/discover/example.com
 Returns `{ domain, provenance, note, discovered[], resources[], checked[] }`. The hosted endpoint
 adds SSRF protections and caches at the edge for up to ~10 minutes.
 
+For evidence-based resolution beyond the exact host, `GET https://nessgate.com/explore/{domain}`
+additionally follows the pointers the domain's own files declare and federates the official MCP
+Registry; every record carries an `evidence` class and a `provenance` chain. See the
+[API docs](https://nessgate.com/api) for the contract.
+
 ## 3. MCP tool — for MCP-aware agents and clients
 
 NessGate runs a remote MCP server (Streamable HTTP) exposing one tool, **`discover_domain`**. It is
