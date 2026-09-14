@@ -18,3 +18,4 @@ wordpress-plugin/
 /mcp-key*.pem
 # Downloaded mcp-publisher binary (not source).
 /.tools/
+/.private/

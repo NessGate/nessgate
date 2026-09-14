@@ -1,11 +1,10 @@
 # NessGate Resolver v2 — bounded evidence resolution (design)
 
-Status: **design, not implemented.** This document records the agreed direction after the
-"exact-host resolver is too narrow" finding (Microsoft/OpenAI cases) and two reviewer rounds. It
-does not change runtime behaviour; it is the plan for a deliberate v2, to be built after the current
-adoption push, with the limits and evidence model below designed in from day one.
+Status: **implemented** (the `/explore` endpoint). This document records the design rationale and
+constraints behind evidence-based resolution — why it exists, what it deliberately is not, and the
+limits and evidence model it was built with from day one. `/discover` is unchanged.
 
-## The problem we found
+## The problem
 
 NessGate today is an **exact-host resolver**: given `example.com`, it checks standard locations on
 `example.com`. But real machine-readable resources often live elsewhere the domain *leads to*:
@@ -114,13 +113,10 @@ Evolve from "domain → machine-readable resources" toward **"one domain — eve
 registry-verified, computed live, stored nowhere. Harder to reproduce than "check N URLs"; still the
 smallest neutral primitive, not a directory.
 
-## Split of work
+## Implementation status
 
-**Done now (small, low-risk, shipped separately):** exact-host empty-result wording changed to "No
-supported resources found on this exact host" + a note that related hosts/registries may publish
-more; ARD wording reframed to "normative domain resolution" with the honest reasons the other two
-surfaces are not implemented.
-
-**Design now, build later (this document):** layers 2–3 (bounded, stateless, provenance-tracked
-delegated discovery + attributed registry federation), the evidence-tree output, and the limits
-above — as a deliberate Resolver v2 after the adoption push, never as a persistent map.
+All deterministic layers are live in `/explore`: bounded delegated discovery of publisher-declared
+pointers, the evidence classes and provenance chains, attributed MCP-Registry federation, and the
+opt-in candidate-verification POST. Exact-host empty results say "no supported resources found on
+this exact host" (related hosts or registries may publish more). The design's hard "no"s remain
+binding: no persistent map, no global crawl, no guessed subdomains, no AI-established ownership.
