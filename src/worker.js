@@ -664,7 +664,12 @@ async function apiDiscover(raw, env, ctx, request) {
 // bounded (EXPLORE_LIMITS) so a malicious publisher cannot turn NessGate into an
 // SSRF/amplification proxy; it guesses no hosts or paths, stores nothing, runs no
 // AI, and makes no ownership claim. /discover is unchanged for existing callers.
-const EXPLORE_LIMITS = { maxDepth: 2, maxHosts: 8, maxRequests: 24, maxTotalBytes: 6_000_000 };
+// deadlineMs is a HARD wall-clock cap for one /explore request: sequential
+// best-effort fetches against slow or stalling hosts must never stack into
+// minutes. Once the deadline passes, no NEW fetch starts (an in-flight one still
+// honors its own 8s timeout, so worst case ≈ deadline + one fetch); the answer
+// returns with whatever was gathered and stats.truncated = true.
+const EXPLORE_LIMITS = { maxDepth: 2, maxHosts: 8, maxRequests: 24, maxTotalBytes: 6_000_000, deadlineMs: 20_000 };
 const MAX_CANDIDATES = 10; // cap on opt-in caller-supplied candidate URLs to verify (subrequest budget)
 
 // Organization Discovery (opt-in, ?org=1). Major organizations publish their
@@ -881,7 +886,7 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false)
     return { status: 429, body: { error: "Too many requests. Please try again later." } };
   }
 
-  const budget = { requests: 0, bytes: 0, hosts: new Set(), seen: new Set(), truncated: false };
+  const budget = { requests: 0, bytes: 0, hosts: new Set(), seen: new Set(), truncated: false, start: Date.now() };
   const out = [];
 
   // Attributed MCP Registry federation — ISSUED FIRST (so it grabs an early
@@ -903,6 +908,7 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false)
     try { host = new URL(url).hostname.toLowerCase().replace(/\.+$/, ""); } catch { return null; }
     if (budget.seen.has(url)) return null;
     budget.seen.add(url);
+    if (Date.now() - budget.start > EXPLORE_LIMITS.deadlineMs) { budget.truncated = true; return null; }
     if (budget.truncated || budget.requests >= EXPLORE_LIMITS.maxRequests) { budget.truncated = true; return null; }
     if (!budget.hosts.has(host) && budget.hosts.size >= EXPLORE_LIMITS.maxHosts) { budget.truncated = true; return null; }
     budget.requests++;

@@ -67,29 +67,58 @@ if (resolveForm) {
         renderList(resources, resources.length + " machine-readable resource" + (resources.length === 1 ? "" : "s") + " found");
         return;
       }
-      // Exact host is empty — look for verified resources on related hosts under
-      // the same domain (Organization Discovery) before answering.
-      box.textContent = "Nothing on " + d + " itself — checking related hosts…";
-      let related = [];
-      try {
-        const orgRes = await fetch("/explore/" + encodeURIComponent(domain) + "?org=1");
-        const orgData = await orgRes.json();
-        related = Array.isArray(orgData.resources)
-          ? orgData.resources.filter((r) => r && r.evidence === "same-domain-host" && typeof r.url === "string" && r.url.startsWith("https://"))
-          : [];
-      } catch {}
-      box.textContent = "";
-      if (related.length) {
-        renderList(related, "Nothing on " + d + " itself, but " + related.length + " verified resource" + (related.length === 1 ? "" : "s") + " on related hosts under the same domain:");
-        const note = document.createElement("p");
-        note.className = "meta";
-        note.textContent = "Same registrable domain — the relationship is implied by shared DNS control, not independently verified.";
-        box.append(note);
-        return;
-      }
-      box.textContent =
-        "No supported resources found on " + d + " itself or its common related hosts. " +
-        "This is an exact-host check — other subdomains or external registries may still publish machine-readable resources.";
+      // Exact host is empty: answer immediately and honestly, then OFFER the
+      // slower related-host check as a separate, explicit action.
+      const msg = document.createElement("p");
+      msg.textContent =
+        "No supported resources found on " + d + " itself. This is an exact-host check — " +
+        "related hosts (like a developers. subdomain) or external registries may still publish some.";
+      box.append(msg);
+      const orgBtn = document.createElement("button");
+      orgBtn.type = "button";
+      orgBtn.textContent = "Check related hosts →";
+      box.append(orgBtn);
+      orgBtn.addEventListener("click", async () => {
+        orgBtn.disabled = true;
+        orgBtn.textContent = "Checking related hosts… (up to ~30s)";
+        // Client-side hard timeout so the UI can never hang on a slow check.
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 35000);
+        let related = null; // null = the check itself failed/timed out
+        try {
+          const orgRes = await fetch("/explore/" + encodeURIComponent(domain) + "?org=1", { signal: ctrl.signal });
+          const orgData = await orgRes.json();
+          if (!orgData.error) {
+            related = (Array.isArray(orgData.resources) ? orgData.resources : []).filter(
+              (r) => r && r.evidence === "same-domain-host" && typeof r.url === "string" && r.url.startsWith("https://")
+            );
+          }
+        } catch {} finally {
+          clearTimeout(timer);
+        }
+        orgBtn.remove();
+        if (related === null) {
+          const p = document.createElement("p");
+          p.className = "meta";
+          p.textContent = "The related-host check did not complete in time. Please try again.";
+          box.append(p);
+          return;
+        }
+        if (related.length) {
+          renderList(related, related.length + " verified resource" + (related.length === 1 ? "" : "s") + " on related hosts under the same domain:");
+          const note = document.createElement("p");
+          note.className = "meta";
+          note.textContent = "Same registrable domain — the relationship is implied by shared DNS control, not independently verified.";
+          box.append(note);
+        } else {
+          const p = document.createElement("p");
+          p.className = "meta";
+          p.textContent =
+            "Nothing found on common related hosts either. Note: some sites' bot protection blocks " +
+            "checks from hosted infrastructure, so published files can be missed here.";
+          box.append(p);
+        }
+      });
     } catch {
       box.textContent = "Resolve failed. Please try again.";
     }
