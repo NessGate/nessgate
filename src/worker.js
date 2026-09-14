@@ -136,7 +136,17 @@ async function route(request, env, ctx) {
     return apiDiscover(decodeURIComponent(path.slice("/discover/".length)), env, ctx, request);
   }
   if (path.startsWith("/explore/") && request.method === "GET") {
-    return apiExplore(decodeURIComponent(path.slice("/explore/".length)), env, ctx, request);
+    return apiExplore(decodeURIComponent(path.slice("/explore/".length)), env, ctx, request, []);
+  }
+  if (path.startsWith("/explore/") && request.method === "POST") {
+    // Opt-in candidate verification: the caller's AI/search POSTs candidate URLs;
+    // NessGate verifies them deterministically and labels them evidence:"candidate".
+    let candidates = [];
+    try {
+      const b = await request.json();
+      if (b && Array.isArray(b.candidates)) candidates = b.candidates;
+    } catch {}
+    return apiExplore(decodeURIComponent(path.slice("/explore/".length)), env, ctx, request, candidates);
   }
   if (path === "/version" && request.method === "GET") {
     return json({ build: env.BUILD_ID || "dev", spec: "v1" }, 200, cors());
@@ -652,6 +662,7 @@ async function apiDiscover(raw, env, ctx, request) {
 // SSRF/amplification proxy; it guesses no hosts or paths, stores nothing, runs no
 // AI, and makes no ownership claim. /discover is unchanged for existing callers.
 const EXPLORE_LIMITS = { maxDepth: 2, maxHosts: 8, maxRequests: 24, maxTotalBytes: 6_000_000 };
+const MAX_CANDIDATES = 10; // cap on opt-in caller-supplied candidate URLs to verify (subrequest budget)
 const EXPLORE_UA = "NessGate-Explore/1.0 (+https://nessgate.com)";
 const EXPLORE_RATE_LIMIT_PER_HOUR = 60;
 const EXPLORE_NOTE =
@@ -710,6 +721,18 @@ function classifyJson(text) {
   // a followed document, missing it is far better than inventing a wrong type.
   if (Array.isArray(obj.supportedInterfaces) || (obj.capabilities && Array.isArray(obj.skills))) return "a2a-agent-card";
   return null;
+}
+
+// Pure: verify one fetched candidate document into evidence:"candidate" records —
+// empty unless it is genuinely a recognized machine-readable resource (an
+// llms.txt index or a classifiable JSON standard). NessGate confirms the
+// resource's existence/type, never its relationship to any domain.
+function verifyCandidateRecords(url, text) {
+  const prov = ["ai-candidate", url];
+  if (isLlmsPath(url)) return [{ source: "llms.txt", sourceUrl: url, type: "llms.txt", url, evidence: "candidate", provenance: prov, depth: 1 }];
+  const t = classifyJson(text);
+  if (!t) return [];
+  return normalizeResources(t, "json", text, url).map((rec) => ({ ...rec, evidence: "candidate", provenance: prov, depth: 1 }));
 }
 
 // Attributed MCP Registry federation. The official registry domain-authenticates
@@ -791,12 +814,14 @@ async function fetchMcpRegistry(namespace) {
   }
 }
 
-async function exploreData(raw, env, ctx, request) {
+async function exploreData(raw, env, ctx, request, candidates = []) {
   const domain = normalizeDomain(raw, true);
   if (!domain) return { status: 400, body: { error: "Invalid domain" } };
+  const hasCandidates = Array.isArray(candidates) && candidates.length > 0;
   const cache = caches.default;
   const key = new Request(`https://resolver-cache.nessgate.com/explore/${domain}`);
-  const hit = await cache.match(key);
+  // Candidate requests are per-body and never cached (input varies per call).
+  const hit = hasCandidates ? null : await cache.match(key);
   if (hit) return { status: 200, body: await hit.json(), cached: true };
   if (!(await rateLimit(env, request, "explore", EXPLORE_RATE_LIMIT_PER_HOUR))) {
     return { status: 429, body: { error: "Too many requests. Please try again later." } };
@@ -921,6 +946,24 @@ async function exploreData(raw, env, ctx, request) {
   const regText = await registryPromise;
   if (namespace && regText) for (const rec of mcpRegistryRecords(regText, namespace, domain)) out.push(rec);
 
+  // Phase 4 — OPTIONAL candidate verification (opt-in via POST body). NessGate
+  // runs NO AI itself and stores nothing: the caller's AI/search supplies the
+  // candidate URLs, and NessGate fetches each (bounded, SSRF-safe) and verifies it
+  // is a real machine-readable resource. A verified candidate is labelled
+  // evidence:"candidate" — its RELATIONSHIP to the domain is UNVERIFIED and
+  // NessGate makes no ownership claim; only its existence/type is confirmed.
+  if (hasCandidates) {
+    for (const cand of candidates.slice(0, MAX_CANDIDATES)) {
+      if (typeof cand !== "string") continue;
+      let cu;
+      try { cu = new URL(cand); } catch { continue; }
+      if (cu.protocol !== "https:") continue;
+      const doc = await fetchDoc(cand);
+      if (!doc) continue;
+      for (const rec of verifyCandidateRecords(doc.finalUrl, doc.text)) out.push(rec);
+    }
+  }
+
   // Dedup (source|url|sourceUrl), keep first (earliest/strongest evidence), cap.
   const seenRec = new Set();
   const resources = [];
@@ -942,6 +985,7 @@ async function exploreData(raw, env, ctx, request) {
       publisherHosted: resources.filter((r) => r.evidence === "publisher-hosted").length,
       publisherDeclared: resources.filter((r) => r.evidence === "publisher-declared").length,
       namespaceVerified: resources.filter((r) => r.evidence === "namespace-verified").length,
+      candidate: resources.filter((r) => r.evidence === "candidate").length,
       requests: budget.requests,
       hosts: budget.hosts.size,
       bytes: budget.bytes,
@@ -952,14 +996,17 @@ async function exploreData(raw, env, ctx, request) {
   const res = new Response(JSON.stringify(body), {
     headers: { "Content-Type": "application/json", "Cache-Control": `max-age=${DISCOVER_CACHE_SECONDS}` },
   });
-  if (ctx) ctx.waitUntil(cache.put(key, res));
+  if (ctx && !hasCandidates) ctx.waitUntil(cache.put(key, res));
   return { status: 200, body };
 }
 
-async function apiExplore(raw, env, ctx, request) {
-  const { status, body } = await exploreData(raw, env, ctx, request);
+async function apiExplore(raw, env, ctx, request, candidates = []) {
+  const { status, body } = await exploreData(raw, env, ctx, request, candidates);
+  const hasCand = Array.isArray(candidates) && candidates.length > 0;
   const extra =
-    status === 200 ? { ...cors(), "Cache-Control": `public, max-age=${DISCOVER_CACHE_SECONDS}` } : cors();
+    status === 200
+      ? { ...cors(), "Cache-Control": hasCand ? "no-store" : `public, max-age=${DISCOVER_CACHE_SECONDS}` }
+      : cors();
   return json(body, status, extra);
 }
 
@@ -1519,4 +1566,4 @@ function selfDomain() { return SELF_DOMAIN; }
 function apiCatalog() { return API_CATALOG; }
 function mcpTools() { return MCP_TOOLS; }
 function adapters() { return ADAPTERS; }
-export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, selfDomain, apiCatalog, mcpTools, adapters };
+export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, selfDomain, apiCatalog, mcpTools, adapters };

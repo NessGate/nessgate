@@ -22,6 +22,7 @@ import {
   exploreBudgetAllows,
   domainToNamespace,
   mcpRegistryRecords,
+  verifyCandidateRecords,
   adapters,
 } from "../src/worker.js";
 
@@ -211,6 +212,19 @@ is(domainToNamespace("notadomain"), null, "domainToNamespace: no dot → null");
   is(recs[0].url, "https://mcp.example.com/mcp", "registry: remote url extracted");
   is(/verified control of the namespace .* NessGate did not verify this itself/.test(recs[0].attribution), true, "registry: attributed to the registry, not re-claimed by NessGate");
   is(mcpRegistryRecords("not json", "com.example", "example.com").length, 0, "registry: garbage → empty");
+}
+
+console.log("--- Explore v2 candidate verification (opt-in; AI suggests, NessGate verifies)");
+{
+  const llms = verifyCandidateRecords("https://x.com/api/llms.txt", "# Docs\n- [a](https://x.com/a)");
+  is(llms.length, 1, "candidate: an llms.txt is verified");
+  is(llms[0].evidence, "candidate", "candidate: labelled evidence:candidate");
+  is(JSON.stringify(llms[0].provenance), JSON.stringify(["ai-candidate", "https://x.com/api/llms.txt"]), "candidate: provenance marks it AI-suggested");
+  const ard = verifyCandidateRecords("https://x.com/c.json", JSON.stringify({ entries: [{ type: "application/json", url: "https://x.com/a.json" }] }));
+  is(ard.length, 1, "candidate: a classifiable JSON (ARD) is verified");
+  is(ard[0].evidence, "candidate", "candidate: JSON resource labelled candidate");
+  is(verifyCandidateRecords("https://x.com/page.json", '{"random":true}').length, 0, "candidate: unrecognized JSON is NOT accepted (relationship never invented)");
+  is(verifyCandidateRecords("https://x.com/notes.txt", "just text").length, 0, "candidate: a non-llms .txt is not accepted as a resource");
 }
 
 console.log("--- resolver normalization (thin, source-labelled, never invents semantics)");
