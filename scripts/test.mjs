@@ -15,6 +15,9 @@ import {
   mcpTools,
   normalizeResources,
   isAcs,
+  parseLlmsLinks,
+  looksMachineReadable,
+  classifyJson,
   adapters,
 } from "../src/worker.js";
 
@@ -144,6 +147,23 @@ is(parseAgentmap("Sitemap: https://x.com/sitemap.xml", "agentmap"), [], "Agentma
   is(parseAidRecord("just some text"), null, "AID: garbage → null");
   is(parseAidRecord("p=mcp;a=pat"), null, "AID: missing version+uri → null");
 }
+
+console.log("--- Explore v2 helpers: llms.txt link-following, machine-readable filter, JSON classify");
+is(
+  parseLlmsLinks("# Docs\n- [API](https://x.com/api/llms.txt)\n- [Guide](https://x.com/guide.html)\nSee https://x.com/ai-info.json for more."),
+  ["https://x.com/api/llms.txt", "https://x.com/guide.html", "https://x.com/ai-info.json"],
+  "parseLlmsLinks: markdown links + bare URLs extracted"
+);
+is(looksMachineReadable("https://x.com/api/llms.txt"), true, "looksMachineReadable: llms.txt");
+is(looksMachineReadable("https://x.com/.well-known/ard.json"), true, "looksMachineReadable: json / well-known");
+is(looksMachineReadable("https://x.com/guide.html"), false, "looksMachineReadable: html page skipped (not followed)");
+is(looksMachineReadable("not a url"), false, "looksMachineReadable: garbage → false");
+is(classifyJson('{"entries":[]}'), "ard-catalog", "classifyJson: ARD catalog");
+is(classifyJson('{"openapi":"3.0.0"}'), "openapi", "classifyJson: OpenAPI");
+is(classifyJson('{"aic":"x","name":"A","certificate":{"requestedValidity":1}}'), "gbz-185-4", "classifyJson: GB/Z ACS ranked before A2A");
+is(classifyJson('{"name":"Just an agent"}'), "a2a-agent-card", "classifyJson: A2A card (loosest, last)");
+is(classifyJson('{"random":true}'), null, "classifyJson: unknown JSON → null");
+is(classifyJson("not json"), null, "classifyJson: non-JSON → null");
 
 console.log("--- resolver normalization (thin, source-labelled, never invents semantics)");
 {

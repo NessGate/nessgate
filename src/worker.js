@@ -135,6 +135,9 @@ async function route(request, env, ctx) {
   if (path.startsWith("/discover/") && request.method === "GET") {
     return apiDiscover(decodeURIComponent(path.slice("/discover/".length)), env, ctx, request);
   }
+  if (path.startsWith("/explore/") && request.method === "GET") {
+    return apiExplore(decodeURIComponent(path.slice("/explore/".length)), env, ctx, request);
+  }
   if (path === "/version" && request.method === "GET") {
     return json({ build: env.BUILD_ID || "dev", spec: "v1" }, 200, cors());
   }
@@ -638,6 +641,189 @@ async function apiDiscover(raw, env, ctx, request) {
   return json(body, status, extra);
 }
 
+/* -------------------- Explore — bounded delegated discovery (v2) -------------------- */
+// GET /explore/{domain} — /discover plus deterministic DELEGATED discovery. It
+// keeps the exact-host answer (evidence "publisher-hosted") and then follows the
+// EXPLICIT machine-readable pointers a hosted document declares (an llms.txt
+// index, an ARD entry, an api-catalog link, …) up to a bounded depth — across
+// hosts only because the publisher itself named the target (evidence
+// "publisher-declared"). Every record carries a provenance chain. It is strictly
+// bounded (EXPLORE_LIMITS) so a malicious publisher cannot turn NessGate into an
+// SSRF/amplification proxy; it guesses no hosts or paths, stores nothing, runs no
+// AI, and makes no ownership claim. /discover is unchanged for existing callers.
+const EXPLORE_LIMITS = { maxDepth: 2, maxHosts: 8, maxRequests: 24 };
+const EXPLORE_UA = "NessGate-Explore/1.0 (+https://nessgate.com)";
+const EXPLORE_RATE_LIMIT_PER_HOUR = 60;
+const EXPLORE_NOTE =
+  "Exact-host results are served by the domain itself (publisher-hosted). Delegated results were " +
+  "reached by following explicit machine-readable pointers the domain published (publisher-declared); " +
+  "each carries a provenance chain. NessGate follows only what a document explicitly names — it never " +
+  "guesses hosts or paths, stores nothing, runs no AI, and makes no ownership claim.";
+
+// Pure: extract candidate URLs from an llms.txt document (markdown links + bare).
+function parseLlmsLinks(text) {
+  if (typeof text !== "string") return [];
+  const urls = new Set();
+  for (const m of text.match(/\]\((https?:\/\/[^)\s]+)\)/g) || []) urls.add(m.slice(2, -1));
+  for (const b of text.match(/https?:\/\/[^\s)<>"'\]]+/g) || []) urls.add(b.replace(/[.,;]+$/, ""));
+  return [...urls];
+}
+
+// Pure: does this URL look like a machine-readable resource worth following?
+function looksMachineReadable(url) {
+  let p;
+  try { p = new URL(url).pathname.toLowerCase(); } catch { return false; }
+  return /\.(json|txt)$/.test(p) || p.includes("/.well-known/") || p.endsWith("/llms.txt") || p.endsWith("/llms-full.txt");
+}
+
+// Pure: classify a fetched JSON document as one known standard type (or null).
+// Most-specific first so a card that also carries a name isn't mislabelled.
+function classifyJson(text) {
+  for (const t of ["ard-catalog", "api-catalog", "openapi", "anp", "ucp", "host-meta", "awp", "gbz-185-4", "a2a-agent-card"]) {
+    if (probeShapeOk(t, "json", text)) return t;
+  }
+  return null;
+}
+
+async function exploreData(raw, env, ctx, request) {
+  const domain = normalizeDomain(raw, true);
+  if (!domain) return { status: 400, body: { error: "Invalid domain" } };
+  const cache = caches.default;
+  const key = new Request(`https://resolver-cache.nessgate.com/explore/${domain}`);
+  const hit = await cache.match(key);
+  if (hit) return { status: 200, body: await hit.json(), cached: true };
+  if (!(await rateLimit(env, request, "explore", EXPLORE_RATE_LIMIT_PER_HOUR))) {
+    return { status: 429, body: { error: "Too many requests. Please try again later." } };
+  }
+
+  const budget = { requests: 0, hosts: new Set(), seen: new Set(), truncated: false };
+  const out = [];
+  const rootUrl = `https://${domain}/`;
+
+  // Bounded, SSRF-safe fetch of a single delegated URL (cross-host allowed because
+  // the publisher named it; self is dispatched in-process).
+  async function fetchDoc(url) {
+    let host;
+    try { host = new URL(url).hostname.toLowerCase().replace(/\.+$/, ""); } catch { return null; }
+    if (budget.seen.has(url)) return null;
+    budget.seen.add(url);
+    if (budget.requests >= EXPLORE_LIMITS.maxRequests) { budget.truncated = true; return null; }
+    if (!budget.hosts.has(host) && budget.hosts.size >= EXPLORE_LIMITS.maxHosts) { budget.truncated = true; return null; }
+    budget.requests++;
+    let text;
+    try {
+      if (domain === SELF_DOMAIN && host === SELF_DOMAIN) {
+        const u = new URL(url);
+        text = await selfProbe(u.pathname + u.search, env, ctx);
+      } else {
+        text = await safeFetch(url, domain, MAX_JSON_BYTES, false, EXPLORE_UA, true);
+      }
+    } catch { return null; }
+    budget.hosts.add(host);
+    return text;
+  }
+
+  // Add records for one fetched doc and return the pointers it explicitly names.
+  function ingest(url, text, provenance, depth) {
+    const follow = [];
+    let path = "";
+    try { path = new URL(url).pathname.toLowerCase(); } catch {}
+    if (path.endsWith(".txt") || path.endsWith("/llms.txt")) {
+      out.push({ source: "llms.txt", sourceUrl: url, type: "llms.txt", url, evidence: "publisher-declared", provenance, depth });
+      for (const link of parseLlmsLinks(text).slice(0, MAX_PER_SOURCE)) if (looksMachineReadable(link)) follow.push(link);
+      return follow;
+    }
+    const t = classifyJson(text);
+    if (!t) return follow;
+    for (const rec of normalizeResources(t, "json", text, url)) {
+      out.push({ ...rec, evidence: "publisher-declared", provenance, depth });
+      if (rec.url && rec.url !== url && looksMachineReadable(rec.url)) follow.push(rec.url);
+    }
+    return follow;
+  }
+
+  async function walk(url, depth, provenance) {
+    const text = await fetchDoc(url);
+    if (text == null) return;
+    const follow = ingest(url, text, provenance, depth);
+    if (depth < EXPLORE_LIMITS.maxDepth) {
+      for (const t of follow) if (!budget.seen.has(t)) await walk(t, depth + 1, [...provenance, t]);
+    }
+  }
+
+  // Phase 1 — exact host (same adapters as /discover), tagged by evidence.
+  const settled = await Promise.allSettled(ADAPTERS.map((a) => runAdapter(a, domain, env, ctx)));
+  const results = settled.map((r) => (r.status === "fulfilled" && r.value ? r.value : { discovered: [], resources: [] }));
+  const exactResources = results.flatMap((r) => r.resources);
+  const discovered = results.flatMap((r) => r.discovered);
+  for (const rec of exactResources) {
+    const hosted = rec.url === rec.sourceUrl; // the served document itself
+    out.push({
+      ...rec,
+      evidence: hosted ? "publisher-hosted" : "publisher-declared",
+      provenance: hosted ? [rec.url] : [rec.sourceUrl, rec.url].filter(Boolean),
+      depth: 0,
+    });
+  }
+
+  // Phase 2 — follow explicit pointers (depth 1..maxDepth).
+  const targets = []; // { url, chain }
+  const llms = discovered.find((d) => d.type === "llms.txt");
+  if (llms) {
+    const text = await fetchDoc(llms.url);
+    if (text) for (const link of parseLlmsLinks(text).slice(0, MAX_PER_SOURCE)) {
+      if (looksMachineReadable(link)) targets.push({ url: link, chain: [llms.url, link] });
+    }
+  }
+  for (const rec of exactResources) {
+    if (rec.url && rec.url !== rec.sourceUrl && looksMachineReadable(rec.url)) {
+      targets.push({ url: rec.url, chain: [rec.sourceUrl, rec.url].filter(Boolean) });
+    }
+  }
+  for (const { url, chain } of targets) {
+    if (budget.requests >= EXPLORE_LIMITS.maxRequests) { budget.truncated = true; break; }
+    await walk(url, 1, chain);
+  }
+
+  // Dedup (source|url|sourceUrl), keep first (earliest/strongest evidence), cap.
+  const seenRec = new Set();
+  const resources = [];
+  for (const r of out) {
+    const k = `${r.source}|${r.url}|${r.sourceUrl}`;
+    if (seenRec.has(k)) continue;
+    seenRec.add(k);
+    resources.push(r);
+    if (resources.length >= MAX_DISCOVER_RESOURCES) break;
+  }
+
+  const body = {
+    domain,
+    note: EXPLORE_NOTE,
+    checked: ADAPTERS.map((a) => a.id),
+    resources,
+    stats: {
+      publisherHosted: resources.filter((r) => r.evidence === "publisher-hosted").length,
+      publisherDeclared: resources.filter((r) => r.evidence === "publisher-declared").length,
+      requests: budget.requests,
+      hosts: budget.hosts.size,
+      truncated: budget.truncated,
+    },
+    limits: EXPLORE_LIMITS,
+  };
+  const res = new Response(JSON.stringify(body), {
+    headers: { "Content-Type": "application/json", "Cache-Control": `max-age=${DISCOVER_CACHE_SECONDS}` },
+  });
+  if (ctx) ctx.waitUntil(cache.put(key, res));
+  return { status: 200, body };
+}
+
+async function apiExplore(raw, env, ctx, request) {
+  const { status, body } = await exploreData(raw, env, ctx, request);
+  const extra =
+    status === 200 ? { ...cors(), "Cache-Control": `public, max-age=${DISCOVER_CACHE_SECONDS}` } : cors();
+  return json(body, status, extra);
+}
+
 /* ----------------------- MCP server (read-only tool) ----------------------- */
 // POST /mcp — Model Context Protocol over Streamable HTTP, stateless JSON
 // responses. Exposes the resolver as a tool so AI agents can call it directly
@@ -879,17 +1065,23 @@ function hostAllowedForDomain(host, domain) {
 // Fetch constrained to the target domain: HTTPS only, public DNS only,
 // redirects kept on-domain, capped size, short timeout. With strictHosts,
 // every hop (including redirects) must stay on the apex of the domain.
-async function safeFetch(url, allowedDomain, maxBytes, strictHosts = false, userAgent = "NessGate-Discover/1.0 (+https://nessgate.com)") {
+async function safeFetch(url, allowedDomain, maxBytes, strictHosts = false, userAgent = "NessGate-Discover/1.0 (+https://nessgate.com)", allowCrossHost = false) {
   let current = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const u = new URL(current);
     if (u.protocol !== "https:") throw new Error("only HTTPS is allowed");
     const host = u.hostname.toLowerCase().replace(/\.+$/, "");
-    const hostOk = strictHosts
+    // allowCrossHost (used only by /explore for publisher-declared targets): drop
+    // the on-domain restriction but keep EVERY other SSRF guard — no forbidden
+    // hosts (localhost, self, IP literals, internal suffixes) and a public-DNS
+    // check on this hop and every redirect below.
+    const hostOk = allowCrossHost
+      ? true
+      : strictHosts
       ? host === allowedDomain
       : hostAllowedForDomain(host, allowedDomain);
     if (isForbiddenHost(host) || !hostOk) {
-      throw new Error("request left the target domain");
+      throw new Error(allowCrossHost ? "target host is not allowed" : "request left the target domain");
     }
     await assertPublicDns(host);
 
@@ -1160,4 +1352,4 @@ function selfDomain() { return SELF_DOMAIN; }
 function apiCatalog() { return API_CATALOG; }
 function mcpTools() { return MCP_TOOLS; }
 function adapters() { return ADAPTERS; }
-export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, selfDomain, apiCatalog, mcpTools, adapters };
+export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, parseLlmsLinks, looksMachineReadable, classifyJson, selfDomain, apiCatalog, mcpTools, adapters };
