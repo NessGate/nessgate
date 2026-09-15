@@ -31,6 +31,19 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h2>2026</h2>
 
+<h3 id="charter-v2-draft">Proposed Charter v2 — draft published for review (not yet effective)</h3>
+<ul>
+<li>A <a href="/charter-v2"><strong>proposed Charter v2</strong></a> is published as a public
+    <strong>draft</strong>. It is <strong>not yet effective</strong> and changes nothing about how
+    the resolver behaves today; <a href="/charter">Charter v1</a> remains the active, binding
+    charter. The draft proposes two clearly separated kinds of state (publisher-declared/registered
+    records and a short-lived discovery cache), provenance-scoped publisher control, bounded reading
+    of a publisher's own pages plus defined public adapters, grouped-not-ranked ordering, and seven
+    affirmative neutrality promises. Production behavior will not adopt any of these before Charter
+    v2 becomes the active charter. Technical design:
+    <a href="https://github.com/NessGate/nessgate/blob/main/docs/v2-architecture.md" rel="noopener"><code>docs/v2-architecture.md</code></a>.</li>
+</ul>
+
 <h3 id="v1-6-0">v1.6.0 — Benchmark-driven general rules</h3>
 <ul>
 <li><strong>Canonical-host fallback (same registrable domain only).</strong> When the exact host

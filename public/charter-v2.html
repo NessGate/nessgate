@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proposed NessGate Charter v2 (Draft) — for review</title>
+<meta name="description" content="A public DRAFT of a proposed Charter v2 for NessGate — PROPOSED, NOT YET EFFECTIVE. It is published for review only and does not govern NessGate today; Charter v1 remains the active, binding charter until v2 is formally adopted.">
+<link rel="canonical" href="https://nessgate.com/charter-v2">
+<meta name="robots" content="noindex, follow">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#0F2D4A">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0F2D4A">
+<meta property="og:site_name" content="NessGate">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Proposed NessGate Charter v2 (Draft) — for review">
+<meta property="og:description" content="A public DRAFT of a proposed Charter v2 — PROPOSED, NOT YET EFFECTIVE. Charter v1 remains the active, binding charter until v2 is formally adopted.">
+<meta property="og:url" content="https://nessgate.com/charter-v2">
+<meta property="og:image" content="https://nessgate.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/style.css?v=10">
+</head>
+<body>
+<header class="site-head"><a class="brand" href="/"><img src="/logo-horizontal.svg" alt="NessGate" width="143" height="28" class="brand-logo"></a><nav class="top-nav" aria-label="Primary"><a href="/check">Check</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/about">About</a><a class="nav-gh" href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a></nav></header>
+<main>
+<h1>Proposed NessGate Charter v2</h1>
+<p class="meta">Draft of 15 September 2026 · <strong>PROPOSED — NOT YET EFFECTIVE</strong> · published for public review.</p>
+
+<p class="note"><strong>Status: this is a proposal, not the rules.</strong> This page does
+<strong>not</strong> govern NessGate today. The active, binding charter remains
+<a href="/charter">Charter v1</a>, and it stays in force unchanged until — and unless — a Charter v2
+is formally adopted and published as the active charter. We publish this draft early, in the open,
+because we would rather show our thinking than hold it back. Nothing here describes how the live
+service behaves right now. Production behavior will never quietly contradict the active charter:
+before persistent storage, publisher registration, or resolve-time reading of a publisher's own
+pages ever becomes production behavior, a Charter v2 carrying these promises must first become the
+active published charter.</p>
+
+<h2>Why a v2 is proposed</h2>
+<p>NessGate today reads only what a domain publishes at its exact host, live, storing nothing. That
+is trustworthy, but on measurement it returns nothing for most domains — useful resources often
+live on a subdomain, a related property, or a public registry the strict resolver never reaches. A
+resolver that is empty most of the time will be routed around. The proposal below lets NessGate
+find and normalize more of what genuinely exists, <em>without</em> loosening what "verified" or
+"official" means: every result still says exactly why it exists, and weak evidence is never
+presented as authoritative. The full technical design is public in
+<a href="https://github.com/NessGate/nessgate/blob/main/docs/v2-architecture.md" rel="noopener"><code>docs/v2-architecture.md</code></a>.</p>
+
+<h2>Retained from Charter v1 (unchanged)</h2>
+<p>These promises carry over verbatim and are not up for revision:</p>
+<ul>
+<li><strong>Free forever to participate</strong> — no fee to use the resolver, to be read, or to build on it.</li>
+<li><strong>Never sell ranking, placement, priority, or badges</strong> — there is nothing to buy that changes how a domain is treated.</li>
+<li><strong>Neutral to everyone</strong> — every domain is read the same way and returned the same way.</li>
+<li><strong>The resource always lives on the domain</strong> — NessGate reads and links back; it never rehosts, owns, or becomes the resource.</li>
+<li><strong>Open and independently implementable</strong> — public specification, Apache-2.0 reference implementation, buildable by anyone without permission.</li>
+<li><strong>A stable, additive specification</strong> — a published response shape keeps working across a major version; breaking changes only ever arrive as a new major version.</li>
+</ul>
+
+<h2>What would change (v1 → v2), and why</h2>
+
+<h3>1. From "stores nothing" to two clearly separated, inspectable kinds of state</h3>
+<p><em>Charter v1 says:</em> "Nothing is crawled, indexed, or persisted. Each answer is computed
+fresh and dies with its short edge cache."</p>
+<p><em>Charter v2 would promise:</em> NessGate keeps two clearly separated kinds of state, both
+inspectable — <strong>records a publisher declared or registered</strong>, kept until the publisher
+revokes them and re-verified on a schedule; and a <strong>short-lived discovery cache</strong>
+re-derived from public evidence and never served stale. NessGate builds no content corpus — no
+stored page text, no search index — only pointers, each carrying its source, evidence class,
+verification state, timestamps, and expiry.</p>
+
+<h3>2. From "no domain data" to publisher-owned and independently-attributed records</h3>
+<p><em>Charter v1 says:</em> "NessGate keeps no user data and no domain data."</p>
+<p><em>Charter v2 would promise:</em> No accounts and no user data, ever. A domain record exists
+only because the domain itself declared or registered it, or because an independent public source
+(a certificate log, another publisher, a named registry) attested it with recorded provenance.
+Publishers control what they own and may revoke it at any time; independent evidence is separately
+attributed and expires on its own schedule rather than being erased on demand.</p>
+
+<h3>3. A bounded, publisher-scoped resolve-time read</h3>
+<p><em>New clause:</em> In its broader tiers NessGate may read a publisher's <strong>own</strong>
+public pages at resolve time — bounded, robots-respecting, with provenance on every hop — solely to
+follow that publisher's own links. It does not crawl arbitrary third-party sites or commentary
+<em>about</em> a publisher. Separately, a small set of <strong>explicitly defined public
+adapters</strong> (certificate-transparency logs, named registries) may read third-party sources,
+always with full provenance and always as discovered (Level 2) until independently confirmed.</p>
+
+<h3>4. Reaffirmed under the new tiers: no scores, no ranking</h3>
+<p><em>Charter v1 says:</em> "It does not rank, score, rate…"</p>
+<p><em>Charter v2 would promise:</em> No scores, ever — no numeric confidence, no ranking. Results
+are <strong>grouped by evidence class and deterministically ordered within each group</strong>;
+grouping is not ranking and buys no one placement.</p>
+
+<h2>New affirmative promises</h2>
+<p>Charter v2 would add these explicit commitments:</p>
+<ol>
+<li><strong>Discovery never becomes authority.</strong> A resource NessGate merely found is marked
+    <em>discovered</em> and stays there; it becomes <em>authoritative</em> only when a publisher
+    declaration, a verified registration, or a domain-authenticated registry independently
+    establishes it. Storing a discovered record never upgrades it.</li>
+<li><strong>Two questions, never merged.</strong> NessGate reports <em>whether a resource is
+    real</em> and <em>how strongly it relates to a domain</em> as two separate facts. Finding or
+    verifying a resource never makes it "official."</li>
+<li><strong>Storage independence.</strong> Any persistent store is an implementation choice, never
+    part of the protocol. The same captured evidence, evaluated under the same open rules, yields
+    the same classification with any store or none.</li>
+<li><strong>Operator independence.</strong> nessgate.com is one reference deployment. The open
+    implementation runs for anyone on their own database or with no database, and reaches the same
+    classifications from the same captured evidence and the same open rules.</li>
+<li><strong>No privileged submitter — including our own commercial layer.</strong> Anyone may
+    submit candidate resources; every submission, from any party including NessReady, is evaluated
+    under the identical public rules and remains <em>discovered</em> until it independently earns
+    authority. There is no private path to promotion, and none for sale.</li>
+<li><strong>Source-preserving federation.</strong> When a result comes from another registry,
+    NessGate names that registry and its verification method. Registries are never flattened into a
+    generic "trusted" stamp.</li>
+<li><strong>No proprietary publishing format.</strong> NessGate introduces no publishing file for
+    domains to adopt. It reads the standards that already exist; a domain's own standard files are
+    its declaration.</li>
+</ol>
+
+<h2>Before v2 could become active</h2>
+<p>This draft becomes binding only when it is formally adopted and published here as the active
+charter, replacing v1. Until then: v1 governs; any pre-release or experimental build that exercises
+a v2-only capability will be labelled experimental and will name exactly which proposed v2
+capabilities it uses, and will never be presented as governed by v1. The single hard rule is that
+<strong>production behavior must never quietly contradict the active charter</strong> — so
+persistent storage, registration, and resolve-time page reading do not go live in production before
+Charter v2 is the active charter.</p>
+
+<h2>Change log</h2>
+<ul>
+<li><strong>2026-09-15 — draft published for review.</strong> First public proposal of Charter v2:
+    two separated kinds of state, provenance-scoped publisher control, bounded publisher-surface
+    reading with defined public adapters, grouped-not-ranked ordering, and seven affirmative
+    neutrality promises. Not yet effective. Corrections and revisions will be recorded here and in
+    git history rather than by rewriting the past; if something changes, we will say why.</li>
+</ul>
+
+<p class="note">This is a proposal for review. The binding rules today are
+<a href="/charter">Charter v1</a>. Technical design:
+<a href="https://github.com/NessGate/nessgate/blob/main/docs/v2-architecture.md" rel="noopener"><code>docs/v2-architecture.md</code></a>.
+Notable changes are also recorded in the <a href="/changelog">changelog</a>.</p>
+</main>
+<footer>
+  <nav aria-label="Footer"><a href="/check">Check</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/spec">Spec</a><a href="/charter">Charter</a><a href="/changelog">Changelog</a><a href="/blog">Blog</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></nav>
+  <p class="foot-src"><a href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a> &middot; <a href="https://www.npmjs.com/package/@nessgate/resolver" rel="noopener">npm</a></p>
+  <p>© 2026 NessGate</p>
+</footer>
+</body>
+</html>

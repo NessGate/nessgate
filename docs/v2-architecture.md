@@ -163,7 +163,7 @@ Constraint carried over from the 2026-09 direction decision: **NessGate ships no
 
 ## 10. Neutrality Charter changes (Charter v2 — principle-level, public, versioned)
 
-Charter v2 is stated as **principles**, not mechanisms. Exact TTL values, storage engines (D1/SQLite/Postgres), queue design, challenge formats, and budgets live in the **specification** and may change without a charter amendment; the promises below cannot. Nothing changes silently — the charter page carries a change log, and Charter v2 ships (and is announced) before any persistent storage goes live.
+Charter v2 is stated as **principles**, not mechanisms. Exact TTL values, storage engines (D1/SQLite/Postgres), queue design, challenge formats, and budgets live in the **specification** and may change without a charter amendment; the promises below cannot. Nothing changes silently — the charter page carries a change log. The proposed text is published as a public **draft** early (see §14 stage 0); it must be **formally adopted as the active charter** before any persistent storage, registration, or hosted page-reading becomes production behavior.
 
 ### A. Clauses that must change (with the principle that replaces each)
 
@@ -210,8 +210,15 @@ Unchanged v1 commitments — free forever, no ranking/placement sales, neutral t
 
 ## 14. Staged implementation order (smallest safe first release)
 
-1. **v2.0-alpha (library only, no charter change needed):** two-axis/two-level result shape in `@nessgate/resolver`; adapter formalization; `tier: balanced` with CT + sitemap adapters; conformance tests. Hosted service untouched.
-2. **Charter v2 published** (with change log + announcement). Gate for everything below.
+**Transparency-first sequencing.** Documents and experimental code may go public early; only *production behavior* is gated. Two rules govern the order below:
+- **The activation gate (hard rule):** production behavior must never quietly contradict the *active* charter. Persistent storage, publisher registration, and hosted resolve-time page reading do not become production behavior until **Charter v2 is the active published charter** (not merely the published draft).
+- **Experimental labelling:** any pre-release or alpha that exercises a proposed-v2 capability before Charter v2 is active must be labelled experimental/pre-release, name exactly which proposed-v2 capabilities it exercises, and never be presented as governed by Charter v1.
+
+Git history is preserved; corrections are made openly (new commits, recorded reasons), never by rewriting history.
+
+0. **Proposed Charter v2 published as a public DRAFT** — *done 2026-09-15* (`/charter-v2`, marked NOT YET EFFECTIVE, dated, with change log; Charter v1 stays active and is labelled as such). Publishing the draft is not the activation gate.
+1. **v2.0-alpha (library only):** two-axis/two-level result shape in `@nessgate/resolver`; adapter formalization; `tier: balanced` with CT + sitemap adapters; conformance tests. Hosted service untouched. May be released publicly as **experimental/pre-release**, naming the proposed-v2 capabilities it exercises; the library carries no charter-governed hosted behavior, so it does not require v2 to be active — but it is not presented as v1 behavior either.
+2. **Charter v2 formally adopted and published as the active charter** (replacing v1, with change log + announcement). **This is the activation gate for stages 3–6.**
 3. **v2.0:** storage interface + D1 discovery cache on nessgate.com (24 h TTL) + `freshness` in responses; hosted /explore adds CT+sitemap (within existing budgets).
 4. **v2.1:** registration challenge flow (revived, per §9) + authoritative index; useful-empty responses linking the publishing path; WP-plugin registration client.
 5. **v2.2:** async demand-gated refresh (Queues); registry federation adapters (AGNTCY, NANDA; MCP Registry already present).
