@@ -288,6 +288,28 @@ is(probeShapeOkObj("openapi", {}), false, "probeShapeOkObj: rejects like text va
   for (const [t, x] of cases) is(probeShapeOkObj(t, JSON.parse(x)), probeShapeOk(t, "json", x), `obj/text shape agreement: ${t}`);
 }
 
+console.log("--- canonical fallback engine path (library resolve() with mocked fetch)");
+{
+  const lib = await import("../public/resolver.mjs");
+  const mock = async (url) => {
+    const u = String(url);
+    if (u === "https://flipcase.com/") return { ok: true, status: 200, url: "https://www.flipcase.com/", text: async () => "<html>home</html>" };
+    if (u === "https://www.flipcase.com/llms.txt") return { ok: true, status: 200, url: u, text: async () => "# Flipcase\n- [docs](https://www.flipcase.com/docs)" };
+    return { ok: false, status: 404, url: u, text: async () => "" };
+  };
+  const r = await lib.resolve("flipcase.com", { fetch: mock });
+  is(r.discovered.length, 1, "fallback: canonical www llms.txt discovered when apex is empty");
+  is(r.discovered[0].url, "https://www.flipcase.com/llms.txt", "fallback: discovered url is on the canonical host");
+  const crossMock = async (url) => {
+    const u = String(url);
+    if (u === "https://flipcase.com/") return { ok: true, status: 200, url: "https://other-domain.com/", text: async () => "<html>x</html>" };
+    if (u === "https://other-domain.com/llms.txt") return { ok: true, status: 200, url: u, text: async () => "# Other" };
+    return { ok: false, status: 404, url: u, text: async () => "" };
+  };
+  const r2 = await lib.resolve("flipcase.com", { fetch: crossMock });
+  is(r2.discovered.length, 0, "fallback: cross-registrable-domain redirect is NEVER followed");
+}
+
 console.log("--- Related Discovery (cross-domain; strict evidence model)");
 {
   is(isCrossRegistrable("googleapis.com", "google.com"), true, "cross: different registrable domain");
