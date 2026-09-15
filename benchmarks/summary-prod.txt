@@ -1,0 +1,46 @@
+google.com: disc=0(-) org+=0 rel+=3
+microsoft.com: disc=0(-) org+=0 rel+=1
+instagram.com: disc=0(-) org+=0 rel+=0
+linkedin.com: disc=0(-) org+=0 rel+=0
+hicloudcam.com: disc=0(-) org+=0 rel+=0
+gtld-servers.net: disc=0(-) org+=0 rel+=0
+bing.com: disc=0(-) org+=0 rel+=0
+fastly.net: disc=0(-) org+=0 rel+=0
+office.net: disc=0(-) org+=0 rel+=0
+youtu.be: disc=0(-) org+=0 rel+=0
+icloud.com: disc=0(-) org+=0 rel+=0
+pinterest.com: disc=0(-) org+=0 rel+=5
+googlesyndication.com: disc=0(-) org+=0 rel+=0
+windows.net: disc=0(-) org+=0 rel+=0
+myfritz.net: disc=0(-) org+=0 rel+=0
+root-servers.net: disc=0(-) org+=0 rel+=0
+tiktokv.com: disc=0(-) org+=0 rel+=0
+baidu.com: disc=0(-) org+=0 rel+=0
+windows.com: disc=0(-) org+=0 rel+=0
+nginx.com: disc=0(-) org+=1 rel+=0
+ipstack.com: disc=1(-) org+=ERR rel+=ERR
+zenserp.com: disc=ERR(-) org+=ERR rel+=ERR
+theaxolotlapi.netlify.app: disc=ERR(-) org+=ERR rel+=ERR
+kinduff.github.io: disc=ERR(-) org+=ERR rel+=0
+http.dog: disc=ERR(-) org+=ERR rel+=ERR
+random-d.uk: disc=0(-) org+=0 rel+=0
+xeno-canto.org: disc=ERR(-) org+=ERR rel+=ERR
+catboys.com: disc=ERR(-) org+=ERR rel+=ERR
+rapidapi.com: disc=ERR(-) org+=ERR rel+=ERR
+soruly.github.io: disc=ERR(-) org+=ERR rel+=0
+capev2.readthedocs.io: disc=ERR(-) org+=ERR rel+=ERR
+bazaar.abuse.ch: disc=ERR(-) org+=ERR rel+=0
+urlscan.io: disc=ERR(-) org+=ERR rel+=ERR
+colormind.io: disc=ERR(-) org+=ERR rel+=0
+pro.europeana.eu: disc=0(-) org+=0 rel+=0
+lordicon.com: disc=ERR(-) org+=ERR rel+=ERR
+data.rijksmuseum.nl: disc=ERR(-) org+=ERR rel+=ERR
+auth0.com: disc=ERR(-) org+=ERR rel+=ERR
+stytch.com: disc=ERR(-) org+=ERR rel+=ERR
+tierion.com: disc=ERR(-) org+=ERR rel+=ERR
+
+=== PROD summary (40 domains) ===
+exact positive: 2.5% | org incremental: 2.5% | related incremental: 7.5%
+any-layer: 12.5% | genuine empty: 45.0% | blocked/timeout: 45.0%
+edge-cached /discover responses: 0/40 (reported separately; fresh runs measure coverage)
+triplet latency p50/p90: 11909ms / 30538ms
