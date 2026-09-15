@@ -31,7 +31,7 @@ if (existsSync(outFile)) {
 } else writeFileSync(outFile, "");
 
 // Bounded caps so one domain can't run away; balanced verifies at most a few hosts.
-const OPTS = { timeoutMs: 6000, maxBytes: 1_000_000, ctCap: 8, sitemapCap: 8, hostVerifyCap: 5 };
+const OPTS = { timeoutMs: 6000, ctTimeoutMs: 20000, maxBytes: 1_000_000, ctCap: 8, sitemapCap: 8, hostVerifyCap: 5 };
 const hostOf = (it) => (it.provenance.find((p) => p.host) || {}).host || "";
 
 async function online() {

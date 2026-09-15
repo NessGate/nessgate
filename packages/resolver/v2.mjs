@@ -230,8 +230,11 @@ export const V2_ADAPTERS = [
       const items = [];
       let text;
       try {
+        // CT logs (crt.sh) are routinely slow (10-20s); give this one external
+        // fetch a longer, dedicated timeout so CT coverage is not a timeout
+        // artifact. Applies uniformly to every domain — not domain-specific.
         text = await fetchText(ctx.fetchImpl, "https://crt.sh/?q=%25." + encodeURIComponent(ctx.domain) + "&output=json",
-          "application/json", ctx.timeoutMs, ctx.maxBytes);
+          "application/json", ctx.ctTimeoutMs, ctx.maxBytes);
         ctx.stat.requests++;
       } catch (e) { ctx.stat.skipped.push("ct(" + ((e && e.message) || "err") + ")"); return items; }
       const names = parseCtNames(text, ctx.domain, ctx.caps.ctCap);
@@ -315,7 +318,7 @@ function orderItems(items) {
     String(a.resource.url).localeCompare(String(b.resource.url)));
 }
 
-// resolveV2(domain, { tier, fetch, timeoutMs, maxBytes, ctCap, sitemapCap, hostVerifyCap })
+// resolveV2(domain, { tier, fetch, timeoutMs, ctTimeoutMs, maxBytes, ctCap, sitemapCap, hostVerifyCap })
 //   tier: "fast" (exact-host only) | "balanced" (adds CT + sitemap) | "deep"
 //         (not implemented in the alpha; clamps to balanced and discloses it)
 // Returns a two-axis result: items[] (grouped by evidence class, deterministic
@@ -338,6 +341,7 @@ export async function resolveV2(domain, opts = {}) {
     domain: d,
     fetchImpl,
     timeoutMs: opts.timeoutMs || 8000,
+    ctTimeoutMs: opts.ctTimeoutMs || 20000,   // CT logs are slow; dedicated, uniform timeout
     maxBytes: opts.maxBytes || 1_000_000,
     caps: {
       ctCap: opts.ctCap ?? 20,
