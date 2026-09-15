@@ -59,8 +59,16 @@ export function validateProbeContent(kind, text) {
       return false;
     }
   }
-  const head = text.trimStart().slice(0, 15).toLowerCase();
-  return !head.startsWith("<!doctype") && !head.startsWith("<html");
+  // HTML is detected after skipping leading comments: a shell page opening with
+  // <!-- ... --> must not pass as text, while a genuine text file with a
+  // comment header still does.
+  let head = text.trimStart();
+  for (let i = 0; i < 5 && head.startsWith("<!--"); i++) {
+    const end = head.indexOf("-->");
+    if (end === -1) return false;
+    head = head.slice(end + 3).trimStart();
+  }
+  return !head.startsWith("<");
 }
 
 // Confirm the document looks like the mechanism we probed for, so a JSON
@@ -70,6 +78,12 @@ export function probeShapeOk(type, kind, text) {
   if (kind !== "json") return true;
   let obj;
   try { obj = JSON.parse(text); } catch { return false; }
+  return probeShapeOkObj(type, obj);
+}
+
+// Object variant: one parse per document even when classifying against many
+// types (repeated JSON.parse of large specs is the dominant CPU cost).
+export function probeShapeOkObj(type, obj) {
   if (!obj || typeof obj !== "object") return false;
   switch (type) {
     case "ard-catalog": return Array.isArray(obj.entries);
@@ -469,6 +483,28 @@ export async function resolve(domain, opts = {}) {
   const discovered = results.flatMap((r) => r.discovered);
   let resources = results.flatMap((r) => r.resources);
   const checked = ADAPTERS.map((a) => a.id);
+  // Canonical-host fallback (same registrable domain ONLY): when the exact host
+  // publishes nothing and its homepage redirects to www./a subdomain of itself,
+  // probe that canonical host for llms.txt / ard.json. A redirect to a different
+  // registrable domain is never followed here. Mirrors src/worker.js.
+  if (discovered.length === 0) {
+    try {
+      const r = await fetchImpl("https://" + d + "/", { redirect: "follow" });
+      const canon = sameRegCanonicalHost(r.url, d);
+      if (canon) {
+        for (const [path, type, kind] of [["/llms.txt", "llms.txt", "text"], ["/.well-known/ard.json", "ard-catalog", "json"]]) {
+          try {
+            const text = await fetchText(fetchImpl, "https://" + canon + path, timeoutMs, maxBytes);
+            if (validateProbeContent(kind, text) && probeShapeOk(type, kind, text)) {
+              const url = "https://" + canon + path;
+              discovered.push({ type, url });
+              resources.push(...normalizeResources(type, kind, text, url));
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+  }
   // Optional GB/Z 185.5 discovery gateway — off unless the caller configures it.
   if (opts.gbz && opts.gbz.gatewayUrl) {
     const g = await queryGbzGateway(opts.gbz, timeoutMs);
@@ -480,4 +516,13 @@ export async function resolve(domain, opts = {}) {
   return { domain: d, provenance: "self-published", discovered, resources, checked };
 }
 
-export default { resolve, normalizeResources, normalizeDomain, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, ADAPTERS };
+// Pure: the same-registrable-domain canonical host implied by a homepage final
+// URL. Null for the apex itself and for any cross-registrable-domain redirect.
+export function sameRegCanonicalHost(finalUrl, domain) {
+  let h;
+  try { h = new URL(finalUrl).hostname.toLowerCase().replace(/\.+$/, ""); } catch { return null; }
+  if (h === domain) return null;
+  return h.endsWith("." + domain) ? h : null;
+}
+
+export default { resolve, normalizeResources, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, ADAPTERS };

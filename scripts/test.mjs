@@ -27,6 +27,8 @@ import {
   orgRecordsFromDoc,
   docRecords,
   isCrossRegistrable,
+  sameRegCanonicalHost,
+  probeShapeOkObj,
   parseRwsDeclaration,
   rwsReciprocal,
   parseAssetLinksWeb,
@@ -104,6 +106,10 @@ is(validateProbeContent("text", "# Acme\n> AI guidance"), true, "plain text/mark
 is(validateProbeContent("text", "  <!DOCTYPE html><html>"), false, "catch-all HTML rejected for text probe");
 is(validateProbeContent("text", "<html lang=\"en\">"), false, "html tag rejected for text probe");
 is(validateProbeContent("text", "   \n  "), false, "whitespace-only rejected");
+is(validateProbeContent("text", "  <!-- Copyright Microsoft --> <!DOCTYPE html><html>"), false, "HTML behind a leading comment rejected (login-shell false-positive guard)");
+is(validateProbeContent("text", "<!-- File: llms.txt Domain: x -->\n# Real llms\n- [a](https://x/a)"), true, "genuine text with a comment header still accepted");
+is(validateProbeContent("text", "<!-- unterminated"), false, "unterminated comment rejected");
+is(validateProbeContent("text", "<HTML><body>"), false, "bare <tag> head rejected");
 
 console.log("--- per-type probe shape validation (no JSON catch-all false positives)");
 is(probeShapeOk("ard-catalog", "json", '{"entries":[]}'), true, "ARD with entries[] accepted");
@@ -266,6 +272,20 @@ console.log("--- Explore v2 Organization Discovery (opt-in, bounded, verified-on
   is(orgArd.length, 1, "org: an ARD catalog on a related host is normalized");
   is(orgArd[0].evidence, "same-domain-host", "org: ARD entries labelled same-domain-host");
   is(orgRecordsFromDoc("https://api.example.com/page.json", '{"random":true}', "conventional").length, 0, "org: unrecognized JSON is not reported");
+}
+
+console.log("--- canonical-host fallback + single-parse shape checks (benchmark rules)");
+is(sameRegCanonicalHost("https://www.capgemini.com/", "capgemini.com"), "www.capgemini.com", "canonical: apex→www accepted");
+is(sameRegCanonicalHost("https://m365.cloud.microsoft/x", "cloud.microsoft"), "m365.cloud.microsoft", "canonical: apex→subdomain accepted");
+is(sameRegCanonicalHost("https://azure.microsoft.com/", "azure.com"), null, "canonical: cross-registrable-domain redirect → null (never authoritative)");
+is(sameRegCanonicalHost("https://capgemini.com/", "capgemini.com"), null, "canonical: no redirect → null");
+is(sameRegCanonicalHost("not a url", "x.com"), null, "canonical: garbage → null");
+is(probeShapeOkObj("ard-catalog", { entries: [] }), true, "probeShapeOkObj: same semantics as text variant (ARD)");
+is(probeShapeOkObj("openapi", {}), false, "probeShapeOkObj: rejects like text variant");
+{
+  // The object and text variants must agree (single-parse optimization safety).
+  const cases = [["ard-catalog", '{"entries":[]}'], ["ucp", '{"capabilities":[]}'], ["anp", "{}"], ["openapi", '{"swagger":"2.0"}'], ["gbz-185-4", '{"aic":"","name":"S"}']];
+  for (const [t, x] of cases) is(probeShapeOkObj(t, JSON.parse(x)), probeShapeOk(t, "json", x), `obj/text shape agreement: ${t}`);
 }
 
 console.log("--- Related Discovery (cross-domain; strict evidence model)");

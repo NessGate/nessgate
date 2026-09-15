@@ -244,6 +244,10 @@ const DISCOVER_NOTE =
 
 // Reject catch-all rewrites: SPA hosts return 200 + their HTML shell for every
 // path, which would otherwise report ghost files across half the modern web.
+// For text probes, HTML is detected after skipping leading comments: an HTML
+// login/shell page that opens with <!-- ... --> must not pass as llms.txt,
+// while a genuine plain-text file that starts with a comment header still does
+// (its next content is text, not a tag).
 function validateProbeContent(kind, text) {
   if (typeof text !== "string" || text.trim() === "") return false;
   if (kind === "json") {
@@ -254,8 +258,13 @@ function validateProbeContent(kind, text) {
       return false;
     }
   }
-  const head = text.trimStart().slice(0, 15).toLowerCase();
-  return !head.startsWith("<!doctype") && !head.startsWith("<html");
+  let head = text.trimStart();
+  for (let i = 0; i < 5 && head.startsWith("<!--"); i++) {
+    const end = head.indexOf("-->");
+    if (end === -1) return false; // unterminated comment: not a text document
+    head = head.slice(end + 3).trimStart();
+  }
+  return !head.startsWith("<");
 }
 
 // Beyond "is it valid JSON" (validateProbeContent), confirm the document
@@ -267,6 +276,13 @@ function probeShapeOk(type, kind, text) {
   if (kind !== "json") return true;
   let obj;
   try { obj = JSON.parse(text); } catch { return false; }
+  return probeShapeOkObj(type, obj);
+}
+
+// Object variant so callers that already parsed the document pay for ONE parse
+// — classifyJson tests one doc against many types, and repeated JSON.parse of
+// large specs was the dominant CPU cost on heavy routes (1102 resource limits).
+function probeShapeOkObj(type, obj) {
   if (!obj || typeof obj !== "object") return false;
   switch (type) {
     case "ard-catalog": return Array.isArray(obj.entries);
@@ -634,7 +650,33 @@ async function discoverData(raw, env, ctx, request) {
   const settled = await Promise.allSettled(ADAPTERS.map((a) => runAdapter(a, domain, env, ctx)));
   const results = settled.map((r) => (r.status === "fulfilled" && r.value ? r.value : { discovered: [], resources: [] }));
   const discovered = results.flatMap((r) => r.discovered);
-  const resources = results.flatMap((r) => r.resources).slice(0, MAX_DISCOVER_RESOURCES);
+  let resources = results.flatMap((r) => r.resources);
+
+  // Canonical-host fallback (general rule; same registrable domain ONLY). When
+  // the exact host publishes nothing and its homepage 301s to www./a subdomain
+  // of itself, the site's real canonical host may hold the files (measured on
+  // real publishers). Bounded: one homepage fetch + two probes; a redirect to a
+  // DIFFERENT registrable domain is never followed here (safeFetch stays
+  // domain-locked), so this can never change whose resources are reported.
+  if (discovered.length === 0 && domain !== SELF_DOMAIN) {
+    try {
+      const home = await safeFetch(`https://${domain}/`, domain, MAX_JSON_BYTES, false, DISCOVER_UA, false, true);
+      const canon = sameRegCanonicalHost(home.finalUrl, domain);
+      if (canon) {
+        for (const [path, type, kind] of [["/llms.txt", "llms.txt", "text"], ["/.well-known/ard.json", "ard-catalog", "json"]]) {
+          try {
+            const text = await safeFetch(`https://${canon}${path}`, domain, MAX_JSON_BYTES, false, DISCOVER_UA);
+            if (validateProbeContent(kind, text) && probeShapeOk(type, kind, text)) {
+              const url = `https://${canon}${path}`;
+              discovered.push({ type, url });
+              resources.push(...normalizeResources(type, kind, text, url));
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+  }
+  resources = resources.slice(0, MAX_DISCOVER_RESOURCES);
   const body = {
     domain,
     provenance: "self-published",
@@ -745,6 +787,17 @@ function isCrossRegistrable(host, domain) {
   if (typeof host !== "string" || !host) return false;
   const h = host.toLowerCase().replace(/\.+$/, "");
   return h !== domain && !h.endsWith("." + domain);
+}
+
+// Pure: the same-registrable-domain canonical host implied by a homepage final
+// URL (apex → www./subdomain of itself). Returns null for the apex itself and
+// for any cross-registrable-domain redirect — those are never treated as the
+// same authoritative host.
+function sameRegCanonicalHost(finalUrl, domain) {
+  let h;
+  try { h = new URL(finalUrl).hostname.toLowerCase().replace(/\.+$/, ""); } catch { return null; }
+  if (h === domain) return null;
+  return h.endsWith("." + domain) ? h : null;
 }
 
 // Pure: parse a Related Website Set file. If the file's primary is the queried
@@ -874,7 +927,7 @@ function classifyJson(text) {
   try { obj = JSON.parse(text); } catch { return null; }
   if (!obj || typeof obj !== "object") return null;
   for (const t of ["ard-catalog", "api-catalog", "openapi", "anp", "ucp", "host-meta", "awp", "gbz-185-4"]) {
-    if (probeShapeOk(t, "json", text)) return t;
+    if (probeShapeOkObj(t, obj)) return t; // single parse; shape checks on the object
   }
   // A2A only when the doc has A2A-specific structure. A bare {name}/{url} document
   // (e.g. an ai-info.json profile) must NOT be mislabelled as an agent card — for
@@ -1131,11 +1184,15 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
   // (publisher evidence) plus a small fixed conventional shortlist. Only verified
   // machine-readable resources are reported (evidence "same-domain-host"); a host
   // that serves nothing recognized is simply absent. Shares the global budget.
+  // Homepage is used by both the org phase (same-domain link extraction) and the
+  // related phase (cross-domain redirect detection) — fetch it once.
+  let homeDoc = null;
+  if (org || related) homeDoc = await fetchDoc(`https://${domain}/`);
+
   let orgChecked = null;
   if (org) {
     let homepageHosts = [];
-    const home = await fetchDoc(`https://${domain}/`);
-    if (home) homepageHosts = parseSameOrgHosts(home.text, domain);
+    if (homeDoc) homepageHosts = parseSameOrgHosts(homeDoc.text, domain);
     const orgHosts = [
       ...homepageHosts.map((h) => ({ h, via: "homepage-link" })),
       ...ORG_SUBDOMAIN_SHORTLIST.map((p) => `${p}.${domain}`).filter((h) => !homepageHosts.includes(h)).map((h) => ({ h, via: "conventional" })),
@@ -1204,6 +1261,30 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
       }
       relatedOut.push(entry);
     }
+    // Publisher-redirect candidate (general rule): the apex homepage redirecting
+    // to a DIFFERENT registrable domain is the publisher's own configuration,
+    // but it is recorded ONLY as a provenance-carrying candidate — never as the
+    // same authoritative host — and only when verified resources exist there.
+    if (homeDoc && homeDoc.finalUrl) {
+      let redirHost = null;
+      try { redirHost = new URL(homeDoc.finalUrl).hostname.toLowerCase().replace(/^www\./, ""); } catch {}
+      if (redirHost && isCrossRegistrable(redirHost, domain) && !relatedOut.some((e) => e.host === redirHost)) {
+        const entry = {
+          host: redirHost,
+          class: "publisher-redirect-candidate",
+          redirect: { from: `https://${domain}/`, to: homeDoc.finalUrl },
+          signals: [],
+          resources: [],
+        };
+        for (const p of ORG_PROBE_PATHS) {
+          const doc = await fetchDoc(`https://${redirHost}${p}`);
+          if (!doc) continue;
+          for (const rec of docRecords(doc.finalUrl, doc.text, "publisher-redirect-candidate", ["redirect:homepage", homeDoc.finalUrl, doc.finalUrl])) entry.resources.push(rec);
+        }
+        if (entry.resources.length) relatedOut.push(entry);
+      }
+    }
+
     // Registry-verified: MCP Registry entries whose remote lives on a
     // cross-registrable-domain host (attributed to the registry).
     for (const r of out) {
@@ -1314,7 +1395,7 @@ async function apiExplore(raw, env, ctx, request, candidates = [], org = false, 
 // (the tool dispatches to the same handler).
 
 const MCP_SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26"];
-const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.5.0" };
+const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.6.0" };
 const MCP_INSTRUCTIONS =
   "Use discover_domain to resolve a domain to the machine-readable resources it publishes " +
   "across the supported discovery locations (ARD, A2A, llms.txt, API catalogs, OpenAPI, and " +
@@ -1863,4 +1944,4 @@ function selfDomain() { return SELF_DOMAIN; }
 function apiCatalog() { return API_CATALOG; }
 function mcpTools() { return MCP_TOOLS; }
 function adapters() { return ADAPTERS; }
-export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, orgRecordsFromDoc, docRecords, isCrossRegistrable, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters };
+export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, orgRecordsFromDoc, docRecords, isCrossRegistrable, sameRegCanonicalHost, probeShapeOkObj, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters };

@@ -34,6 +34,13 @@ NessGate never restates the registry's verification as its own. A registry signa
 name the specific domain (for example GitHub's `is_verified` boolean, which does not disclose
 *which* domains were verified) does **not** qualify.
 
+### `publisher-redirect-candidate` — candidate-tier
+The queried domain's **apex homepage redirects to a different registrable domain** — the
+publisher's own configuration, but navigation rather than a purpose-built declaration. The entry
+carries the redirect provenance (`from`/`to`) and is listed only when verified machine-readable
+resources exist on the target; it is **never** treated as the same authoritative host and never
+reaches a strong class by itself.
+
 ### `infrastructure-correlated-candidate` — corroborating only
 Technical co-control signals, **singly or in any combination**, never establish "official" or
 "same organization." They may annotate an entry of any class, and on their own they produce at

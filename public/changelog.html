@@ -31,6 +31,22 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h2>2026</h2>
 
+<h3 id="v1-6-0">v1.6.0 — Benchmark-driven general rules</h3>
+<ul>
+<li><strong>Canonical-host fallback (same registrable domain only).</strong> When the exact host
+    publishes nothing and its homepage redirects to <code>www.</code>/a subdomain of itself,
+    <code>/discover</code> (and the library) probes that canonical host for <code>llms.txt</code>
+    and <code>ard.json</code>. Cross-registrable-domain redirects are never followed here.</li>
+<li><strong>Stricter text-probe validation.</strong> HTML is now detected behind leading
+    <code>&lt;!-- --&gt;</code> comments, closing a false positive where an HTML login shell could
+    pass as <code>llms.txt</code>; genuine text files with comment headers still pass.</li>
+<li><strong><code>publisher-redirect-candidate</code>.</strong> In Related Discovery, an apex
+    homepage redirecting to a different registrable domain yields a provenance-carrying candidate
+    entry (verified resources required) — never treated as the same authoritative host.</li>
+<li>Heavy-route CPU cut: documents are parsed once and shape-checked as objects, instead of
+    re-parsed per candidate type.</li>
+</ul>
+
 <h3 id="v1-5-0">v1.5.0 — Related Discovery</h3>
 <ul>
 <li><strong><code>GET /explore/{domain}?related=1</code> (opt-in).</strong> A clearly separate

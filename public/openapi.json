@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "NessGate API",
-    "version": "1.5.0",
+    "version": "1.6.0",
     "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads whatever that domain already publishes across the standard machine-discovery locations (llms.txt, ARD / ai-catalog.json, A2A agent card, RFC 9727 API catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP manifest, RFC 6415 host-meta) and returns one normalized answer, each record carrying a sourceUrl back to the domain. NessGate stores nothing, never crawls or indexes, and makes no ownership or safety claim. Read endpoints are public, unauthenticated, and CORS-open. The response contract is stable and additive: new optional fields may appear; clients must ignore unknown fields.",
     "contact": { "email": "contact@nessgate.com", "url": "https://nessgate.com/contact" },
     "termsOfService": "https://nessgate.com/terms",
@@ -14,7 +14,7 @@
       "get": {
         "operationId": "discoverDomain",
         "summary": "Resolve a domain to the machine-readable resources it publishes",
-        "description": "Reads what the domain itself publishes at the standard machine-discovery locations (llms.txt, ARD/ai-catalog, A2A agent card, RFC 9727 api-catalog, ai-info.json, openapi.json, Open Resource Discovery, AWP manifest awp.json, RFC 6415 host-meta) and returns one normalized answer. Provenance is always \"self-published\": each record carries a sourceUrl back to the domain so the caller can verify. \"Found\" means the location exists and its content parses (JSON, or non-HTML text); it does not assert protocol conformance. Nothing is stored or indexed; results are computed live and cached for 10 minutes.",
+        "description": "Reads what the domain itself publishes at the standard machine-discovery locations (llms.txt, ARD/ai-catalog, A2A agent card, RFC 9727 api-catalog, ai-info.json, openapi.json, Open Resource Discovery, AWP manifest awp.json, RFC 6415 host-meta) and returns one normalized answer. Provenance is always \"self-published\": each record carries a sourceUrl back to the domain so the caller can verify. \"Found\" means the location exists and its content parses (JSON, or non-HTML text); it does not assert protocol conformance. Nothing is stored or indexed; results are computed live and cached for 10 minutes. When the exact host publishes nothing and its homepage redirects within the same registrable domain (apex to www./subdomain), the canonical host is probed for llms.txt and ard.json as a bounded fallback; cross-registrable-domain redirects are never followed here.",
         "parameters": [
           {
             "name": "domain",
@@ -119,7 +119,7 @@
                           {
                             "type": "object",
                             "properties": {
-                              "evidence": { "type": "string", "enum": ["publisher-hosted", "publisher-declared", "namespace-verified", "candidate", "same-domain-host"], "description": "candidate = a caller-suggested URL (via POST {\"candidates\":[...]}) that NessGate fetched and confirmed is machine-readable; relationship to the domain is unverified." },
+                              "evidence": { "type": "string", "enum": ["publisher-hosted", "publisher-declared", "namespace-verified", "candidate", "same-domain-host", "publisher-redirect-candidate"], "description": "candidate = a caller-suggested URL (via POST {\"candidates\":[...]}) that NessGate fetched and confirmed is machine-readable; relationship to the domain is unverified." },
                               "provenance": { "type": "array", "items": { "type": "string" }, "description": "The chain of URLs/registry hops by which this record was reached." },
                               "depth": { "type": "integer", "example": 0 },
                               "attribution": { "type": "string", "description": "For namespace-verified records: who verified the namespace (attributed to the registry, not NessGate)." }

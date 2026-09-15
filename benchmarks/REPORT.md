@@ -71,7 +71,8 @@ www-only publishers.
 ## Verdict
 
 The resolver is technically sound and every layer behaves as designed, but real-world any-layer
-coverage is **23% (general web) / 30% (developer-API)**: for most of the web, no supported
-resources can be confirmed through current bounded sources, dominated by non-adoption of
-publisher-side standards. The three rules above are the only general coverage improvements the
-data supports; the larger lever is adoption, not resolution.
+coverage is **23% (general web) / 30% (developer-API)**: for most domains, no supported resources
+were confirmed through NessGate's current bounded sources — a result consistent with low publisher
+adoption of these standards, though not proof of non-publication for any individual domain. The
+three rules above are the only general coverage improvements this data supports; the larger lever
+is adoption, not resolution.
