@@ -66,18 +66,22 @@ first_seen / last_verified / expires_at (TTL)
 record_version
 ```
 
-TTL policy:
-- **Authoritative records** (origin = declaration/registration/federation): TTL 7 days, background re-verification before expiry; a failed re-verification marks `verification: unreachable` but never deletes the registration — the publisher's declaration is the fact being recorded.
-- **Discovery cache** (origin = resolution): TTL 24 h hard. Expired means gone (row deleted), not stale-served. Nothing discovered ever outlives its TTL without being re-derived.
-- Estimated size: ≤2 KB/record ⇒ 1 M domains ≈ low GB. D1 is sufficient for years.
+Layer assignment (derived from origin + authentication, never from the mere fact of storage):
+- **Authoritative layer** — origin = publisher declaration, verified registration, or **domain-authenticated** federation. Re-verified on a schedule (reference default: 7-day window; exact values are spec, not protocol). A registration is an *attestation* that the domain proved control and pointed at resources it publishes at a point in time; that attestation may persist, **but a resource's authoritative status follows its current publication, not the past registration.** A declared resource that is removed, or stays unreachable past its freshness window, drops out of Level 1 presentation even though the registration attestation remains on record — a registration once made never keeps a dead resource "official." (Transient re-verification failure flips a resource to `unreachable`; genuine removal drops it from the authoritative layer entirely.)
+- **Discovery layer** — origin = resolution (any discovery adapter) **or unauthenticated registry attribution**. Short TTL (reference default: 24 h), re-derived on expiry, never stale-served, never authoritative.
+- Estimated size: ≤2 KB/record ⇒ 1 M domains ≈ low GB; the reference deployment uses Cloudflare D1, but the store is abstract (§4). Exact TTLs, engine, and eviction are spec/operational details, not protocol.
 
 ## 3. Authoritative index vs discovery cache — the write-path rule
 
 The single most important structural rule, stated once and enforced everywhere:
 
-> **Records enter the authoritative index only by publisher declaration, verified registration, or registry federation. Resolution (including all discovery) can only ever write to the TTL-bounded discovery cache. There is no code path from discovery to authority.**
+> **A record enters the authoritative layer only by publisher declaration, verified registration, or domain-authenticated federation. Resolution — every discovery adapter — and unauthenticated registry attribution can only ever write to the short-TTL discovery layer. There is no code path from discovery to authority.**
 
-This is what keeps the index "an index/cache of evidence and resolution state, not an authority because NessGate stores it." A publisher can purge their domain's discovery-cache rows on demand (same spirit as robots opt-out); authoritative rows are removed by the publisher revoking their declaration.
+This is what keeps the store "an index of evidence and resolution state, not an authority because NessGate stored it."
+
+**Purge rights are scoped by provenance, not by layer (Principle 10):**
+- **Records a publisher owns** — its own declarations, its own registrations, and NessGate's reads of *its own* pages/files (the publisher-surface crawl) — are fully under the publisher's control: revoke, purge, or robots-opt-out at any time, and they are gone.
+- **Independently sourced evidence about a domain** — certificate-transparency records, inbound declarations *from other publishers* that point at it, third-party registry attributions — is governed by provenance and TTL, **not on-demand erasure.** It is always Level 2, always names its independent source, and always expires on its own schedule. A publisher who disputes it may publish its own authoritative declaration, which then takes precedence in presentation; the independent record stays separately attributed until it expires or is corrected at its source. A publisher cannot rewrite independent evidence as if it never existed.
 
 ## 4. Storage abstraction and the D1 reference implementation
 
@@ -89,7 +93,7 @@ The library defines a minimal store interface; every feature in this plan is wri
 ```
 
 - Reference implementations shipped in-repo: `memoryStore` (tests), `sqliteStore` (self-hosters), `d1Store` (nessgate.com).
-- The hosted nessgate.com is the **reference public resolver**, not the protocol. The neutrality test in the directive becomes a CI test: the conformance suite (§15) must pass identically against a resolver with no store and a fresh store — same conclusions from the same public evidence, storage affecting latency only, never classification.
+- The hosted nessgate.com is the **reference public resolver**, not the protocol. The neutrality test becomes a CI test: the conformance suite (§15) must pass identically against a resolver with no store and a fresh store — **the same captured evidence, evaluated under the same open rules, yields the same classification** — storage affecting latency only, never classification.
 
 ## 5. Resolver tiers: fast / balanced / deep
 
@@ -142,33 +146,47 @@ Demand gating (abuse control, §12): refresh jobs run only for (a) domains with 
 
 ## 8. Registry federation
 
-Read-side federation, already consistent with the charter ("reads them and points back"):
-- Adapters for MCP Registry (exists in /explore today), AGNTCY Directory, NANDA index; each declares its authentication semantics.
-- Domain-authenticated registry entries → Level 1 `namespace-verified`; unauthenticated attribution → Level 2 `registry-attributed`.
-- Federated results are cached in the discovery cache with the registry named in `origin`; NessGate never claims to be the source.
-- NessGate does not compete with registries: the strategic position is *many registries → one evidence-labelled normalized answer*.
+Read-side federation, consistent with the charter ("reads them and points back"):
+- Adapters for MCP Registry (exists in /explore today), AGNTCY Directory, NANDA index; each **declares its own authentication method and keeps its own identity** — a federated result always names the source registry and how that registry verified it, never a generic "trusted" status.
+- **Domain-authenticated** registry entries (the registry proved the domain controls the namespace) → Level 1 `namespace-verified`, and MAY enter the authoritative layer, tagged `origin: federation:<registry>` with the authentication method recorded in provenance.
+- **Unauthenticated** attribution (a registry lists the domain without proving control) → Level 2 `registry-attributed`, discovery layer only, short TTL.
+- NessGate never presents itself as the source and never flattens registries into one badge: the strategic position is *many registries, each keeping its identity → one evidence-labelled normalized answer*.
 
 ## 9. Publisher registration / declaration (the coverage lever that actually reaches 60%+)
 
 Constraint carried over from the 2026-09 direction decision: **NessGate ships no publish file of its own.** The front-door-manifest niche is already taken (AWP `/.well-known/awp.json`, A2A `agent.json`, ARD `ai-catalog.json`); a NessGate-specific file would be the reinvention trap and would recreate a publisher-adoption barrier. Declarations therefore ride entirely on the standards NessGate already reads:
 
 - **Declaration = the domain's existing standard files.** An ARD catalog, AWP manifest, llms.txt, etc. IS the publisher's declaration; entries pointing at other hosts are cross-domain declarations. Level 1 `publisher-declared` (already exists in /explore) covers this today. Cross-registrable-domain claims are Level 1 only with bidirectional evidence (both sides declare, or RWS/Asset Links — also already implemented), else Level 2.
-- **Registration** (optional attestation, account-less): `POST /register {domain}` → challenge (DNS TXT `_nessgate.<domain>` or `.well-known` proof file, one-time signed tokens) → authoritative index row (`origin: registration`, class `registered`) pinning *what the domain already publishes*, TTL 7 d with re-verification. No accounts, no email, no user data — the domain proves itself, ACME-style. **This machinery existed and passed production e2e before the pivot retired it** (D1 registry, DNS-TXT/file/json-field proofs, SSRF-hardened) — revival, not greenfield, which materially lowers §14 stage-4 risk.
+- **Registration** (optional attestation, account-less): `POST /register {domain}` → challenge (DNS TXT `_nessgate.<domain>` or `.well-known` proof file, one-time signed tokens) → an authoritative-layer attestation (`origin: registration`, class `registered`) that the domain proved control and pointed at resources it already publishes. **Registration is never required for Level 1 and never a NessGate-only source of truth:** a publisher whose own standard files (ARD, AWP, llms.txt, RWS/Asset Links) already establish authority gets Level 1 from those files with no registration at all. Registration only *attests* to what is independently re-derivable from the domain's own evidence — its provenance records the same proof anyone could re-check — so it adds convenience and an explicit ownership signal, never a fact that exists only because NessGate stored it. The attestation is subject to the §2 freshness rule (a removed resource is not kept "official" by a past registration). No accounts, no email, no user data — the domain proves itself, ACME-style. **This machinery existed and passed production e2e before the pivot retired it** (DNS-TXT/file/json-field proofs, SSRF-hardened) — revival, not greenfield, which lowers §14 stage-4 risk.
 - **Tooling**: WP plugin already writes `ai-info.json`/`llms.txt`/verification files — it becomes the registration client; the useful-empty response (§1) links to the publishing guide.
 - Coverage past the ~50% discovery ceiling comes from publishers adopting the *existing* standards (which registration incentivizes and the plugin automates) — not from a new NessGate format.
 
-## 10. Exact Neutrality Charter changes (public, versioned — Charter v2)
+## 10. Neutrality Charter changes (Charter v2 — principle-level, public, versioned)
 
-Verbatim clauses in conflict, and the proposed amendment for each. Nothing changes silently; charter page shows a change log.
+Charter v2 is stated as **principles**, not mechanisms. Exact TTL values, storage engines (D1/SQLite/Postgres), queue design, challenge formats, and budgets live in the **specification** and may change without a charter amendment; the promises below cannot. Nothing changes silently — the charter page carries a change log, and Charter v2 ships (and is announced) before any persistent storage goes live.
 
-| Current charter text (verbatim) | Conflict | Proposed v2 text (substance) |
+### A. Clauses that must change (with the principle that replaces each)
+
+| Current charter text (verbatim) | Why it must change | Charter v2 principle |
 |---|---|---|
-| "Nothing is crawled, indexed, or persisted. Each answer is computed fresh and dies with its short edge cache." | Persistent index + cache | "NessGate keeps two kinds of state, both inspectable: **records publishers declared or registered** (kept until revoked, re-verified on a schedule) and a **short-lived resolution cache** (each entry expires within 24 hours and is re-derived only from public evidence). It builds no content corpus: no page text, no search index — only pointers with provenance." |
-| "it never stores, rehosts, owns…" / "NessGate keeps no user data and no domain data" | Registration rows | "No accounts and no user data, ever. Domain records exist only when the domain itself declared or registered them, and the publisher can revoke or purge at any time." |
-| (implied by "reads them on demand" + spec "reads what a domain publishes at the standard machine-discovery locations") | Publisher-surface reading (deep tier) | New clause: "In its broader discovery tiers NessGate may read the publisher's **own** public pages at resolve time — bounded, robots-respecting, provenance on every hop — solely to follow the publisher's own links. It never builds a search-engine-style corpus, never reads third-party sites *about* a publisher, and never presents a discovered relationship as authoritative." |
-| "It does not rank, score, rate…" | none — reaffirm | Unchanged. Explicitly reaffirm: no numeric confidence scores; evidence classes only; discovered results ordered by evidence class then alphabetically (no ranking). |
+| "Nothing is crawled, indexed, or persisted. Each answer is computed fresh and dies with its short edge cache." | Persistent store (authoritative records + short-lived discovery cache) | "NessGate keeps two clearly separated kinds of state, both inspectable: **records a publisher declared or registered**, kept until the publisher revokes them and re-verified on a schedule; and a **short-lived discovery cache** re-derived from public evidence and never served stale. NessGate builds no content corpus — no stored page text, no search index — only pointers, each carrying its source, evidence class, verification state, timestamps, and expiry." |
+| "it never stores…" / "NessGate keeps no user data and no domain data" | Registration + declaration + independent-evidence records | "No accounts and no user data, ever. A domain record exists only because the domain itself declared or registered it, or because an independent public source (a certificate log, another publisher, a named registry) attested it with recorded provenance. Publishers control what they own and may revoke it at any time; independent evidence is separately attributed and expires on its own schedule rather than being erased on demand." |
+| (implied by "reads them on demand") | Publisher-surface reading (deep tier) + defined public adapters | "In its broader tiers NessGate may read a publisher's **own** public pages at resolve time — bounded, robots-respecting, provenance on every hop — solely to follow that publisher's own links. It does not crawl arbitrary third-party sites or commentary *about* a publisher. Separately, a small set of **explicitly defined public adapters** (certificate-transparency logs, named registries) may read third-party sources, always with full provenance and always Level 2 until independently confirmed." |
+| "It does not rank, score, rate…" | Reaffirm under the new tiers | "No scores, ever — no numeric confidence, no ranking. Results are **grouped by evidence class and deterministically ordered within each group**; grouping is not ranking and buys no one placement." |
 
-Unchanged commitments (free forever, no ranking sales, neutrality, open spec, resources live on the domain) are restated verbatim in v2. **The charter amendment is the first public artifact of v2 — shipped and announced before any persistent storage goes live.**
+### B. Affirmative neutrality promises (new, principle-level)
+
+Carried into Charter v2 as explicit public commitments:
+
+1. **Discovery never becomes authority.** A resource NessGate merely found is marked *discovered* and stays there; it becomes *authoritative* only when a publisher declaration, a verified registration, or a domain-authenticated registry independently establishes it. Storing a discovered record never upgrades it.
+2. **Two questions, never merged.** NessGate reports *whether a resource is real* and *how strongly it relates to a domain* as two separate facts. Finding or verifying a resource never makes it "official."
+3. **Storage independence.** Any persistent store is an implementation choice, never part of the protocol. The same captured evidence, evaluated under the same open rules, yields the same classification with any store or none.
+4. **Operator independence.** nessgate.com is one reference deployment. The open implementation runs for anyone on their own database or with no database, and reaches the same classifications from the same captured evidence and the same open rules.
+5. **No privileged submitter — including our own commercial layer.** Anyone may submit candidate resources; every submission, from any party including NessReady, is evaluated under the identical public rules and remains *discovered* until it independently earns authority. There is no private path to promotion, and none for sale.
+6. **Source-preserving federation.** When a result comes from another registry, NessGate names that registry and its verification method. Registries are never flattened into a generic "trusted" stamp.
+7. **No proprietary publishing format.** NessGate introduces no publishing file for domains to adopt. It reads the standards that already exist; a domain's own standard files are its declaration.
+
+Unchanged v1 commitments — free forever, no ranking/placement sales, neutral to every domain, open and independently implementable spec, resources always live on the domain — are restated verbatim in v2.
 
 ## 11. Backward compatibility
 
