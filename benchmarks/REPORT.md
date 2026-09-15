@@ -76,3 +76,20 @@ were confirmed through NessGate's current bounded sources — a result consisten
 adoption of these standards, though not proof of non-publication for any individual domain. The
 three rules above are the only general coverage improvements this data supports; the larger lever
 is adoption, not resolution.
+
+## Addendum — v1.6.0 delta rerun and moderate-load hosted test (2026-09-15)
+
+**Identical frozen 200-domain rerun** after implementing the three rules (fresh local state;
+`results2-*.jsonl`): any-layer **23%→26% (A)**, **30%→31% (B)**; zero blocked. Attribution:
+`publisher-redirect-candidate` produced three new positives (fastly.net, workers.dev,
+developer.iconfinder.com); the stricter text guard removed one **confirmed baseline false
+positive** (malshare.com serves an HTML page at `/llms.txt`); the canonical-host fallback is
+engine-test-proven in both directions (mocked fetch), while its two known live targets are
+inaccessible to workerd egress specifically (environment, not logic). Remaining variance
+(apple.com, covalenthq.com) is within run-to-run probe variance.
+
+**Moderate-load hosted test** (12 subset domains, triplet each, 8s pacing, real operator IP, no
+rate-limit exemption): **36/36 requests HTTP 200, zero 503/1102, zero blocked**, any-layer 33.3%,
+triplet p50/p90 14.8s/31.8s — the single-parse CPU optimization holds under realistic paced load,
+so a plan upgrade is not currently required; revisit only if sustained real-world traffic
+reproduces resource-limit errors.

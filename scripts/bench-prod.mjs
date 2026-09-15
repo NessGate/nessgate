@@ -8,7 +8,7 @@ const [cohortFile, outFile] = process.argv.slice(2);
 const base = "https://nessgate.com";
 const domains = readFileSync(cohortFile, "utf8").split("\n").map((s) => s.trim()).filter(Boolean);
 const TIMEOUT_MS = 45000;
-const PAUSE_MS = 5000;
+const PAUSE_MS = 8000;
 
 async function step(url) {
   const t0 = Date.now();

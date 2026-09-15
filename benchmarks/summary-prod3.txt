@@ -1,0 +1,18 @@
+google.com: disc=0(-) org+=0 rel+=3
+microsoft.com: disc=0(-) org+=0 rel+=1
+instagram.com: disc=0(-) org+=0 rel+=0
+linkedin.com: disc=0(-) org+=0 rel+=0
+hicloudcam.com: disc=0(-) org+=0 rel+=0
+gtld-servers.net: disc=0(-) org+=0 rel+=0
+bing.com: disc=0(-) org+=0 rel+=0
+fastly.net: disc=0(-) org+=0 rel+=1
+office.net: disc=0(-) org+=0 rel+=0
+youtu.be: disc=0(-) org+=0 rel+=0
+icloud.com: disc=0(-) org+=0 rel+=0
+pinterest.com: disc=0(-) org+=0 rel+=5
+
+=== PROD summary (12 domains) ===
+exact positive: 0.0% | org incremental: 0.0% | related incremental: 33.3%
+any-layer: 33.3% | genuine empty: 66.7% | blocked/timeout: 0.0%
+edge-cached /discover responses: 0/12 (reported separately; fresh runs measure coverage)
+triplet latency p50/p90: 14830ms / 31755ms
