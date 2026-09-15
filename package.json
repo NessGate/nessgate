@@ -5,6 +5,7 @@
     "dev": "wrangler dev",
     "deploy": "node scripts/deploy.mjs",
     "test": "node scripts/test.mjs",
+    "test:v2": "node scripts/test-v2.mjs",
     "smoke": "node scripts/smoke.mjs",
     "check": "node scripts/test.mjs && node scripts/smoke.mjs",
     "rollback": "wrangler rollback"
