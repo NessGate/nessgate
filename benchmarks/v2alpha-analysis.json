@@ -1,0 +1,247 @@
+{
+  "rows": 200,
+  "errored": 1,
+  "errors": [
+    [
+      "googledomains.com",
+      "hard-timeout"
+    ]
+  ],
+  "coverage": {
+    "v1Positive": "35/199 (17.6%)",
+    "balancedPositive": "43/199 (21.6%)",
+    "uselessEmpty_v1": "164/199 (82.4%)",
+    "uselessEmpty_balanced": "156/199 (78.4%)",
+    "seedsGainedFromEmpty": 8,
+    "gainedExamples": [
+      {
+        "domain": "dzen.ru",
+        "l2": 1,
+        "hosts": 1
+      },
+      {
+        "domain": "nginx.org",
+        "l2": 1,
+        "hosts": 1
+      },
+      {
+        "domain": "nginx.com",
+        "l2": 1,
+        "hosts": 1
+      },
+      {
+        "domain": "yandex.ru",
+        "l2": 1,
+        "hosts": 1
+      },
+      {
+        "domain": "fixer.io",
+        "l2": 4,
+        "hosts": 2
+      },
+      {
+        "domain": "exchangerate.host",
+        "l2": 4,
+        "hosts": 2
+      },
+      {
+        "domain": "urlscan.io",
+        "l2": 1,
+        "hosts": 1
+      },
+      {
+        "domain": "api.amethyste.moe",
+        "l2": 1,
+        "hosts": 1
+      }
+    ]
+  },
+  "additionalResults": {
+    "seedsWithAnyLevel2": "15/199 (7.5%)",
+    "totalLevel2Items": 24,
+    "newHostsTotal": 18,
+    "bySource": {
+      "same-registrable-domain": 21,
+      "publisher-linked": 3
+    }
+  },
+  "noiseAndAssociations": {
+    "sameRegistrableLevel2": 21,
+    "crossRegistrableLevel2": 1,
+    "crossRegistrableNote": "cross-registrable Level-2 items are the noise-prone case (a sitemap/link can name any host); all are Level 2, never authoritative. Listed for audit:",
+    "crossOrgExamples": [
+      {
+        "seed": "fastly.net",
+        "host": "fastly.com",
+        "rel": "publisher-linked",
+        "type": "llms.txt"
+      }
+    ]
+  },
+  "classificationAudit": {
+    "note": "Level is structural (derives only from evidence class), so no item can carry a wrong level. Association correctness (is the host really the org's?) is audited from this sample:",
+    "l2Sample": [
+      {
+        "seed": "dzen.ru",
+        "host": "ms.dzen.ru",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "github.com",
+        "host": "awesome-copilot.github.com",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "fastly.net",
+        "host": "fastly.com",
+        "rel": "publisher-linked",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "nginx.org",
+        "host": "lxr.nginx.org",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "sentry.io",
+        "host": "blog.sentry.io",
+        "rel": "publisher-linked",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "nginx.com",
+        "host": "docs.nginx.com",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "yandex.ru",
+        "host": "cloud.yandex.ru",
+        "rel": "publisher-linked",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "ipstack.com",
+        "host": "blog.ipstack.com",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "ipstack.com",
+        "host": "ipstack-static-website.ipstack.com",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "fixer.io",
+        "host": "blog.fixer.io",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "fixer.io",
+        "host": "data.fixer.io",
+        "rel": "same-registrable-domain",
+        "type": "ord"
+      },
+      {
+        "seed": "fixer.io",
+        "host": "data.fixer.io",
+        "rel": "same-registrable-domain",
+        "type": "ai-info.json"
+      },
+      {
+        "seed": "fixer.io",
+        "host": "data.fixer.io",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "exchangerate.host",
+        "host": "api.exchangerate.host",
+        "rel": "same-registrable-domain",
+        "type": "ord"
+      },
+      {
+        "seed": "exchangerate.host",
+        "host": "api.exchangerate.host",
+        "rel": "same-registrable-domain",
+        "type": "ai-info.json"
+      },
+      {
+        "seed": "exchangerate.host",
+        "host": "api.exchangerate.host",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "exchangerate.host",
+        "host": "blog.exchangerate.host",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "screenshotlayer.com",
+        "host": "api.screenshotlayer.com",
+        "rel": "same-registrable-domain",
+        "type": "ord"
+      },
+      {
+        "seed": "screenshotlayer.com",
+        "host": "api.screenshotlayer.com",
+        "rel": "same-registrable-domain",
+        "type": "ai-info.json"
+      },
+      {
+        "seed": "screenshotlayer.com",
+        "host": "api.screenshotlayer.com",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "urlscan.io",
+        "host": "docs.urlscan.io",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "api.amethyste.moe",
+        "host": "docs.api.amethyste.moe",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "upres.ai",
+        "host": "api.upres.ai",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "mojoauth.com",
+        "host": "enterprise-ciam.mojoauth.com",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      }
+    ]
+  },
+  "cost": {
+    "v1_note": "v1 issues ~14-16 requests (one pass of exact-host adapters).",
+    "balancedRequests_mean": 41,
+    "balancedRequests_p50": 16,
+    "balancedRequests_p90": 91,
+    "balancedMs_p50": 16926,
+    "balancedMs_p90": 42671,
+    "checkedHosts_mean": "1.7",
+    "unreachableTotal": 166,
+    "reachableEmptyTotal": 163,
+    "ctAbortedSeeds": "83/199 (41.7%)",
+    "sitemapSkippedSeeds": "106/199 (53.3%)"
+  },
+  "authorityAmbiguity": {
+    "note": "Level 1 and Level 2 are separate arrays; verification never promotes. Any overlap or ambiguity would show as a host appearing in both — checked below.",
+    "hostInBothLevels": 0
+  }
+}
