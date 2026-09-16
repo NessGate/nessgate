@@ -31,6 +31,19 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h2>2026</h2>
 
+<h3 id="metrics-2026-09-16">Charter amended — anonymous operational measurement of discovery fulfilment</h3>
+<ul>
+<li>Charter <a href="/charter">Promise 6</a> and the <a href="/privacy">Privacy Policy</a> now permit
+    NessGate to record <strong>anonymous, categorical events</strong> about its own operation: for each
+    discovery call, one outcome label &mdash; resources returned, none returned, invalid input, or
+    error &mdash; with a timestamp and nothing else. There are <strong>no domains, request contents,
+    IP addresses, or identities</strong>, and <strong>no client-IP classification</strong>. Cloudflare
+    Analytics Engine stores these events, aggregates them when queried, may sample them, and retains
+    them for about three months. The sole purpose is to measure whether NessGate actually returns
+    results to agents; it never captures who calls or what they look up, and never influences how any
+    resource is classified. Domain data, user data, cookies, and visitor tracking remain prohibited.</li>
+</ul>
+
 <h3 id="charter-v2-draft">Proposed Charter v2 — draft published for review (not yet effective)</h3>
 <ul>
 <li>A <a href="/charter-v2"><strong>proposed Charter v2</strong></a> is published as a public

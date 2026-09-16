@@ -34,6 +34,12 @@
 <strong>no domain data at all</strong> — no mappings, no copies of resources, no index.
 The only thing we store is short-lived, IP-based rate-limit counters (see Technical data),
 which exist purely to keep the free service available and expire on their own.</p>
+<p>We also record anonymous, categorical events about the service's own operation: for each
+discovery call, a single label &mdash; resources returned, none returned, invalid input, or
+error &mdash; with a timestamp. These events carry <strong>no domains, request contents, IP
+addresses, or identities</strong>, cannot be linked to any person, session, or query, and are
+stored as individual events that we aggregate only when we query them. They are sampled and
+retained for about three months, and exist solely to measure whether NessGate returns results.</p>
 <p>When the <code>GET /discover/{domain}</code> endpoint is queried, NessGate fetches a
 fixed set of standard public locations on the queried domain (such as <code>/llms.txt</code>
 and <code>/.well-known/</code> files), reads and normalizes the responses, returns them with
@@ -42,15 +48,20 @@ crawled in the background — a lookup happens live, only when someone asks.</p>
 
 <h2>What we don't collect</h2>
 <p>NessGate has no user accounts and asks for no names, email addresses, or personal
-information. The site sets <strong>no cookies</strong> and uses <strong>no analytics or
-tracking scripts</strong>.</p>
+information. The site sets <strong>no cookies</strong> and uses <strong>no visitor analytics or
+tracking scripts</strong>. We do <strong>not read or record client IP addresses for
+measurement</strong>. The only measurement we perform is the anonymous categorical event
+described above, which never identifies you.</p>
 
 <h2>Technical data</h2>
 <p>Our infrastructure runs on Cloudflare. Like virtually all web services, requests pass
 through standard server infrastructure that processes IP addresses to deliver responses,
-prevent abuse, and enforce rate limits. The only data we retain is short-lived, IP-keyed
-rate-limit counters kept in Cloudflare KV, which expire automatically within about an hour;
-we do not build profiles of visitors. Cloudflare processes traffic under its own
+prevent abuse, and enforce rate limits. The data we retain is limited to short-lived, IP-keyed
+rate-limit counters kept in Cloudflare KV (which expire automatically within about an hour) and
+anonymous categorical operational events kept in Cloudflare Analytics Engine &mdash; a single
+outcome label with a timestamp, and no domains, request bodies, IP addresses, or identities.
+Analytics Engine stores these events, aggregates them when queried, may sample them, and retains
+them for about three months. We do not build profiles of visitors. Cloudflare processes traffic under its own
 <a href="https://www.cloudflare.com/privacypolicy/" rel="noopener">privacy policy</a>.</p>
 
 <h2>Changes and contact</h2>

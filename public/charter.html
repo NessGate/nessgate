@@ -83,7 +83,13 @@ to it.</p>
     without asking permission. If nessgate.com disappeared, every resource would still stand on
     its own domain, unchanged.</li>
 <li><strong>No accounts, no tracking.</strong> There is nothing to sign up for. NessGate keeps no
-    user data and no domain data; this site sets no cookies and runs no analytics.</li>
+    user data, no client identifiers, and no domain data, and sets no cookies and runs no
+    visitor-tracking or advertising analytics. It records only anonymous, categorical events about
+    its own operation &mdash; for a discovery call, whether it returned resources, returned none,
+    received invalid input, or errored &mdash; each just a label and a timestamp, with no domains,
+    request contents, IP addresses, or identities. Cloudflare Analytics Engine stores these events,
+    aggregates them when queried, may sample them, and retains them for about three months; they
+    measure whether the service works, not who uses it or what they look up.</li>
 <li><strong>A stable, additive specification.</strong> A response shape published for one major
     version keeps working across every later release in that version. A breaking change would only
     ever arrive as a new major version, with the old one supported through a long transition.</li>
@@ -98,6 +104,7 @@ domain publishes. NessGate's contribution is to be the smallest, most neutral ve
 primitive — one that takes no position on your format and asks nothing of the ecosystems it
 complements. We will never claim adoption, endorsement, or use that we do not actually have.</p>
 
+<p class="note">This charter was last amended on 16 September 2026 (anonymous operational measurement of discovery fulfilment) &mdash; see the <a href="/changelog">changelog</a>.</p>
 <p class="note">Read the technical details in the <a href="/spec">NessGate Resolver Specification</a>, or learn
 more <a href="/about">about the project</a>.</p>
 </main>
