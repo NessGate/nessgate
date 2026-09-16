@@ -32,6 +32,16 @@
 // sampleInterval and the report says so when sampling was in effect. The newest
 // day is PARTIAL. Benchmark traffic never appears (it targets other domains).
 //
+// HISTORICAL ARTIFACT (data before 2026-09-16): the resolver's Cache API keys
+// used an on-zone hostname, so Cloudflare logged every cache.match MISS as an
+// empty-UA "GET 504" and every cache.put as a "PUT 204" from its shared
+// infrastructure IP 2a06:98c0:3600::103. Windows covering those days therefore
+// OVERCOUNT "unidentified" traffic and 5xx rates on /discover and /explore
+// (none of those 504s were client-facing). Fixed by moving the cache key host
+// off-zone (.invalid) in src/worker.js. Note the same shared IP is also the
+// egress for ALL Cloudflare-Worker-hosted callers, so per-IP signals for it
+// aggregate many distinct callers (and they share one rate-limit budget).
+//
 // Auth: CLOUDFLARE_API_TOKEN if set, else the local wrangler OAuth token. No
 // token is ever written or printed.
 //

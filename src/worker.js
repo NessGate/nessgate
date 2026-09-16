@@ -698,7 +698,11 @@ async function discoverData(raw, env, ctx, request) {
   const domain = normalizeDomain(raw, true);
   if (!domain) return { status: 400, body: { error: "Invalid domain" } };
   const cache = caches.default;
-  const key = new Request(`https://resolver-cache.nessgate.com/discover/${domain}`);
+  // Synthetic cache key on an off-zone host (.invalid, RFC 2606): with an
+  // on-zone hostname, Cloudflare logs every cache.match miss as a GET 504 and
+  // every cache.put as a PUT 204 in the zone's request analytics — phantom
+  // "errors" that are indistinguishable from real caller traffic.
+  const key = new Request(`https://resolver-cache.nessgate.invalid/discover/${domain}`);
   const hit = await cache.match(key);
   if (hit) return { status: 200, body: await hit.json(), cached: true };
   if (!(await rateLimit(env, request, "disc", DISCOVER_RATE_LIMIT_PER_HOUR))) {
@@ -1100,7 +1104,8 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
   if (!domain) return { status: 400, body: { error: "Invalid domain" } };
   const hasCandidates = Array.isArray(candidates) && candidates.length > 0;
   const cache = caches.default;
-  const key = new Request(`https://resolver-cache.nessgate.com/explore${org ? "-org" : ""}${related ? "-rel" : ""}/${domain}`);
+  // Off-zone (.invalid) key host — see discoverData for why (analytics phantoms).
+  const key = new Request(`https://resolver-cache.nessgate.invalid/explore${org ? "-org" : ""}${related ? "-rel" : ""}/${domain}`);
   // Candidate requests are per-body and never cached (input varies per call).
   const hit = hasCandidates ? null : await cache.match(key);
   if (hit) return { status: 200, body: await hit.json(), cached: true };
