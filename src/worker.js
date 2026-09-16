@@ -1495,6 +1495,25 @@ function rpcError(id, code, message) {
   return { jsonrpc: "2.0", id, error: { code, message } };
 }
 
+// --- Anonymous categorical operational events (Charter Promise 6) ---
+// Pure classification of a discovery call's outcome from what the resolver
+// already returned. Exported so it can be unit-tested directly.
+export function discoveryOutcome(status, body) {
+  if (status === 429 || status >= 500) return "error";
+  const n = body && Array.isArray(body.resources) ? body.resources.length : 0;
+  return n > 0 ? "resources" : "empty";
+}
+// Emits ONE event per discovery call: a single outcome label and a timestamp,
+// nothing else — no domain, request body, IP, or identity, and no client
+// classification (it takes no `request`, so it has no access to the caller). It
+// is downstream-only: it reads a finished outcome and never influences
+// discovery, classification, or authority. Swallowed so it can never affect a
+// response. Enforced by scripts/test-metrics-isolation.mjs.
+function recordDiscovery(env, outcome) {
+  try { if (env && env.METRICS) env.METRICS.writeDataPoint({ indexes: [outcome], blobs: [outcome] }); }
+  catch { /* measurement must never affect the request path */ }
+}
+
 async function mcpEndpoint(request, env, ctx) {
   const headers = { ...cors() };
   const msg = await readJsonBody(request);
@@ -1534,6 +1553,7 @@ async function mcpEndpoint(request, env, ctx) {
     try {
       result = await mcpToolResult(args, env, ctx, request);
     } catch {
+      recordDiscovery(env, "error");
       result = {
         content: [{ type: "text", text: "Resolver temporarily unavailable. Please try again shortly." }],
         isError: true,
@@ -1549,12 +1569,14 @@ async function mcpEndpoint(request, env, ctx) {
 async function mcpToolResult(args, env, ctx, request) {
   const domain = normalizeDomain(args.domain, true);
   if (!domain) {
+    recordDiscovery(env, "invalid");
     return {
       content: [{ type: "text", text: "Invalid domain. Provide a bare registrable domain like example.com." }],
       isError: true,
     };
   }
   const { status, body } = await discoverData(domain, env, ctx, request);
+  recordDiscovery(env, discoveryOutcome(status, body));
   const text = JSON.stringify(body, null, 2);
   const out = { content: [{ type: "text", text }], isError: status === 429 || status >= 500 };
   if (body && typeof body === "object" && !Array.isArray(body)) out.structuredContent = body;

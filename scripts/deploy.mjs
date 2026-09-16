@@ -20,6 +20,7 @@ for (const [label, args] of [
   ["official conformance", ["run", "test:conformance"]],
   ["adapter contract", ["run", "test:contract"]],
   ["lab isolation", ["run", "test:lab"]],
+  ["metrics isolation", ["run", "test:metrics"]],
   ["matrix consistency", ["run", "compat:matrix"]],
 ]) {
   const t = spawnSync("npm", args, { stdio: "inherit", shell: true });

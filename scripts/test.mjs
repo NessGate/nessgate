@@ -10,6 +10,7 @@ import {
   parseAidRecord,
   isPrivateIp,
   assertPublicDns,
+  discoveryOutcome,
   hostAllowedForDomain,
   isForbiddenHost,
   apiCatalog,
@@ -565,6 +566,16 @@ console.log("--- DoH hardening (a stalled resolver must never hang an invocation
   globalThis.fetch = realFetch;
   is(calls <= 2, true, `8 concurrent checks share one in-flight DoH pair (${calls} lookups)`);
 }
+
+console.log("--- discovery-outcome classification (anonymous metric)");
+is(discoveryOutcome(200, { resources: [{ x: 1 }, { y: 2 }] }), "resources", "resources returned");
+is(discoveryOutcome(200, { resources: [] }), "empty", "valid but zero resources");
+is(discoveryOutcome(200, {}), "empty", "no resources field → empty");
+is(discoveryOutcome(500, { resources: [{ x: 1 }] }), "error", "5xx is an error regardless of body");
+is(discoveryOutcome(429, {}), "error", "rate-limited is an error");
+// The metric never encodes the domain, body, or count — only these four labels
+// (plus "invalid" for bad input, set on the pre-resolve path).
+is(["resources", "empty", "error"].includes(discoveryOutcome(200, { resources: [1] })), true, "outcome is always one bounded label");
 
 console.log(failed ? `\n${failed} FAILURES` : "\nAll regression tests passed.");
 process.exit(failed ? 1 : 0);

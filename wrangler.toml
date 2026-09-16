@@ -27,5 +27,13 @@ name = "API_RL"
 namespace_id = "1001"
 simple = { limit = 10, period = 60 }
 
+# Anonymous categorical operational events (Charter Promise 6): one outcome label
+# per discovery call, no domains/bodies/IPs/identities. Aggregated only at query
+# time; Cloudflare samples and retains ~3 months. See scripts/mcp-metrics.mjs.
+[[analytics_engine_datasets]]
+binding = "METRICS"
+dataset = "nessgate_discovery_v1"
+
 # No D1, no cron, no secrets: NessGate is a stateless resolver. It reads what a
-# domain publishes on each request and stores nothing.
+# domain publishes on each request and stores nothing beyond the rate-limit
+# counters and the anonymous discovery-outcome events described above.
