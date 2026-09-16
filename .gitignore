@@ -19,3 +19,7 @@ wordpress-plugin/
 # Downloaded mcp-publisher binary (not source).
 /.tools/
 /.private/
+
+# Transient benchmark stdout/stderr (results .jsonl are committed; logs are not)
+benchmarks/*.log
+benchmarks/*.err
