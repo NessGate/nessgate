@@ -8,7 +8,12 @@
 // What Stage 1 adds, and ONLY this:
 //   1. A two-axis / two-level result model (verification × relationship → level).
 //   2. A formalized, self-describing adapter architecture (V2_ADAPTERS).
-//   3. Deterministic CT-subdomain and sitemap-host discovery adapters (balanced).
+//   3. Deterministic CT-subdomain and sitemap-host discovery adapters (the
+//      "discovery" tier). NOTE: this is NOT the architecture's "balanced" tier,
+//      which additionally requires /explore delegation (declared pointers, org &
+//      related discovery, registry evidence, redirect candidates). That lives in
+//      the worker today and is a later experimental step; "balanced"/"deep"
+//      therefore throw NotImplemented here rather than silently under-deliver.
 //   4. Provenance attached to every result.
 //
 // Explicitly NOT here (later stages, gated on Charter v2 becoming active):
@@ -224,7 +229,7 @@ export const V2_ADAPTERS = [
     discovers: "hosts",
     evidenceClass: "same-registrable-domain",  // namespace proximity ONLY
     canEstablishAuthority: false,
-    tier: "balanced",
+    tier: "discovery",
     external: "ct-log",
     async run(ctx) {
       const items = [];
@@ -260,7 +265,7 @@ export const V2_ADAPTERS = [
     discovers: "hosts",
     evidenceClass: "publisher-linked",  // reached via the publisher's own sitemap
     canEstablishAuthority: false,
-    tier: "balanced",
+    tier: "discovery",
     external: null,
     async run(ctx) {
       const items = [];
@@ -319,8 +324,9 @@ function orderItems(items) {
 }
 
 // resolveV2(domain, { tier, fetch, timeoutMs, ctTimeoutMs, maxBytes, ctCap, sitemapCap, hostVerifyCap })
-//   tier: "fast" (exact-host only) | "balanced" (adds CT + sitemap) | "deep"
-//         (not implemented in the alpha; clamps to balanced and discloses it)
+//   tier: "fast" (exact-host only) | "discovery" (adds CT + sitemap).
+//         "balanced"/"deep" throw NotImplemented — the architecture defines them
+//         to also include /explore delegation, which is not yet in the library.
 // Returns a two-axis result: items[] (grouped by evidence class, deterministic
 // within group), plus level1[]/level2[] splits, checked adapters, and stats.
 export async function resolveV2(domain, opts = {}) {
@@ -333,8 +339,11 @@ export async function resolveV2(domain, opts = {}) {
   const truncations = [];
   let wanted;
   if (tier === "fast") wanted = new Set(["fast"]);
-  else if (tier === "balanced") wanted = new Set(["fast", "balanced"]);
-  else if (tier === "deep") { wanted = new Set(["fast", "balanced"]); truncations.push("deep tier not implemented in alpha; ran balanced"); }
+  else if (tier === "discovery") wanted = new Set(["fast", "discovery"]);
+  else if (tier === "balanced" || tier === "deep")
+    throw new Error(tier + " tier is not implemented in this alpha: the architecture's '" + tier +
+      "' additionally requires /explore delegation (declared pointers, org/related discovery, registry, redirect candidates), " +
+      "which is not yet in the library. Use tier:'discovery' for exact-host + CT + sitemap. See docs/v2-architecture.md.");
   else throw new Error("unknown tier: " + tier);
 
   const ctx = {

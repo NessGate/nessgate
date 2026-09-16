@@ -100,7 +100,7 @@ for (const a of V2_ADAPTERS) {
   const okShape = typeof a.id === "string" && typeof a.standard === "string" &&
     ["resources", "hosts", "relationships"].includes(a.discovers) &&
     typeof a.evidenceClass === "string" && typeof a.canEstablishAuthority === "boolean" &&
-    ["fast", "balanced", "deep"].includes(a.tier) &&
+    ["fast", "discovery", "balanced", "deep"].includes(a.tier) &&
     (a.external === null || typeof a.external === "string") && typeof a.run === "function";
   is(okShape, true, `adapter ${a.id} declares a complete descriptor`);
 }
@@ -138,9 +138,9 @@ is(fast.level1.every((i) => i.level === 1 && i.relationship === "publisher-hoste
 is(fast.level1.every((i) => i.provenance.length > 0), true, "every fast item has provenance");
 
 /* ----------------------------- tier: balanced ----------------------------- */
-console.log("--- tier: balanced (adds CT + sitemap, all Level 2, provenance intact)");
-const bal = await resolveV2(SEED, { ...opts, tier: "balanced" });
-is(bal.checked, ["exact-host", "ct-subdomains", "sitemap-hosts"], "balanced runs all three adapters");
+console.log("--- tier: discovery (adds CT + sitemap, all Level 2, provenance intact)");
+const bal = await resolveV2(SEED, { ...opts, tier: "discovery" });
+is(bal.checked, ["exact-host", "ct-subdomains", "sitemap-hosts"], "discovery runs all three adapters");
 const host = (it) => (it.provenance.find((p) => p.host) || {}).host;
 const apiItem = bal.items.find((i) => host(i) === "api.acme.test");
 is(!!apiItem && apiItem.level === 2 && apiItem.relationship === "same-registrable-domain" && apiItem.verification === "verified", true,
@@ -163,16 +163,16 @@ is(bal.items.every((i, n) => n === 0 || bal.items[n - 1].level <= i.level), true
 
 /* --------------------- determinism / store independence ------------------- */
 console.log("--- determinism / store-independence (no persistent state)");
-const a = await resolveV2(SEED, { ...opts, tier: "balanced" });
-const b = await resolveV2(SEED, { ...opts, tier: "balanced" });
+const a = await resolveV2(SEED, { ...opts, tier: "discovery" });
+const b = await resolveV2(SEED, { ...opts, tier: "discovery" });
 const strip = (r) => ({ ...r, stats: { ...r.stats, ms: 0 } });
 is(JSON.stringify(strip(a)) === JSON.stringify(strip(b)), true, "two fresh runs classify identically (no hidden store)");
 
 /* --------------------------------- tiers ---------------------------------- */
 console.log("--- tier handling");
 await throws(() => resolveV2(SEED, { ...opts, tier: "nonsense" }), "unknown tier throws");
-const deep = await resolveV2(SEED, { ...opts, tier: "deep" });
-is(deep.truncations.includes("deep tier not implemented in alpha; ran balanced"), true, "deep clamps to balanced and discloses it");
+await throws(() => resolveV2(SEED, { ...opts, tier: "balanced" }), "balanced throws NotImplemented (needs /explore, not in alpha)");
+await throws(() => resolveV2(SEED, { ...opts, tier: "deep" }), "deep throws NotImplemented (needs /explore, not in alpha)");
 is(EXPERIMENTAL, true, "module is flagged EXPERIMENTAL");
 is(/NOT active/.test(bal.charter), true, "result states Charter v2 is not active");
 

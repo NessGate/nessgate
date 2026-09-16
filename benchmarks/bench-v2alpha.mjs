@@ -67,7 +67,7 @@ async function attempt(cohort, d) {
     const guard = new Promise((_, rej) => setTimeout(() => rej(new Error("hard-timeout")), 120000));
     const run = (async () => {
       const v1 = await resolveV1(d, OPTS);
-      const bal = await resolveV2(d, { ...OPTS, tier: "balanced" });
+      const bal = await resolveV2(d, { ...OPTS, tier: "discovery" });
       row.v1 = { resources: (v1.resources || []).length, positive: (v1.resources || []).length > 0 };
       const bySource = {};
       for (const it of bal.level2) bySource[it.relationship] = (bySource[it.relationship] || 0) + 1;
