@@ -1,0 +1,76 @@
+{
+  "strata": {
+    "multiProtocol": 19,
+    "positiveSingle": 16,
+    "negativeControl": 12,
+    "blocked": 5
+  },
+  "authoritativeRecall": {
+    "protocolLevel": "67/69 (97.1%)",
+    "domainFullRecall": "33/35 (94.3%)",
+    "perProtocol": {
+      "llms.txt": "34/34",
+      "ard-catalog": "11/11",
+      "api-catalog": "13/13",
+      "openapi": "7/9",
+      "a2a-agent-card": "2/2"
+    }
+  },
+  "recallMisses": [
+    {
+      "domain": "vercel.com",
+      "missed": [
+        "openapi"
+      ]
+    },
+    {
+      "domain": "posthog.com",
+      "missed": [
+        "openapi"
+      ]
+    }
+  ],
+  "falsePositives": {
+    "negativeControls_withAnyResult": "0/12 (0.0%)",
+    "negFPdomains": [],
+    "positiveDomains_extra": []
+  },
+  "classificationCorrectness": "36/36 (100.0%)",
+  "provenanceCorrectness": "36/36 (100.0%)",
+  "protocolParserFailures": [],
+  "blockedStratum": [
+    {
+      "d": "loc.gov",
+      "found": [],
+      "note": "reported separately, not a negative"
+    },
+    {
+      "d": "perplexity.ai",
+      "found": [],
+      "note": "reported separately, not a negative"
+    },
+    {
+      "d": "medium.com",
+      "found": [],
+      "note": "reported separately, not a negative"
+    },
+    {
+      "d": "gitlab.com",
+      "found": [
+        "llms.txt"
+      ],
+      "note": "reported separately, not a negative"
+    },
+    {
+      "d": "nps.gov",
+      "found": [],
+      "note": "reported separately, not a negative"
+    }
+  ],
+  "cost": {
+    "ms_p50": 1714,
+    "ms_p90": 2544,
+    "requests_p50": 17,
+    "requests_p90": 20
+  }
+}

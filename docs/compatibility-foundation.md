@@ -160,18 +160,45 @@ lab's only outputs are proposed fixtures and proposed diffs that enter the *same
 any human change. AI lives in the lab, never in the authority decision path (§8). (The lab can reuse
 the multi-agent workflow tooling already used elsewhere; runs are offline and produce PRs.)
 
-## 6. Unseen-domain benchmark (the moat metric)
+## 6. Unseen-domain benchmark (the moat metric) — FROZEN FIRST (M0.5)
 
-`benchmarks/holdout-unseen.txt` — a **frozen** cohort drawn from a *different* source than the
-Tranco / public-apis cohorts used so far, and **never** referenced in any fixture, matrix entry, or
-tuning. `benchmarks/bench-unseen.mjs` runs the real resolver over it.
+**Sequencing rule (reviewer directive):** the holdout cohort, its ground truth, and the first
+untouched baseline are **frozen BEFORE the corpus is expanded (M1)** — otherwise, even
+unintentionally, corpus additions could bias the ruler. Establish the ruler, then build.
 
-Goal: *"Give NessGate a domain it has never seen and it still resolves it correctly."* Measures:
-correct resources; missed authoritative resources; false associations; protocol/parser failures;
-provenance correctness; classification correctness; latency/request cost. Ground truth = a one-time
-documented manual audit of the holdout set, then reused; drift re-audited. **Never optimize or
-hardcode around holdout domains** — using a holdout domain to fix a bug retires it from the holdout
-set (it becomes a normal fixture) and a fresh holdout domain replaces it.
+`benchmarks/holdout-unseen.txt` — a **frozen, stratified** cohort drawn from sources *not* used by
+the Tranco / public-apis cohorts, **never** referenced in any fixture, matrix entry, or tuning.
+
+**Stratification (do NOT use a random sample dominated by domains that publish nothing):** the cohort
+tags each domain with a stratum, recorded in `benchmarks/holdout-unseen.json`:
+- `positive` — real supported machine-readable surface(s);
+- `multi-protocol` — more than one supported surface;
+- `ecosystem` — spread across different protocols/ecosystems (ARD, A2A, MCP, OpenAPI, ORD, AWP,
+  llms.txt, host-meta, ANP, UCP, AID, GB/Z);
+- `legacy` — difficult/legacy implementations where naturally present;
+- `negative-control` — genuinely no supported surface;
+- `blocked` — blocked/unreachable; classified **separately**, never counted as a negative.
+
+**Ground truth** is established by an **independent** direct probe (raw HTTPS GET of the exact
+well-known/surface URLs + human review of the bodies), NOT by running the resolver under test — so
+the benchmark is a fair ruler, not a tautology. Frozen artifacts: domain list; selection
+methodology; per-domain ground-truth snapshot + date; and content hashes where useful.
+
+**Separate metrics (never a single "accuracy" number)** — a resolver that returns nothing for
+everything must NOT score well just because many sites expose nothing. `benchmarks/bench-unseen.mjs`
+reports each independently:
+- **authoritative-resource recall** — of the ground-truth authoritative surfaces, how many the
+  resolver found (the metric that punishes "returns nothing");
+- **false-positive / false-association rate**;
+- **classification correctness** (right evidence class / level);
+- **provenance correctness** (every result re-derivable from its provenance);
+- **protocol / parser failures**;
+- **unresolved / blocked / unreachable rate** (reported separately, not as negatives);
+- **latency / request cost.**
+
+**Never optimize or hardcode around holdout domains.** If a holdout domain later teaches a
+compatibility fix: retire it from the holdout, turn the lesson into a normal `compat/` fixture, and
+replace it with a fresh unseen holdout domain.
 
 ## 7. Compatibility metrics (engineering, not marketing)
 
@@ -181,7 +208,7 @@ Generated into `compat/metrics.json` by `scripts/compat-matrix.mjs`:
 - official conformance vectors passing / total;
 - permanent real-world regression cases;
 - distinct implementation quirks handled;
-- unseen-domain accuracy (from §6);
+- unseen-domain metrics (from §6 — the separated set, never a single accuracy number);
 - silent-regression count (regressions caught only after release — target 0);
 - time from protocol/spec change → compatible release.
 
@@ -226,26 +253,31 @@ registries rather than competing with all of them. Its unique question:
 ## 12. Proposed implementation order (build decision is yours)
 
 Docs first (this). Then, smallest safe increments, each independently shippable, **no production
-resolver behavior change and no Charter-v2 activation required for M1–M5**:
+resolver behavior change and no Charter-v2 activation required for M0.5–M5**:
 
+- **M0.5 — Freeze the unseen-domain benchmark FIRST (the ruler).** Select + stratify the holdout
+  (§6) from sources not used by our cohorts; establish independent ground truth; freeze the domain
+  list, methodology, ground-truth snapshot/date, and hashes; build `bench-unseen.mjs` with the
+  separated metrics; record the first **untouched** baseline. Done *before* any corpus expansion so
+  the ruler cannot be contaminated.
 - **M1 — Corpus + CI spine.** Create `compat/` (matrix, adapter manifests for the 14 existing
   adapters, fixtures backfilled from the current hand-written tests). Add `scripts/test-compat.mjs`
   (layer 2) + `scripts/compat-matrix.mjs` (consistency + metrics); wire both into `npm run check` and
-  the deploy gate. Add the "fix ⇒ fixture" rule to CONTRIBUTING.
+  the deploy gate. Add the "fix ⇒ fixture" rule to CONTRIBUTING. **M1 must not intentionally change
+  resolver behavior**; after M1, rerun the exact frozen unseen benchmark only to confirm no
+  regression.
 - **M2 — Official conformance (layer 1).** Vendor available official schemas/vectors (ARD, A2A,
   OpenAPI, api-catalog, …); add the dev-only validator; record sources/licenses.
-- **M3 — Unseen-domain benchmark.** Frozen holdout cohort + `bench-unseen.mjs` + first audited
-  baseline. This becomes the headline moat metric.
+- **M3 — (folded into M0.5)** the unseen benchmark now lives at M0.5; M3 is retired.
 - **M4 — Adapter contract in code.** Extend the `V2_ADAPTERS` descriptor with the §4 fields; add the
   contract test (every adapter ↔ manifest ↔ matrix ↔ fixtures).
 - **M5 — Compatibility Lab (offline).** Watchers + analyzer + proposer, human/CI-gated; produces
   candidate fixtures/diffs only.
 - **Later — Supporting infra (former "Stage 2").** Storage/index + registration, justified on
-  latency/publishing/freshness (not discovery recall), sequenced after M1–M4 and gated on Charter v2
-  activation. The Stage-1 `discovery` tier (CT/sitemap) remains an optional, source-substitutable
-  library capability (see the reconciled benchmark: safe, correct, but a small recall gain over
-  strict+explore — a supporting feature, not the moat).
+  latency/publishing/freshness (not discovery recall), sequenced after the moat work and gated on
+  Charter v2 activation. The Stage-1 `discovery` tier (CT/sitemap) remains an optional,
+  source-substitutable library capability (reconciled benchmark: safe, correct, small recall gain
+  over strict+explore — supporting feature, not the moat).
 
-When this plan is approved we decide what to build first (recommended: **M1 + M3** — the corpus spine
-and the unseen-domain metric — because together they *are* the moat and require no storage,
-registration, or Charter-v2 activation).
+**Build now (approved): M0.5 then M1, then stop and report.** Do not begin M2/M4/M5, storage,
+registration, or Charter-v2 activation until that review. Keep all production behavior unchanged.

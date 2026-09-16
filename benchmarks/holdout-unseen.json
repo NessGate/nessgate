@@ -1,0 +1,868 @@
+{
+  "meta": {
+    "name": "NessGate unseen-domain holdout (M0.5)",
+    "frozen": "2026-09-15",
+    "purpose": "Moat metric: resolve domains NEVER seen in dev/corpus/tuning. FROZEN before corpus (M1).",
+    "sourcesNote": "Candidates drawn from llms.txt/ARD/MCP adopters + negative/blocked controls; NONE overlap cohort A (Tranco top-100) or cohort B (public-apis first-100).",
+    "groundTruthMethod": "Independent direct HTTPS GET of each protocol surface (probe-groundtruth.mjs) + spec-shape verification (verify-groundtruth.mjs). NOT established via @nessgate/resolver.",
+    "groundTruthSourceHash": "sha256:d9b4cb48917ad2b9",
+    "strata": {
+      "multi-protocol": 19,
+      "positive-single": 16,
+      "negative-control": 12,
+      "blocked": 5
+    },
+    "total": 52,
+    "ecosystemNote": "Genuine surfaces found in the wild: llms.txt, ard-catalog, api-catalog, openapi, a2a-agent-card. NOT found in this pool: ord, awp, host-meta, anp, ucp, aid, gbz-185-4 (near-zero public adoption) — those are covered by compat corpus fixtures, not this recall benchmark.",
+    "rule": "Never optimize/hardcode around these domains. If one teaches a fix: retire it, make a compat fixture, replace with a fresh unseen domain.",
+    "corrections": [
+      "2026-09-15: neon.tech +ard-catalog (probe miss, independently re-confirmed)"
+    ]
+  },
+  "domains": [
+    {
+      "domain": "supabase.com",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog",
+        "api-catalog",
+        "openapi"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ard.json"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json"
+        }
+      ]
+    },
+    {
+      "domain": "vercel.com",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog",
+        "api-catalog",
+        "openapi"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json"
+        }
+      ]
+    },
+    {
+      "domain": "gitbook.com",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog",
+        "api-catalog"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog"
+        }
+      ]
+    },
+    {
+      "domain": "pinecone.io",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "a2a-agent-card",
+        "api-catalog",
+        "openapi"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "a2a-agent-card",
+          "path": "/.well-known/agent-card.json"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json"
+        }
+      ]
+    },
+    {
+      "domain": "clerk.com",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "api-catalog",
+        "openapi"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json"
+        }
+      ]
+    },
+    {
+      "domain": "resend.com",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "api-catalog",
+        "openapi"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json"
+        }
+      ]
+    },
+    {
+      "domain": "railway.app",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog",
+        "api-catalog",
+        "openapi"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ard.json"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json"
+        }
+      ]
+    },
+    {
+      "domain": "fly.io",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog",
+        "api-catalog"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog"
+        }
+      ]
+    },
+    {
+      "domain": "zapier.com",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog",
+        "api-catalog"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog"
+        }
+      ]
+    },
+    {
+      "domain": "weaviate.io",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json"
+        }
+      ]
+    },
+    {
+      "domain": "huggingface.co",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "ard-catalog",
+        "api-catalog"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog"
+        }
+      ]
+    },
+    {
+      "domain": "neon.tech",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "api-catalog",
+        "openapi",
+        "ard-catalog"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json"
+        }
+      ],
+      "groundTruthNote": "ard-catalog added post-freeze-audit: independent curl of /.well-known/ai-catalog.json returned valid specVersion/host/entries[9]; initial probe missed it (308/transient)."
+    },
+    {
+      "domain": "turso.tech",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "openapi"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json"
+        }
+      ]
+    },
+    {
+      "domain": "upstash.com",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "api-catalog"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog"
+        }
+      ]
+    },
+    {
+      "domain": "posthog.com",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "openapi"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json"
+        }
+      ]
+    },
+    {
+      "domain": "modelcontextprotocol.io",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "a2a-agent-card"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "a2a-agent-card",
+          "path": "/.well-known/agent-card.json"
+        }
+      ]
+    },
+    {
+      "domain": "ucpchecker.com",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ard.json"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json"
+        }
+      ]
+    },
+    {
+      "domain": "synscribe.com",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json"
+        }
+      ]
+    },
+    {
+      "domain": "elevenlabs.io",
+      "stratum": "multi-protocol",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "api-catalog"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog"
+        }
+      ]
+    },
+    {
+      "domain": "mintlify.com",
+      "stratum": "positive-single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        }
+      ]
+    },
+    {
+      "domain": "stripe.com",
+      "stratum": "positive-single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        }
+      ]
+    },
+    {
+      "domain": "replit.com",
+      "stratum": "positive-single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        }
+      ]
+    },
+    {
+      "domain": "cursor.com",
+      "stratum": "positive-single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        }
+      ]
+    },
+    {
+      "domain": "tailscale.com",
+      "stratum": "positive-single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        }
+      ]
+    },
+    {
+      "domain": "bun.sh",
+      "stratum": "positive-single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        }
+      ]
+    },
+    {
+      "domain": "svelte.dev",
+      "stratum": "positive-single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        }
+      ]
+    },
+    {
+      "domain": "hono.dev",
+      "stratum": "positive-single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        }
+      ]
+    },
+    {
+      "domain": "prisma.io",
+      "stratum": "positive-single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        }
+      ]
+    },
+    {
+      "domain": "inngest.com",
+      "stratum": "positive-single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        }
+      ]
+    },
+    {
+      "domain": "nylas.com",
+      "stratum": "positive-single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        }
+      ]
+    },
+    {
+      "domain": "design.dev",
+      "stratum": "positive-single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        }
+      ]
+    },
+    {
+      "domain": "trigger.dev",
+      "stratum": "positive-single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        }
+      ]
+    },
+    {
+      "domain": "wordpress.com",
+      "stratum": "positive-single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        }
+      ]
+    },
+    {
+      "domain": "notion.so",
+      "stratum": "positive-single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        }
+      ]
+    },
+    {
+      "domain": "atlassian.com",
+      "stratum": "positive-single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt"
+        }
+      ]
+    },
+    {
+      "domain": "fast.ai",
+      "stratum": "negative-control",
+      "groundTruthProtocols": [],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": []
+    },
+    {
+      "domain": "anthropic.com",
+      "stratum": "negative-control",
+      "groundTruthProtocols": [],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": []
+    },
+    {
+      "domain": "langchain.com",
+      "stratum": "negative-control",
+      "groundTruthProtocols": [],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": []
+    },
+    {
+      "domain": "deno.com",
+      "stratum": "negative-control",
+      "groundTruthProtocols": [],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": []
+    },
+    {
+      "domain": "astro.build",
+      "stratum": "negative-control",
+      "groundTruthProtocols": [],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": []
+    },
+    {
+      "domain": "biomejs.dev",
+      "stratum": "negative-control",
+      "groundTruthProtocols": [],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": []
+    },
+    {
+      "domain": "example.com",
+      "stratum": "negative-control",
+      "groundTruthProtocols": [],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": []
+    },
+    {
+      "domain": "iana.org",
+      "stratum": "negative-control",
+      "groundTruthProtocols": [],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": []
+    },
+    {
+      "domain": "gnu.org",
+      "stratum": "negative-control",
+      "groundTruthProtocols": [],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": []
+    },
+    {
+      "domain": "craigslist.org",
+      "stratum": "negative-control",
+      "groundTruthProtocols": [],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": []
+    },
+    {
+      "domain": "mit.edu",
+      "stratum": "negative-control",
+      "groundTruthProtocols": [],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": []
+    },
+    {
+      "domain": "kernel.org",
+      "stratum": "negative-control",
+      "groundTruthProtocols": [],
+      "reachable": true,
+      "blocked": false,
+      "groundTruth": []
+    },
+    {
+      "domain": "perplexity.ai",
+      "stratum": "blocked",
+      "groundTruthProtocols": [],
+      "reachable": true,
+      "blocked": true,
+      "groundTruth": []
+    },
+    {
+      "domain": "loc.gov",
+      "stratum": "blocked",
+      "groundTruthProtocols": [],
+      "reachable": true,
+      "blocked": true,
+      "groundTruth": []
+    },
+    {
+      "domain": "medium.com",
+      "stratum": "blocked",
+      "groundTruthProtocols": [],
+      "reachable": true,
+      "blocked": true,
+      "groundTruth": []
+    },
+    {
+      "domain": "gitlab.com",
+      "stratum": "blocked",
+      "groundTruthProtocols": [],
+      "reachable": true,
+      "blocked": true,
+      "groundTruth": []
+    },
+    {
+      "domain": "nps.gov",
+      "stratum": "blocked",
+      "groundTruthProtocols": [],
+      "reachable": false,
+      "blocked": true,
+      "groundTruth": []
+    }
+  ]
+}
