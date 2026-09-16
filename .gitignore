@@ -23,3 +23,7 @@ wordpress-plugin/
 # Transient benchmark stdout/stderr (results .jsonl are committed; logs are not)
 benchmarks/*.log
 benchmarks/*.err
+
+# competitive-benchmark transient outputs (results-holdout.jsonl + REPORT committed)
+benchmarks/competitive/*.log
+benchmarks/competitive/results-smoke.jsonl

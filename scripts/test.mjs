@@ -511,6 +511,17 @@ console.log("--- npm package parity (packages/resolver)");
   is(served === pkg, true, "packages/resolver/index.mjs is byte-identical to public/resolver.mjs");
 }
 
+console.log("--- self ARD catalog is served at BOTH canonical names");
+{
+  // ARD readers in the wild probe /.well-known/ai-catalog.json (the ARD-canonical
+  // name); ard.json is the alias. nessgate.com must serve BOTH or it is invisible
+  // to standard ARD tooling (DNS-AID et al.). Byte-identical to avoid drift.
+  const { readFileSync } = await import("node:fs");
+  const ard = readFileSync(new URL("../public/.well-known/ard.json", import.meta.url), "utf8");
+  const aic = readFileSync(new URL("../public/.well-known/ai-catalog.json", import.meta.url), "utf8");
+  is(aic === ard, true, "public/.well-known/ai-catalog.json is byte-identical to ard.json (ARD-canonical alias)");
+}
+
 console.log("--- RFC 9727 api-catalog + MCP tool shapes");
 is(Array.isArray(API_CATALOG.linkset) && API_CATALOG.linkset.length === 1, true, "api-catalog is a linkset with one API");
 is(!!API_CATALOG.linkset[0].anchor, true, "linkset context has an anchor");
