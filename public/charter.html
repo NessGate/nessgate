@@ -42,7 +42,7 @@ NessGate reads whatever that domain already publishes across the standard machin
 locations (a data file, an API, an A2A agent card, an <code>llms.txt</code>, an
 ARD catalog, or a format that does not exist yet) and returns one normalized answer, with a link
 back to each source on the domain. It reads the domain on demand and caches each answer at the
-edge for up to 10 minutes, and stores nothing.
+edge for up to 10 minutes, and keeps no copy of what it reads.
 Anyone (an AI agent, a tool, a person) can ask NessGate what a domain publishes, instead of
 guessing among unofficial pages, third-party databases, and scraped sources.</p>
 

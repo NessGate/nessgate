@@ -69,8 +69,9 @@ a shared specification rather than one vendor's service are set out in the
 may be empty) · <code>400</code> invalid domain · <code>429</code> rate limited.</p>
 <p><strong>Normalization:</strong> input is lowercased; scheme, path, query, port, trailing dots, and
 a leading <code>www.</code> are stripped. Internationalized domains use their ASCII/punycode form.
-Answers are computed fresh and cached at the edge for 10 minutes; nothing is stored beyond that
-cache.</p>
+Answers are computed fresh and cached at the edge for 10 minutes; no domain data or answer content
+is stored beyond that cache (the only other state is anonymous, categorical outcome events — see the
+<a href="/charter">Charter</a>).</p>
 
 <h2>2. The normalized resource record</h2>
 <p>Each entry in <code>resources</code> is a thin, uniform record. NessGate reuses each source's own
