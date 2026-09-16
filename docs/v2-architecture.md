@@ -4,6 +4,17 @@ Status: PROPOSAL (nothing implemented; per directive, plan before code)
 Date: 2026-09-15
 Inputs: v1.6.0 frozen codebase audit · frozen-200 benchmarks (NessGate v1.6 + NessReady P1/P2) · Neutrality Charter (live) · strategic directive of 2026-09-15
 
+> **STRATEGIC RECLASSIFICATION (2026-09-15).** The moat is accumulated *compatibility knowledge* and
+> the system that maintains it — not this storage/index or general discovery. The persistent
+> storage, caching, and optional registration described in this document are hereby **supporting
+> infrastructure** (latency, freshness, publishing), **not the primary strategy**. Nothing here is
+> deleted; its role is demoted. The moat plan is **`docs/compatibility-foundation.md`**, and its
+> guiding line is: *NessGate's moat is not knowing every domain in advance; it is knowing how to
+> resolve domains it has never seen before.* The reconciled Stage-1 benchmark
+> (`benchmarks/V2-ALPHA-REPORT-RECONCILED.md`) supports this: CT/sitemap add only ~2 net domains over
+> strict+explore, so storage/registration should be justified on latency/publishing value, not
+> discovery recall.
+
 ---
 
 ## 0. What the evidence actually supports (constraints on this plan)
