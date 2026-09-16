@@ -47,7 +47,7 @@
 // Auth: CLOUDFLARE_API_TOKEN if set, else the local wrangler OAuth token. No
 // token is ever written or printed.
 //
-//   node scripts/usage-analytics.mjs [--days=7] [--first-party=197.200.,197.204.] [--top=8] [--json]
+//   node scripts/usage-analytics.mjs [--days=7] [--first-party=203.0.113.,198.51.100.] [--top=8] [--json]
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
