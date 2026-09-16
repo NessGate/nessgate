@@ -21,7 +21,8 @@ Known domain
 
 The durable advantage is **not** the compatibility corpus by itself (open source; fixtures are
 public and copyable). It is the *system* that maintains compatibility: continuous protocol tracking,
-a permanent real-world regression corpus, official conformance ingestion, fast fixes, a contributor
+a permanent real-world regression corpus, official example vectors (canonical documents, not full
+conformance suites), fast fixes, a contributor
 ecosystem, trusted normalization semantics, and a measured reputation for resolving **unseen**
 domains correctly. Speed of compatibility maintenance and breadth of regression knowledge are the
 moat — not secrecy.

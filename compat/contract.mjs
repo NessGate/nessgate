@@ -80,5 +80,12 @@ export function validateContract(ctx) {
   // 10. every fixture's protocol is known to the matrix (or a gbz alias)
   for (const f of fixtures) if (!matrix[f.protocol] && !(f.id.startsWith("gbz-185-4/") && matrix["gbz-185-4"])) v.push(`fixture '${f.id}': protocol '${f.protocol}' not in matrix`);
 
+  // 11. every fixture on disk is INDEXED by the matrix. The audit found eight
+  // fixtures that ran in CI but were invisible to the corpus manifest — a
+  // reviewer reading the matrix would under-count what is actually enforced.
+  const matrixFixtureRefs = new Set();
+  for (const entry of Object.values(matrix)) for (const ver of Object.values(entry)) for (const fid of ver.fixtures || []) matrixFixtureRefs.add(fid);
+  for (const f of fixtures) if (!matrixFixtureRefs.has(f.id)) v.push(`fixture '${f.id}' exists on disk but no matrix entry lists it`);
+
   return v;
 }

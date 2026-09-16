@@ -44,8 +44,8 @@
       "fixtures": [
         "a2a-agent-card/1.0/supported-interfaces",
         "a2a-agent-card/legacy/top-level-url",
-        "gbz-185-4/2.2/acs-at-agent-card",
-        "a2a-agent-card/reject/empty"
+        "a2a-agent-card/reject/empty",
+        "gbz-185-4/2.2/acs-at-agent-card"
       ]
     },
     "legacy": {
@@ -60,8 +60,8 @@
       "fixtures": [
         "a2a-agent-card/1.0/supported-interfaces",
         "a2a-agent-card/legacy/top-level-url",
-        "gbz-185-4/2.2/acs-at-agent-card",
-        "a2a-agent-card/reject/empty"
+        "a2a-agent-card/reject/empty",
+        "gbz-185-4/2.2/acs-at-agent-card"
       ]
     },
     "gbz-185-4": {
@@ -76,8 +76,8 @@
       "fixtures": [
         "a2a-agent-card/1.0/supported-interfaces",
         "a2a-agent-card/legacy/top-level-url",
-        "gbz-185-4/2.2/acs-at-agent-card",
-        "a2a-agent-card/reject/empty"
+        "a2a-agent-card/reject/empty",
+        "gbz-185-4/2.2/acs-at-agent-card"
       ]
     }
   },
@@ -91,8 +91,8 @@
       "officialSuite": "vendor/api-catalog/rfc9727/ (RFC 9727 §A)",
       "deviations": [],
       "fixtures": [
-        "api-catalog/rfc9727/linkset-service-desc",
-        "api-catalog/reject/no-linkset"
+        "api-catalog/reject/no-linkset",
+        "api-catalog/rfc9727/linkset-service-desc"
       ]
     }
   },
@@ -117,10 +117,15 @@
       "authority": "publisher-hosted (Level 1) — the domain's own surface",
       "officialSuite": "vendor/openapi/3.0/ (OAI petstore, Apache-2.0)",
       "deviations": [
-        "specs >1MB exceed the resolver maxBytes cap and are currently missed (see benchmarks/V2-ALPHA-REPORT-... ; fix will add a resolve-level fixture per the corpus rule)"
+        "detection reads a bounded 64 KB prefix: large specs are detected from the document head (pointer-only record); a document that COMPLETES within the cap must be valid JSON with an openapi/swagger version, so complete-but-malformed docs are rejected"
       ],
       "fixtures": [
         "openapi/3.0/basic",
+        "openapi/3.0/detect-large-truncated",
+        "openapi/3.0/detect-small-full",
+        "openapi/reject/detect-complete-malformed",
+        "openapi/reject/detect-html",
+        "openapi/reject/detect-no-marker",
         "openapi/reject/no-openapi-field"
       ]
     },
@@ -132,10 +137,15 @@
       "authority": "publisher-hosted (Level 1) — the domain's own surface",
       "officialSuite": null,
       "deviations": [
-        "specs >1MB exceed the resolver maxBytes cap and are currently missed (see benchmarks/V2-ALPHA-REPORT-... ; fix will add a resolve-level fixture per the corpus rule)"
+        "detection reads a bounded 64 KB prefix: large specs are detected from the document head (pointer-only record); a document that COMPLETES within the cap must be valid JSON with an openapi/swagger version, so complete-but-malformed docs are rejected"
       ],
       "fixtures": [
         "openapi/3.0/basic",
+        "openapi/3.0/detect-large-truncated",
+        "openapi/3.0/detect-small-full",
+        "openapi/reject/detect-complete-malformed",
+        "openapi/reject/detect-html",
+        "openapi/reject/detect-no-marker",
         "openapi/reject/no-openapi-field"
       ]
     },
@@ -147,10 +157,15 @@
       "authority": "publisher-hosted (Level 1) — the domain's own surface",
       "officialSuite": null,
       "deviations": [
-        "specs >1MB exceed the resolver maxBytes cap and are currently missed (see benchmarks/V2-ALPHA-REPORT-... ; fix will add a resolve-level fixture per the corpus rule)"
+        "detection reads a bounded 64 KB prefix: large specs are detected from the document head (pointer-only record); a document that COMPLETES within the cap must be valid JSON with an openapi/swagger version, so complete-but-malformed docs are rejected"
       ],
       "fixtures": [
         "openapi/3.0/basic",
+        "openapi/3.0/detect-large-truncated",
+        "openapi/3.0/detect-small-full",
+        "openapi/reject/detect-complete-malformed",
+        "openapi/reject/detect-html",
+        "openapi/reject/detect-no-marker",
         "openapi/reject/no-openapi-field"
       ]
     }
@@ -179,7 +194,8 @@
       "officialSuite": null,
       "deviations": [],
       "fixtures": [
-        "awp/draft/protocols-object-and-string"
+        "awp/draft/protocols-object-and-string",
+        "awp/reject/no-protocols"
       ]
     }
   },
@@ -193,6 +209,7 @@
       "officialSuite": "vendor/host-meta/rfc6415/ (RFC 6415 §A)",
       "deviations": [],
       "fixtures": [
+        "host-meta/reject/no-links",
         "host-meta/rfc6415/links"
       ]
     }
@@ -207,7 +224,8 @@
       "officialSuite": null,
       "deviations": [],
       "fixtures": [
-        "anp/draft/collectionpage-items"
+        "anp/draft/collectionpage-items",
+        "anp/reject/no-items"
       ]
     }
   },

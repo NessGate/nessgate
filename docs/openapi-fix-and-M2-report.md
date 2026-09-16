@@ -48,7 +48,12 @@ caps preserved. Residual: prefix detection is head-based, so a spec that places 
 after 64 KB (contrary to convention) would be missed — recorded as a matrix deviation, and it would
 become a fixture if ever observed.
 
-## Part 2 — M2: official conformance ingestion (layer 1)
+## Part 2 — M2: official example vectors (layer 1)
+
+> **Scope, precisely:** these are three official *example documents* (9 targeted assertions),
+> not protocol conformance *suites*. "Official" refers to the provenance of each vector
+> (RFC / OAI canonical material), not to suite-level coverage — full conformance suites
+> would need dozens of vectors per protocol and mostly do not exist for these ecosystems.
 
 Vendored the ecosystems' **own** canonical material (each with `SOURCE.md`: origin, license, date),
 run through the resolver by `scripts/test-conformance.mjs`:
