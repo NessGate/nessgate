@@ -18,6 +18,10 @@
 // private network behind it to pivot into.
 
 const FETCH_TIMEOUT_MS = 8000;
+// Every DNS-over-HTTPS lookup carries its own abort timer: an untimed DoH await
+// was the one unbounded wait in the request path, and a stalled resolver could
+// hang the whole invocation until the edge killed it (production 504s).
+const DOH_TIMEOUT_MS = 5000;
 const MAX_JSON_BYTES = 1_000_000; // 1 MB cap on any fetched document
 // OpenAPI specs are frequently multi-MB, but detection + our pointer-only record
 // live in the document HEAD, so we read only a bounded prefix for /openapi.json —
@@ -382,23 +386,34 @@ async function getOnDomain(domain, pathOrUrl, env, ctx) {
 }
 
 // DoH TXT lookup for the DNS channel. Queries Cloudflare's public resolver.
-async function dohTxt(name) {
+// Bounded DoH query. The abort timer stays armed through the body read, so a
+// resolver that stalls mid-response cannot hang the invocation either. Returns
+// the parsed dns-json object, or null on any failure.
+async function dohQuery(name, type, cacheTtl = 60) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), DOH_TIMEOUT_MS);
   try {
     const res = await fetch(
-      `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=TXT`,
-      { headers: { Accept: "application/dns-json" }, cf: { cacheTtl: 60 } }
+      `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=${type}`,
+      { headers: { Accept: "application/dns-json" }, signal: ctrl.signal, cf: { cacheTtl } }
     );
-    if (!res.ok) return [];
-    const data = await res.json();
-    const out = [];
-    for (const a of data.Answer || []) {
-      if (a.type !== 16) continue; // TXT
-      out.push(String(a.data).replace(/"\s+"/g, "").replace(/^"|"$/g, ""));
-    }
-    return out;
+    if (!res.ok) return null;
+    return await res.json();
   } catch {
-    return [];
+    return null;
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+async function dohTxt(name) {
+  const data = await dohQuery(name, "TXT");
+  const out = [];
+  for (const a of (data && data.Answer) || []) {
+    if (a.type !== 16) continue; // TXT
+    out.push(String(a.data).replace(/"\s+"/g, "").replace(/^"|"$/g, ""));
+  }
+  return out;
 }
 
 // GB/Z 185.4 (China, 智能体互联) agent description ("ACS"). Structurally an
@@ -908,17 +923,8 @@ function nsContained(nsHosts, domain) {
 
 // DoH NS lookup (Cloudflare resolver), best-effort.
 async function dohNs(name) {
-  try {
-    const res = await fetch(
-      `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=NS`,
-      { headers: { Accept: "application/dns-json" }, cf: { cacheTtl: 300 } }
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.Answer || []).filter((a) => a.type === 2).map((a) => String(a.data));
-  } catch {
-    return [];
-  }
+  const data = await dohQuery(name, "NS", 300);
+  return ((data && data.Answer) || []).filter((a) => a.type === 2).map((a) => String(a.data));
 }
 const EXPLORE_UA = "NessGate-Explore/1.0 (+https://nessgate.com)";
 const EXPLORE_RATE_LIMIT_PER_HOUR = 60;
@@ -1051,24 +1057,41 @@ function mcpRegistryRecords(json, namespace, domain) {
 // very large namespaces (io.github.* can take >20s), so this uses a short timeout
 // and degrades gracefully to "" — federation is best-effort, never a hang.
 const REGISTRY_TIMEOUT_MS = 5000;
+const MCP_REGISTRY_MAX_BYTES = 500_000; // registry pages are ~10-100 KB; cap defensively
 async function fetchMcpRegistry(namespace) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), REGISTRY_TIMEOUT_MS);
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), REGISTRY_TIMEOUT_MS);
-    let res;
-    try {
-      res = await fetch(`${MCP_REGISTRY_API}?search=${encodeURIComponent(namespace)}&limit=50`, {
-        headers: { Accept: "application/json", "User-Agent": EXPLORE_UA },
-        signal: ctrl.signal,
-        cf: { cacheTtl: 300 },
-      });
-    } finally {
-      clearTimeout(timer);
-    }
+    const res = await fetch(`${MCP_REGISTRY_API}?search=${encodeURIComponent(namespace)}&limit=50`, {
+      headers: { Accept: "application/json", "User-Agent": EXPLORE_UA },
+      signal: ctrl.signal,
+      cf: { cacheTtl: 300 },
+    });
     if (!res.ok) return "";
-    return await res.text();
+    // Bounded read with the abort timer still armed: the registry is a trusted
+    // party, but its response is still an external body — cap it so an oversized
+    // or slow-trickling reply can neither bloat nor hang the invocation.
+    const reader = res.body.getReader();
+    const chunks = [];
+    let size = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > MCP_REGISTRY_MAX_BYTES) {
+        try { await reader.cancel(); } catch {}
+        return "";
+      }
+      chunks.push(value);
+    }
+    const buf = new Uint8Array(size);
+    let off = 0;
+    for (const chunk of chunks) { buf.set(chunk, off); off += chunk.length; }
+    return new TextDecoder().decode(buf);
   } catch {
     return "";
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -1775,61 +1798,65 @@ async function safeFetch(url, allowedDomain, maxBytes, strictHosts = false, user
 // short-TTL cache collapses repeats to one check (the DNS-rebinding window this
 // opens is already documented and immaterial: Worker egress has no private
 // network, and probes assert nothing).
-const DNS_CHECK_CACHE = new Map(); // host -> { ok, err, expires }
+const DNS_CHECK_CACHE = new Map(); // host -> { promise: Promise<{ok, err}>, expires }
 const DNS_CHECK_TTL_MS = 60_000;
 
 async function assertPublicDns(host) {
   const now = Date.now();
-  const cached = DNS_CHECK_CACHE.get(host);
-  if (cached && cached.expires > now) {
-    if (!cached.ok) throw new Error(cached.err);
-    return;
+  let entry = DNS_CHECK_CACHE.get(host);
+  // Cache the IN-FLIGHT promise, not just the settled result: the adapters run
+  // in parallel and all check the same host at once, so a result-only cache let
+  // every one of them fire its own duplicate DoH pair before the first finished
+  // (subrequest waste on cold isolates).
+  if (!entry || entry.expires <= now) {
+    if (DNS_CHECK_CACHE.size > 500) DNS_CHECK_CACHE.delete(DNS_CHECK_CACHE.keys().next().value);
+    entry = { promise: checkPublicDns(host), expires: now + DNS_CHECK_TTL_MS };
+    DNS_CHECK_CACHE.set(host, entry);
   }
+  const r = await entry.promise;
+  if (!r.ok) throw new Error(r.err);
+}
+
+// Never rejects — always settles to { ok, err } so a shared cached promise can
+// be awaited by any number of callers.
+async function checkPublicDns(host) {
   const ips = [];
   for (const type of ["A", "AAAA"]) {
-    try {
-      const res = await fetch(
-        `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(host)}&type=${type}`,
-        { headers: { Accept: "application/dns-json" }, cf: { cacheTtl: 60 } }
-      );
-      if (!res.ok) continue;
-      const data = await res.json();
-      for (const a of data.Answer || []) {
-        if (a.type === 1 || a.type === 28) ips.push(a.data);
-      }
-    } catch {
-      // DNS lookup failure for one record type is not fatal by itself
+    const data = await dohQuery(host, type);
+    for (const a of (data && data.Answer) || []) {
+      if (a.type === 1 || a.type === 28) ips.push(a.data);
     }
   }
-  let ok = true;
-  let err = "";
-  if (ips.length === 0) { ok = false; err = "the domain does not resolve to a public address"; }
-  else if (ips.some((ip) => isPrivateIp(ip))) { ok = false; err = "the domain resolves to a non-public address"; }
-  if (DNS_CHECK_CACHE.size > 500) DNS_CHECK_CACHE.delete(DNS_CHECK_CACHE.keys().next().value);
-  DNS_CHECK_CACHE.set(host, { ok, err, expires: now + DNS_CHECK_TTL_MS });
-  if (!ok) throw new Error(err);
+  if (ips.length === 0) return { ok: false, err: "the domain does not resolve to a public address" };
+  if (ips.some((ip) => isPrivateIp(ip))) return { ok: false, err: "the domain resolves to a non-public address" };
+  return { ok: true, err: "" };
 }
 
 function isPrivateIp(ip) {
   const s = String(ip).toLowerCase().trim();
   if (s.includes(":")) {
-    // IPv6: loopback, unspecified, link-local, unique-local, v4-mapped, doc range
+    // IPv6: loopback, unspecified, discard, link-local, unique-local, multicast,
+    // v4-mapped, NAT64 and 6to4 (both embed IPv4, possibly private), doc range
     return (
       s === "::1" ||
       s === "::" ||
+      s.startsWith("100:") ||
       s.startsWith("fc") ||
       s.startsWith("fd") ||
       s.startsWith("fe8") ||
       s.startsWith("fe9") ||
       s.startsWith("fea") ||
       s.startsWith("feb") ||
+      s.startsWith("ff") ||
       s.startsWith("::ffff:") ||
+      s.startsWith("64:ff9b") ||
+      s.startsWith("2002:") ||
       s.startsWith("2001:db8")
     );
   }
   const p = s.split(".").map(Number);
   if (p.length !== 4 || p.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return true;
-  const [a, b] = p;
+  const [a, b, c] = p;
   return (
     a === 0 ||
     a === 10 ||
@@ -1840,6 +1867,8 @@ function isPrivateIp(ip) {
     (a === 192 && b === 0) ||
     (a === 192 && b === 168) ||
     (a === 198 && (b === 18 || b === 19)) ||
+    (a === 198 && b === 51 && c === 100) ||
+    (a === 203 && b === 0 && c === 113) ||
     a >= 224
   );
 }
@@ -2003,4 +2032,4 @@ function selfDomain() { return SELF_DOMAIN; }
 function apiCatalog() { return API_CATALOG; }
 function mcpTools() { return MCP_TOOLS; }
 function adapters() { return ADAPTERS; }
-export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, orgRecordsFromDoc, docRecords, isCrossRegistrable, sameRegCanonicalHost, probeShapeOkObj, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters };
+export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, assertPublicDns, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, orgRecordsFromDoc, docRecords, isCrossRegistrable, sameRegCanonicalHost, probeShapeOkObj, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters };

@@ -9,6 +9,7 @@ import {
   parseAgentmap,
   parseAidRecord,
   isPrivateIp,
+  assertPublicDns,
   hostAllowedForDomain,
   isForbiddenHost,
   apiCatalog,
@@ -83,10 +84,21 @@ is(isPrivateIp("169.254.169.254"), true, "link-local/metadata");
 is(isPrivateIp("127.0.0.1"), true, "loopback");
 is(isPrivateIp("100.64.0.1"), true, "CGNAT");
 is(isPrivateIp("8.8.8.8"), false, "public v4 ok");
+is(isPrivateIp("198.51.100.7"), true, "TEST-NET-2");
+is(isPrivateIp("203.0.113.9"), true, "TEST-NET-3");
 is(isPrivateIp("::1"), true, "v6 loopback");
 is(isPrivateIp("fd12::1"), true, "v6 unique-local");
 is(isPrivateIp("fe80::1"), true, "v6 link-local");
+is(isPrivateIp("ff02::1"), true, "v6 multicast");
+is(isPrivateIp("100::1"), true, "v6 discard prefix");
+is(isPrivateIp("64:ff9b::a00:1"), true, "NAT64 (embeds IPv4, possibly private)");
+is(isPrivateIp("2002:7f00::1"), true, "6to4 (embeds IPv4, possibly private)");
 is(isPrivateIp("2606:4700::1111"), false, "public v6 ok");
+// Alternative IP spellings must never pass domain validation (SSRF encodings).
+is(normalizeDomain("127.1"), null, "rejects short-form IP");
+is(normalizeDomain("2130706433"), null, "rejects decimal IP");
+is(normalizeDomain("0x7f000001"), null, "rejects hex IP");
+is(normalizeDomain("017700000001"), null, "rejects octal IP");
 
 console.log("--- host allowances");
 is(hostAllowedForDomain("example.com", "example.com"), true, "apex allowed");
@@ -515,6 +527,44 @@ is(
   "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;&#39; &amp;",
   "all HTML-special characters escaped"
 );
+
+console.log("--- DoH hardening (a stalled resolver must never hang an invocation)");
+{
+  const realFetch = globalThis.fetch;
+  // A DoH endpoint that never responds on its own — it settles ONLY if the
+  // caller aborts. The check must FAIL within its own timeout budget, not hang
+  // (untimed DoH awaits were the root cause of production 504s). The watchdog
+  // race makes a reintroduced hang a loud test failure instead of a silent
+  // unsettled await. Worst case is one timer per record type (A + AAAA).
+  globalThis.fetch = (url, opts) =>
+    new Promise((_, reject) => {
+      if (opts && opts.signal) {
+        opts.signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+      }
+    });
+  const t0 = Date.now();
+  let watchdog;
+  const outcome = await Promise.race([
+    assertPublicDns("stalled-doh.test.example").then(() => "resolved", () => "rejected"),
+    new Promise((r) => { watchdog = setTimeout(r, 15_000, "hung"); }),
+  ]);
+  clearTimeout(watchdog);
+  const ms = Date.now() - t0;
+  globalThis.fetch = realFetch;
+  is(outcome, "rejected", "assertPublicDns fails (not hangs) when DoH stalls");
+  is(ms < 12_000, true, `assertPublicDns bounded by its DoH timers (took ${ms}ms)`);
+
+  // Parallel adapters check the same host at once: they must share ONE
+  // in-flight lookup (A + AAAA), not stampede a duplicate DoH pair each.
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return new Response(JSON.stringify({ Answer: [{ type: 1, data: "93.184.216.34" }] }));
+  };
+  await Promise.all(Array.from({ length: 8 }, () => assertPublicDns("stampede.test.example")));
+  globalThis.fetch = realFetch;
+  is(calls <= 2, true, `8 concurrent checks share one in-flight DoH pair (${calls} lookups)`);
+}
 
 console.log(failed ? `\n${failed} FAILURES` : "\nAll regression tests passed.");
 process.exit(failed ? 1 : 0);
