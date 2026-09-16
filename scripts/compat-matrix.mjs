@@ -29,6 +29,19 @@ for (const [id, m] of Object.entries(manifests)) {
   const proto = m.normalizeAs || id;
   (matrix[proto]) ? okmsg(`manifest ${id} → matrix['${proto}'] present`) : fail(`manifest ${id} → matrix['${proto}'] MISSING`);
 }
+// 2b. every adapter surface is REPRESENTED in its matrix entry. Adapters that
+// collapse into one normalizeAs (ARD: well-known + <link rel> + robots) must all
+// contribute — otherwise the matrix silently understates real coverage. (Guards
+// the last-writer-wins bug where the matrix listed only 'robots agentmap:'.)
+for (const [id, m] of Object.entries(manifests)) {
+  const proto = m.normalizeAs || id;
+  if (!matrix[proto]) continue; // already failed in #2
+  const matrixSurfaces = new Set(Object.values(matrix[proto]).flatMap((v) => v.surfaces || []));
+  const missing = (m.surfaces || []).filter((s) => !matrixSurfaces.has(s));
+  missing.length
+    ? fail(`adapter ${id} surface(s) not in matrix['${proto}']: ${missing.join(", ")}`)
+    : okmsg(`adapter ${id} surfaces represented in matrix['${proto}']`);
+}
 // 3. every matrix fixture ref exists on disk
 for (const [proto, versions] of Object.entries(matrix)) {
   for (const [v, entry] of Object.entries(versions)) {

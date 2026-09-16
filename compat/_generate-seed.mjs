@@ -128,8 +128,13 @@ for (const a of ADAPTERS) {
   const proto = a.normalizeAs || a.id;
   matrix[proto] ||= {};
   for (const v of m.versions) {
+    // Several adapters can collapse into one normalizeAs (ARD is read via the
+    // well-known catalog, an HTML <link rel>, AND a robots Agentmap directive).
+    // The matrix surface list must be the UNION of every contributing adapter,
+    // not last-writer-wins — otherwise the table understates real coverage.
+    const prior = matrix[proto][v]?.surfaces || [];
     matrix[proto][v] = {
-      surfaces: m.surfaces,
+      surfaces: [...new Set([...prior, ...m.surfaces])],
       parser: `normalizeResources('${proto}')`,
       authority: `${m.authority} (Level 1) — the domain's own surface`,
       officialSuite: m.officialSuite,

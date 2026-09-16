@@ -17,6 +17,9 @@
   "ard-catalog": {
     "0.91": {
       "surfaces": [
+        "/.well-known/ard.json",
+        "/.well-known/ai-catalog.json",
+        "<link rel=ard|ai-catalog>",
         "robots agentmap:"
       ],
       "parser": "normalizeResources('ard-catalog')",
