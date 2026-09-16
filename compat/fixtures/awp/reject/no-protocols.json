@@ -1,0 +1,14 @@
+{
+  "id": "awp/reject/no-protocols",
+  "protocol": "awp",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/.well-known/awp.json",
+    "body": "{\"hello\":\"world\"}"
+  },
+  "expect": {
+    "reject": true
+  },
+  "notes": "AWP manifest without a protocols block → rejected"
+}

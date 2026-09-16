@@ -1,0 +1,14 @@
+{
+  "id": "host-meta/reject/no-links",
+  "protocol": "host-meta",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/.well-known/host-meta.json",
+    "body": "{\"subject\":\"https://x.com/\"}"
+  },
+  "expect": {
+    "reject": true
+  },
+  "notes": "host-meta JRD without links[] → rejected"
+}

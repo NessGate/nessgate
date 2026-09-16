@@ -1,0 +1,14 @@
+{
+  "id": "anp/reject/no-items",
+  "protocol": "anp",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/.well-known/agent-descriptions",
+    "body": "{\"hello\":\"world\"}"
+  },
+  "expect": {
+    "reject": true
+  },
+  "notes": "ANP without items[]/@type CollectionPage → rejected"
+}

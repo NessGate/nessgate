@@ -18,6 +18,7 @@ for (const [label, args] of [
   ["compatibility corpus", ["run", "test:compat"]],
   ["openapi size handling", ["run", "test:openapi"]],
   ["official conformance", ["run", "test:conformance"]],
+  ["adapter contract", ["run", "test:contract"]],
   ["matrix consistency", ["run", "compat:matrix"]],
 ]) {
   const t = spawnSync("npm", args, { stdio: "inherit", shell: true });
