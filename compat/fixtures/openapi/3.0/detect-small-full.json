@@ -5,6 +5,7 @@
   "kind": "json",
   "origin": "synthetic",
   "detect": "openapi",
+  "truncated": false,
   "input": {
     "url": "https://x.com/openapi.json",
     "body": "{\"openapi\":\"3.0.0\",\"info\":{\"title\":\"Acme API\"},\"paths\":{}}"
@@ -13,5 +14,5 @@
     "ok": true,
     "title": "Acme API"
   },
-  "notes": "small fully-parseable spec"
+  "notes": "small fully-parseable spec (completed within cap)"
 }

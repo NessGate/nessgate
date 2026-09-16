@@ -592,7 +592,7 @@ function normalizeResources(type, kind, text, sourceUrl) {
 // the same logic as the embeddable library (packages/resolver, public/resolver.mjs).
 // A small spec is parsed authoritatively; a large one is confirmed by the version
 // marker that opens the document, so a multi-MB spec is found from its first bytes.
-export function detectOpenApi(text) {
+export function detectOpenApi(text, truncated = false) {
   if (typeof text !== "string" || !text) return { ok: false };
   try {
     const o = JSON.parse(text);
@@ -601,6 +601,7 @@ export function detectOpenApi(text) {
     }
     return { ok: false };
   } catch {
+    if (!truncated) return { ok: false }; // complete but malformed → reject (do NOT trust the marker)
     if (!/^﻿?\s*\{/.test(text)) return { ok: false };
     const ver = /"(?:openapi|swagger)"\s*:\s*"(\d[^"]*)"/.exec(text);
     if (!ver) return { ok: false };
@@ -610,9 +611,11 @@ export function detectOpenApi(text) {
 }
 
 // Fetch a bounded prefix of an on-domain document (for OpenAPI: read only the
-// head, truncating at the cap instead of failing on a huge body).
+// head). Returns { text, truncated } — truncated true only when the body
+// exceeded the cap, so the caller can distinguish a cap-truncated document from
+// a complete one.
 async function getOnDomainPrefix(domain, path, env, ctx, prefixBytes) {
-  if (domain === SELF_DOMAIN) return getOnDomain(domain, path, env, ctx); // self docs are small
+  if (domain === SELF_DOMAIN) return { text: await getOnDomain(domain, path, env, ctx), truncated: false }; // self docs are small
   return safeFetch(`https://${domain}${path}`, domain, prefixBytes, false, DISCOVER_UA, false, false, true);
 }
 
@@ -624,9 +627,9 @@ async function runAdapter(a, domain, env, ctx) {
         // OpenAPI: bounded-prefix read + head detection, so large specs are found
         // without downloading/parsing megabytes.
         if (a.id === "openapi") {
-          let text;
-          try { text = await getOnDomainPrefix(domain, path, env, ctx, OPENAPI_PREFIX_BYTES); } catch { continue; }
-          const det = detectOpenApi(text);
+          let r;
+          try { r = await getOnDomainPrefix(domain, path, env, ctx, OPENAPI_PREFIX_BYTES); } catch { continue; }
+          const det = detectOpenApi(r.text, r.truncated);
           if (det.ok) return { discovered: [{ type: a.id, url }], resources: [{ source: "openapi", sourceUrl: url, type: "openapi", name: det.title, url }] };
           continue;
         }
@@ -1724,18 +1727,28 @@ async function safeFetch(url, allowedDomain, maxBytes, strictHosts = false, user
     const reader = res.body.getReader();
     const chunks = [];
     let size = 0;
-    let capped = false;
+    let truncated = false;
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      chunks.push(value);
-      size += value.length;
-      if (size >= maxBytes) {
-        // truncateAtCap (OpenAPI prefix reads): stop and keep the bounded head
-        // instead of failing on a legitimately huge document.
-        if (truncateAtCap) { capped = true; try { await reader.cancel(); } catch {} break; }
-        await reader.cancel();
-        throw new Error("the response is too large");
+      if (truncateAtCap) {
+        // OpenAPI prefix read: retain ONLY up to the cap (trim the final chunk),
+        // then cancel. `truncated` true only when more bytes existed beyond the cap.
+        const remaining = maxBytes - size;
+        if (value.length >= remaining) {
+          chunks.push(value.subarray(0, remaining));
+          size += remaining;
+          if (value.length > remaining) truncated = true;
+          else { const nxt = await reader.read(); if (!nxt.done) truncated = true; }
+          try { await reader.cancel(); } catch {}
+          break;
+        }
+        chunks.push(value);
+        size += value.length;
+      } else {
+        size += value.length;
+        if (size > maxBytes) { await reader.cancel(); throw new Error("the response is too large"); }
+        chunks.push(value);
       }
     }
     const buf = new Uint8Array(size);
@@ -1744,7 +1757,8 @@ async function safeFetch(url, allowedDomain, maxBytes, strictHosts = false, user
       buf.set(c, off);
       off += c.length;
     }
-    const text = new TextDecoder().decode(capped && size > maxBytes ? buf.subarray(0, maxBytes) : buf);
+    const text = new TextDecoder().decode(buf);
+    if (truncateAtCap) return { text, truncated };
     // Explore mode needs the final URL (redirects can move content to another
     // host), every host touched (so redirect hosts count against the budget) and
     // the byte count (for the global byte budget). /discover callers get the

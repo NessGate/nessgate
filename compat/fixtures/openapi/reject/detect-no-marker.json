@@ -4,6 +4,7 @@
   "kind": "json",
   "origin": "synthetic",
   "detect": "openapi",
+  "truncated": false,
   "input": {
     "url": "https://x.com/openapi.json",
     "body": "{\"hello\":\"world\",\"paths\":{}}"
@@ -11,5 +12,5 @@
   "expect": {
     "ok": false
   },
-  "notes": "JSON object without openapi/swagger marker → rejected"
+  "notes": "JSON without openapi/swagger marker → rejected"
 }

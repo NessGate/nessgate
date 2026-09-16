@@ -319,7 +319,15 @@ function onDomain(host, domain) {
   return host === domain || host === "www." + domain || host.endsWith("." + domain);
 }
 
-async function fetchText(fetchImpl, url, timeoutMs, maxBytes) {
+// Bounded read → { text, truncated }. LITERAL cap: at most maxBytes of body data
+// are ever retained in memory — the final chunk is trimmed to the remaining
+// allowance before buffering, then the stream is cancelled. `truncated` is true
+// only when there were MORE bytes beyond the cap (a body that ends exactly at
+// the cap is complete, not truncated), so callers can tell a cap-truncated
+// document from a complete one. (The network/runtime may have buffered bytes
+// under fetch before we cancel; NessGate itself retains and processes no more
+// than maxBytes.)
+export async function fetchBounded(fetchImpl, url, timeoutMs, maxBytes) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -328,39 +336,49 @@ async function fetchText(fetchImpl, url, timeoutMs, maxBytes) {
       headers: { Accept: "application/json, text/plain;q=0.9, */*;q=0.1", "User-Agent": "NessGate-Resolver/1.3" },
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
-    // Bounded read: never buffer more than maxBytes. Protects against huge/hostile
-    // bodies and respects size without downloading the whole document (a
-    // multi-MB spec is truncated to the cap rather than throwing). Streams when
-    // the runtime exposes a body reader; falls back to a bounded slice otherwise.
     const reader = res.body && typeof res.body.getReader === "function" ? res.body.getReader() : null;
     if (reader) {
       const chunks = [];
       let size = 0;
+      let truncated = false;
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
+        const remaining = maxBytes - size;
+        if (value.length >= remaining) {
+          chunks.push(value.subarray(0, remaining)); // retain ONLY up to the cap
+          size += remaining;
+          if (value.length > remaining) truncated = true;
+          else { const nxt = await reader.read(); if (!nxt.done) truncated = true; } // exact-cap: peek for more
+          try { await reader.cancel(); } catch {}
+          break;
+        }
         chunks.push(value);
         size += value.length;
-        if (size >= maxBytes) { try { await reader.cancel(); } catch {} break; }
       }
       const buf = new Uint8Array(size);
       let off = 0;
       for (const c of chunks) { buf.set(c, off); off += c.length; }
-      return new TextDecoder().decode(size > maxBytes ? buf.subarray(0, maxBytes) : buf);
+      return { text: new TextDecoder().decode(buf), truncated };
     }
     const text = await res.text();
-    return text.length > maxBytes ? text.slice(0, maxBytes) : text;
+    return text.length > maxBytes ? { text: text.slice(0, maxBytes), truncated: true } : { text, truncated: false };
   } finally {
     clearTimeout(timer);
   }
 }
 
-// OpenAPI detection from a (possibly truncated) document HEAD. A small spec is
-// parsed authoritatively; a large one — read only as a bounded prefix — is
-// confirmed by the version marker that conventionally opens the document, so a
-// 10 MB spec is detected from its first bytes. Pointer-only: we never need the
-// full paths object. Rejects non-JSON (e.g. an HTML wrong-content-type page).
-export function detectOpenApi(text) {
+async function fetchText(fetchImpl, url, timeoutMs, maxBytes) {
+  return (await fetchBounded(fetchImpl, url, timeoutMs, maxBytes)).text;
+}
+
+// OpenAPI detection. If the body completed within our cap (`truncated` false) we
+// require valid JSON with an openapi/swagger version — a complete-but-malformed
+// document is REJECTED. Only when WE truncated the body (it exceeded the prefix
+// cap) do we fall back to the bounded head-marker scan, since a genuinely large
+// spec cannot be JSON-parsed from its head alone. Pointer-only: we never need
+// the full paths object.
+export function detectOpenApi(text, truncated = false) {
   if (typeof text !== "string" || !text) return { ok: false };
   try {
     const o = JSON.parse(text);
@@ -369,8 +387,8 @@ export function detectOpenApi(text) {
     }
     return { ok: false };
   } catch {
-    // Truncated (large) document: tolerant head scan of the prefix only.
-    if (!/^﻿?\s*\{/.test(text)) return { ok: false }; // must look like a JSON object
+    if (!truncated) return { ok: false }; // complete but malformed → reject (do NOT trust the marker)
+    if (!/^﻿?\s*\{/.test(text)) return { ok: false }; // truncated: must still look like a JSON object
     const ver = /"(?:openapi|swagger)"\s*:\s*"(\d[^"]*)"/.exec(text);
     if (!ver) return { ok: false };
     const title = /"title"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(text);
@@ -417,9 +435,9 @@ async function runAdapter(a, domain, fetchImpl, timeoutMs, maxBytes) {
         // OpenAPI: read a bounded prefix and detect from the head, so large specs
         // (multi-MB) are found without downloading/parsing the whole document.
         if (a.id === "openapi") {
-          let text;
-          try { text = await fetchText(fetchImpl, url, timeoutMs, OPENAPI_PREFIX_BYTES); } catch { continue; }
-          const det = detectOpenApi(text);
+          let r;
+          try { r = await fetchBounded(fetchImpl, url, timeoutMs, OPENAPI_PREFIX_BYTES); } catch { continue; }
+          const det = detectOpenApi(r.text, r.truncated);
           if (det.ok) return { discovered: [{ type: a.id, url }], resources: [{ source: "openapi", sourceUrl: url, type: "openapi", name: det.title, url }] };
           continue;
         }
@@ -582,4 +600,4 @@ export function sameRegCanonicalHost(finalUrl, domain) {
   return h.endsWith("." + domain) ? h : null;
 }
 
-export default { resolve, normalizeResources, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, ADAPTERS };
+export default { resolve, normalizeResources, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, fetchBounded, ADAPTERS };

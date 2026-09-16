@@ -1,0 +1,16 @@
+{
+  "id": "openapi/reject/detect-complete-malformed",
+  "protocol": "openapi",
+  "kind": "json",
+  "origin": "synthetic",
+  "detect": "openapi",
+  "truncated": false,
+  "input": {
+    "url": "https://x.com/openapi.json",
+    "body": "{\n  \"openapi\": \"3.0.0\",\n  ...invalid JSON...\n}"
+  },
+  "expect": {
+    "ok": false
+  },
+  "notes": "Fix 1: a COMPLETE (non-truncated) malformed body must be rejected even though it contains an openapi marker"
+}

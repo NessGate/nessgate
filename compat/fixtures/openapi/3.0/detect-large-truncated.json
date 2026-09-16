@@ -5,6 +5,7 @@
   "kind": "json",
   "origin": "real-world",
   "detect": "openapi",
+  "truncated": true,
   "input": {
     "url": "https://x.com/openapi.json",
     "body": "{\"openapi\":\"3.1.0\",\"info\":{\"title\":\"Big API\",\"version\":\"1.0\",\"description\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"paths\":{\"/a\":{\"get\":{"
@@ -14,5 +15,5 @@
     "title": "Big API",
     "truncated": true
   },
-  "notes": "REGRESSION for the >1MB OpenAPI recall gap (vercel 10.8MB / posthog 6.5MB): detected from the bounded head even when the body is truncated"
+  "notes": "REGRESSION for >1MB OpenAPI (vercel 10.8MB/posthog 6.5MB): WE truncated at the prefix cap, so head-marker detection applies"
 }

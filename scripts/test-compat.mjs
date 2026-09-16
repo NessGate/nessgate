@@ -30,9 +30,10 @@ for (const file of files) {
   try { fx = JSON.parse(readFileSync(file, "utf8")); } catch { failed++; console.error(`FAIL  ${file}: unreadable`); continue; }
   const { id, protocol, kind, input, expect } = fx;
 
-  // Detector fixtures (e.g. OpenAPI bounded-prefix detection).
+  // Detector fixtures (e.g. OpenAPI bounded-prefix detection). `truncated`
+  // states whether WE cut the body at the cap (vs a body that completed).
   if (fx.detect === "openapi") {
-    const d = detectOpenApi(input.body);
+    const d = detectOpenApi(input.body, !!fx.truncated);
     let match = !!d.ok === !!expect.ok;
     if (match && expect.ok) {
       if ("title" in expect) match = d.title === expect.title;

@@ -4,6 +4,7 @@
   "kind": "json",
   "origin": "synthetic",
   "detect": "openapi",
+  "truncated": false,
   "input": {
     "url": "https://x.com/openapi.json",
     "body": "<!DOCTYPE html><html><head><title>SPA</title></head></html>"
@@ -11,5 +12,5 @@
   "expect": {
     "ok": false
   },
-  "notes": "wrong content type (HTML shell at /openapi.json) → rejected"
+  "notes": "HTML shell at /openapi.json → rejected"
 }
