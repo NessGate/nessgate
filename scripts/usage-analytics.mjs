@@ -5,16 +5,21 @@
 // API. This reads edge request counts Cloudflare already records — it adds NO
 // tracking, NO storage, and no change to NessGate's no-store stance.
 //
-// Honesty notes:
-//  - Benchmark traffic does NOT appear here: benchmarks resolve OTHER domains,
-//    which never touch the nessgate.com zone.
-//  - CI smoke (a handful of requests per deploy) and local dev/testing DO hit
-//    these paths from the operator's IP. Pass --exclude-ip=<ip> to remove a
-//    known internal source; otherwise it is counted and noted.
+// Measurement honesty (the numbers this script prints are the numbers we may
+// publicly repeat, so they must not flatter):
+//  - Cloudflare's adaptive dataset is SAMPLED. Every row is weighted by its
+//    sampleInterval; totals are estimates, and the report says so whenever any
+//    sampling was in effect.
+//  - Traffic is SEGMENTED by user agent: registry liveness bots and monitors
+//    (the bulk of /mcp traffic) are separated from possible real clients.
+//    Requests are not users, and monitored uptime is not adoption.
+//  - The window ends "now": the newest day is PARTIAL and labeled as such.
+//  - Benchmark traffic never appears here (it resolves OTHER domains, which
+//    never touch this zone). CI smoke + local dev DO hit these paths from the
+//    operator's IP — pass --exclude-ip=<ip> to remove a known internal source.
 //
-// Auth: uses CLOUDFLARE_API_TOKEN if set (recommend a token scoped to
-// Account/Zone Analytics:Read); otherwise falls back to the local wrangler
-// OAuth token. No token is ever written or printed.
+// Auth: CLOUDFLARE_API_TOKEN if set (recommend Account+Zone Analytics:Read),
+// else the local wrangler OAuth token. No token is ever written or printed.
 //
 // Usage:
 //   node scripts/usage-analytics.mjs [--days=7] [--zone=<tag>] [--exclude-ip=<ip>] [--json]
@@ -40,6 +45,16 @@ const ENDPOINTS = [
   { key: "/explore", label: "Evidence resolve (/explore/*)", filter: { clientRequestPath_like: "/explore/%" } },
   { key: "/check", label: "Compatibility   (/check*)", filter: { clientRequestPath_like: "/check%" } },
 ];
+
+// UA classes. "monitor" = self-declared bots, health checkers, crawlers and
+// research probes (they ping every server in the MCP Registry — uptime, not
+// adoption). "unidentified" = empty UA (scanners, curl-alikes). Everything else
+// counts as a POSSIBLE client — an upper bound on real usage, not proof of it.
+const MONITOR_RE = /bot|crawl|spider|probe|monitor|liveness|audit|research|collector|watch|beat|sentinel|registry|scan|health|uptime|pingdom|checker/i;
+function uaClass(ua) {
+  if (!ua || !ua.trim()) return "unidentified";
+  return MONITOR_RE.test(ua) ? "monitor" : "client";
+}
 
 function getToken() {
   if (process.env.CLOUDFLARE_API_TOKEN) return { token: process.env.CLOUDFLARE_API_TOKEN.trim(), src: "CLOUDFLARE_API_TOKEN" };
@@ -85,8 +100,8 @@ function dayWindows(n) {
 
 const QUERY = `query($zone:String!,$since:Time!,$until:Time!,$f:[ZoneHttpRequestsAdaptiveGroupsFilter_InputObject!]){
   viewer{ zones(filter:{zoneTag:$zone}){
-    httpRequestsAdaptiveGroups(limit:100, filter:{AND:$f}, orderBy:[count_DESC]){
-      count dimensions{ edgeResponseStatus }
+    httpRequestsAdaptiveGroups(limit:500, filter:{AND:$f}, orderBy:[count_DESC]){
+      count avg{ sampleInterval } dimensions{ edgeResponseStatus userAgent }
     }
   }}
 }`;
@@ -106,7 +121,13 @@ async function run() {
   }
   const windows = dayWindows(DAYS);
   const totals = {};
-  for (const ep of ENDPOINTS) totals[ep.key] = { ok: 0, redir: 0, clientErr: 0, serverErr: 0, total: 0 };
+  let sampled = false;
+  for (const ep of ENDPOINTS) {
+    totals[ep.key] = {
+      ok: 0, redir: 0, clientErr: 0, serverErr: 0, total: 0,
+      segments: { monitor: 0, unidentified: 0, client: 0 },
+    };
+  }
 
   for (const w of windows) {
     for (const ep of ENDPOINTS) {
@@ -117,32 +138,47 @@ async function run() {
       catch (e) { console.error(`  ! ${ep.key} ${w.since.slice(0, 10)}: ${e.message}`); continue; }
       const rows = data.viewer.zones?.[0]?.httpRequestsAdaptiveGroups || [];
       for (const r of rows) {
-        const b = statusBucket(Number(r.dimensions.edgeResponseStatus));
-        totals[ep.key][b] += r.count;
-        totals[ep.key].total += r.count;
+        // Adaptive sampling: each stored row represents ~sampleInterval real
+        // requests. Weight, or high-traffic windows silently undercount.
+        const si = (r.avg && r.avg.sampleInterval) || 1;
+        if (si > 1.001) sampled = true;
+        const n = Math.round(r.count * si);
+        const t = totals[ep.key];
+        t[statusBucket(Number(r.dimensions.edgeResponseStatus))] += n;
+        t.total += n;
+        t.segments[uaClass(r.dimensions.userAgent)] += n;
       }
     }
   }
 
+  const meta = {
+    zone: ZONE, days: DAYS,
+    since: windows[0].since, until: windows[windows.length - 1].until,
+    lastDayPartial: true, sampled, excludeIp: EXCLUDE_IP,
+  };
   if (AS_JSON) {
-    console.log(JSON.stringify({ zone: ZONE, days: DAYS, since: windows[0].since, until: windows[windows.length - 1].until, excludeIp: EXCLUDE_IP, endpoints: totals }, null, 2));
+    console.log(JSON.stringify({ ...meta, endpoints: totals }, null, 2));
     return;
   }
 
   const grand = Object.values(totals).reduce((a, t) => a + t.total, 0);
-  console.log(`\nNessGate external usage — zone ${ZONE} — last ${DAYS} day(s)`);
-  console.log(`window: ${windows[0].since.slice(0, 10)} → ${windows[windows.length - 1].until.slice(0, 10)}  (auth: ${auth.src})`);
-  console.log(`${EXCLUDE_IP ? `excluding IP ${EXCLUDE_IP}\n` : ""}`);
-  console.log("  endpoint                        total     2xx    3xx    4xx    5xx");
-  console.log("  " + "-".repeat(70));
+  console.log(`\nNessGate external usage — zone ${ZONE} — last ${DAYS} day(s), newest day PARTIAL`);
+  console.log(`window: ${meta.since.slice(0, 10)} → ${meta.until.slice(0, 10)}  (auth: ${auth.src})`);
+  console.log(`counts are ${sampled ? "ESTIMATES (Cloudflare adaptive sampling was in effect; rows weighted by sampleInterval)" : "unsampled (sampleInterval 1 throughout)"}`);
+  console.log(`${EXCLUDE_IP ? `excluding IP ${EXCLUDE_IP}` : "operator IP NOT excluded (pass --exclude-ip=<ip>)"}\n`);
+  console.log("  endpoint                        total     2xx    3xx    4xx    5xx | monitors  no-UA  possible-clients");
+  console.log("  " + "-".repeat(104));
   for (const ep of ENDPOINTS) {
     const t = totals[ep.key];
-    console.log(`  ${ep.label.padEnd(30)} ${String(t.total).padStart(6)}  ${String(t.ok).padStart(6)} ${String(t.redir).padStart(6)} ${String(t.clientErr).padStart(6)} ${String(t.serverErr).padStart(6)}`);
+    console.log(
+      `  ${ep.label.padEnd(30)} ${String(t.total).padStart(6)}  ${String(t.ok).padStart(6)} ${String(t.redir).padStart(6)} ${String(t.clientErr).padStart(6)} ${String(t.serverErr).padStart(6)} | ${String(t.segments.monitor).padStart(8)} ${String(t.segments.unidentified).padStart(6)} ${String(t.segments.client).padStart(9)}`
+    );
   }
-  console.log("  " + "-".repeat(70));
+  console.log("  " + "-".repeat(104));
   console.log(`  ${"ALL ADOPTION ENDPOINTS".padEnd(30)} ${String(grand).padStart(6)}`);
-  console.log(`\nnote: benchmark traffic is NOT counted (it targets other domains, never this zone).`);
-  console.log(`      CI smoke + local dev hit these paths from the operator IP${EXCLUDE_IP ? " (excluded above)" : "; pass --exclude-ip=<ip> to remove"}.`);
+  console.log(`\n"possible-clients" is an UPPER BOUND on real usage (any non-bot-labeled UA), not proof of adoption.`);
+  console.log(`Adoption is measured in integration events (a listing merged, a named dependent, a self-hosted deploy),`);
+  console.log(`never in request counts. Benchmark traffic targets other domains and never appears here.`);
 }
 
 run().catch((e) => { console.error("usage-analytics failed:", e.message); process.exit(1); });
