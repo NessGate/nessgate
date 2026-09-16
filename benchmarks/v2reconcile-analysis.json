@@ -1,0 +1,109 @@
+{
+  "integrity": {
+    "rows": 200,
+    "usable": 200,
+    "exploreFailed": 0,
+    "exploreFailedDomains": []
+  },
+  "coverage": {
+    "A_strictExplore_positive": "55/200 (27.5%)",
+    "B_plusCTsitemap_positive": "57/200 (28.5%)",
+    "trueIncrementalDomains": 2,
+    "rescuedFromEmpty": 2,
+    "rescuedExamples": [
+      {
+        "domain": "dzen.ru",
+        "hosts": [
+          "ms.dzen.ru"
+        ]
+      },
+      {
+        "domain": "nginx.org",
+        "hosts": [
+          "lxr.nginx.org"
+        ]
+      }
+    ],
+    "frozenBaselineNote": "Historical frozen v1.6 baseline was 57/200 (28.5%). Compare A above (fresh run)."
+  },
+  "level2Additions": {
+    "discoveryL2Items_total": 25,
+    "discoveryHosts_total": 18,
+    "hostsAlreadyFoundByExplore_overlap": 10,
+    "hostsNEWvsExplore_incremental": 8,
+    "incrementalBySource": {
+      "same-registrable-domain": 7,
+      "publisher-linked": 1
+    },
+    "reconciliationNote": "overlap = CT/sitemap hosts explore's org/related ALSO found (no new coverage). incremental = genuinely new hosts.",
+    "incrementalExamples": [
+      {
+        "seed": "dzen.ru",
+        "host": "ms.dzen.ru",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "github.com",
+        "host": "awesome-copilot.github.com",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "nginx.org",
+        "host": "lxr.nginx.org",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "yandex.ru",
+        "host": "cloud.yandex.ru",
+        "rel": "publisher-linked",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "ipstack.com",
+        "host": "ipstack-static-website.ipstack.com",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "fixer.io",
+        "host": "blog.fixer.io",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "exchangerate.host",
+        "host": "blog.exchangerate.host",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      },
+      {
+        "seed": "mojoauth.com",
+        "host": "enterprise-ciam.mojoauth.com",
+        "rel": "same-registrable-domain",
+        "type": "llms.txt"
+      }
+    ]
+  },
+  "falseNoisyAssociations": {
+    "crossRegistrableIncremental": 0,
+    "note": "cross-registrable incremental hosts are the noise-prone case; all are Level 2, never authoritative. Audit:",
+    "examples": []
+  },
+  "cost": {
+    "exploreRequests_p50": 11,
+    "exploreRequests_p90": 13,
+    "discoveryRequests_p50": 17,
+    "discoveryRequests_p90": 91,
+    "combinedMs_p50": 21464,
+    "combinedMs_p90": 64674,
+    "note": "combined ms = explore + discovery in this harness (exact-host runs twice; a unified balanced would share it once)."
+  },
+  "adapterFailureRates": {
+    "ctSkipped": "78/200 (39.0%)",
+    "sitemapSkipped": "106/200 (53.0%)",
+    "note": "high crt.sh abort rate makes the incremental a LOWER BOUND; see CT-source investigation."
+  }
+}
