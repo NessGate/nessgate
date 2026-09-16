@@ -5,7 +5,7 @@
 // Run with `npm run test:compat`. (Layer 1, official schemas/vectors, arrives in M2.)
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { validateProbeContent, probeShapeOk, normalizeResources } from "../packages/resolver/index.mjs";
+import { validateProbeContent, probeShapeOk, normalizeResources, detectOpenApi } from "../packages/resolver/index.mjs";
 import { levelFor } from "../packages/resolver/v2.mjs";
 
 let failed = 0, ran = 0;
@@ -29,6 +29,19 @@ for (const file of files) {
   let fx;
   try { fx = JSON.parse(readFileSync(file, "utf8")); } catch { failed++; console.error(`FAIL  ${file}: unreadable`); continue; }
   const { id, protocol, kind, input, expect } = fx;
+
+  // Detector fixtures (e.g. OpenAPI bounded-prefix detection).
+  if (fx.detect === "openapi") {
+    const d = detectOpenApi(input.body);
+    let match = !!d.ok === !!expect.ok;
+    if (match && expect.ok) {
+      if ("title" in expect) match = d.title === expect.title;
+      if (match && expect.truncated) match = d.truncated === true;
+    }
+    ok(match, `${id}: detectOpenApi → ${JSON.stringify({ ok: d.ok, title: d.title, truncated: d.truncated })} (${fx.notes || ""})`);
+    continue;
+  }
+
   const accepted = validateProbeContent(kind, input.body) && probeShapeOk(protocol, kind, input.body);
 
   if (expect && expect.reject) {

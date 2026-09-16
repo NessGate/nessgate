@@ -1,0 +1,18 @@
+{
+  "id": "openapi/3.0/detect-large-truncated",
+  "protocol": "openapi",
+  "version": "3.1",
+  "kind": "json",
+  "origin": "real-world",
+  "detect": "openapi",
+  "input": {
+    "url": "https://x.com/openapi.json",
+    "body": "{\"openapi\":\"3.1.0\",\"info\":{\"title\":\"Big API\",\"version\":\"1.0\",\"description\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"paths\":{\"/a\":{\"get\":{"
+  },
+  "expect": {
+    "ok": true,
+    "title": "Big API",
+    "truncated": true
+  },
+  "notes": "REGRESSION for the >1MB OpenAPI recall gap (vercel 10.8MB / posthog 6.5MB): detected from the bounded head even when the body is truncated"
+}

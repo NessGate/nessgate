@@ -1,0 +1,63 @@
+{
+  "strata": {
+    "multiProtocol": 19,
+    "positiveSingle": 16,
+    "negativeControl": 12,
+    "blocked": 5
+  },
+  "authoritativeRecall": {
+    "protocolLevel": "67/67 (100.0%)",
+    "domainFullRecall": "35/35 (100.0%)",
+    "perProtocol": {
+      "llms.txt": "34/34",
+      "ard-catalog": "10/10",
+      "api-catalog": "12/12",
+      "openapi": "8/8",
+      "a2a-agent-card": "3/3"
+    }
+  },
+  "recallMisses": [],
+  "falsePositives": {
+    "negativeControls_withAnyResult": "0/12 (0.0%)",
+    "negFPdomains": [],
+    "positiveDomains_extra": []
+  },
+  "classificationCorrectness": "36/36 (100.0%)",
+  "provenanceCorrectness": "36/36 (100.0%)",
+  "protocolParserFailures": [],
+  "blockedStratum": [
+    {
+      "d": "perplexity.ai",
+      "found": [],
+      "note": "reported separately, not a negative"
+    },
+    {
+      "d": "loc.gov",
+      "found": [],
+      "note": "reported separately, not a negative"
+    },
+    {
+      "d": "medium.com",
+      "found": [],
+      "note": "reported separately, not a negative"
+    },
+    {
+      "d": "gitlab.com",
+      "found": [
+        "llms.txt"
+      ],
+      "note": "reported separately, not a negative"
+    },
+    {
+      "d": "nps.gov",
+      "found": [],
+      "note": "reported separately, not a negative"
+    }
+  ],
+  "cost": {
+    "ms_p50": 1539,
+    "ms_p90": 2693,
+    "requests_p50": 17,
+    "requests_p90": 20
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "id": "openapi/3.0/detect-small-full",
+  "protocol": "openapi",
+  "version": "3.0",
+  "kind": "json",
+  "origin": "synthetic",
+  "detect": "openapi",
+  "input": {
+    "url": "https://x.com/openapi.json",
+    "body": "{\"openapi\":\"3.0.0\",\"info\":{\"title\":\"Acme API\"},\"paths\":{}}"
+  },
+  "expect": {
+    "ok": true,
+    "title": "Acme API"
+  },
+  "notes": "small fully-parseable spec"
+}

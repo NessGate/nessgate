@@ -46,6 +46,12 @@ export const ADAPTERS = [
 const MAX_DISCOVER_RESOURCES = 200;
 const MAX_PER_SOURCE = 50;
 const MAX_LINKED_CATALOGS = 5;
+// OpenAPI specs are frequently multi-MB, but detection (the openapi/swagger
+// version marker) and our pointer-only record (info.title) live in the document
+// HEAD. Read only a bounded prefix so a large spec is found without downloading
+// or parsing megabytes. Separate from the generic 1 MB document cap so we do
+// not loosen limits for every other protocol.
+const OPENAPI_PREFIX_BYTES = 65536;
 
 // Reject catch-all rewrites: SPA hosts return 200 + their HTML shell for every
 // path. (Identical to the reference resolver.)
@@ -322,11 +328,53 @@ async function fetchText(fetchImpl, url, timeoutMs, maxBytes) {
       headers: { Accept: "application/json, text/plain;q=0.9, */*;q=0.1", "User-Agent": "NessGate-Resolver/1.3" },
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
+    // Bounded read: never buffer more than maxBytes. Protects against huge/hostile
+    // bodies and respects size without downloading the whole document (a
+    // multi-MB spec is truncated to the cap rather than throwing). Streams when
+    // the runtime exposes a body reader; falls back to a bounded slice otherwise.
+    const reader = res.body && typeof res.body.getReader === "function" ? res.body.getReader() : null;
+    if (reader) {
+      const chunks = [];
+      let size = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        size += value.length;
+        if (size >= maxBytes) { try { await reader.cancel(); } catch {} break; }
+      }
+      const buf = new Uint8Array(size);
+      let off = 0;
+      for (const c of chunks) { buf.set(c, off); off += c.length; }
+      return new TextDecoder().decode(size > maxBytes ? buf.subarray(0, maxBytes) : buf);
+    }
     const text = await res.text();
-    if (text.length > maxBytes) throw new Error("too large");
-    return text;
+    return text.length > maxBytes ? text.slice(0, maxBytes) : text;
   } finally {
     clearTimeout(timer);
+  }
+}
+
+// OpenAPI detection from a (possibly truncated) document HEAD. A small spec is
+// parsed authoritatively; a large one — read only as a bounded prefix — is
+// confirmed by the version marker that conventionally opens the document, so a
+// 10 MB spec is detected from its first bytes. Pointer-only: we never need the
+// full paths object. Rejects non-JSON (e.g. an HTML wrong-content-type page).
+export function detectOpenApi(text) {
+  if (typeof text !== "string" || !text) return { ok: false };
+  try {
+    const o = JSON.parse(text);
+    if (o && typeof o === "object" && (typeof o.openapi === "string" || typeof o.swagger === "string")) {
+      return { ok: true, title: o.info && typeof o.info.title === "string" ? o.info.title : undefined };
+    }
+    return { ok: false };
+  } catch {
+    // Truncated (large) document: tolerant head scan of the prefix only.
+    if (!/^﻿?\s*\{/.test(text)) return { ok: false }; // must look like a JSON object
+    const ver = /"(?:openapi|swagger)"\s*:\s*"(\d[^"]*)"/.exec(text);
+    if (!ver) return { ok: false };
+    const title = /"title"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(text);
+    return { ok: true, title: title ? title[1] : undefined, truncated: true };
   }
 }
 
@@ -365,10 +413,19 @@ async function runAdapter(a, domain, fetchImpl, timeoutMs, maxBytes) {
   try {
     if (a.channel === "well-known") {
       for (const path of a.paths) {
+        const url = "https://" + domain + path;
+        // OpenAPI: read a bounded prefix and detect from the head, so large specs
+        // (multi-MB) are found without downloading/parsing the whole document.
+        if (a.id === "openapi") {
+          let text;
+          try { text = await fetchText(fetchImpl, url, timeoutMs, OPENAPI_PREFIX_BYTES); } catch { continue; }
+          const det = detectOpenApi(text);
+          if (det.ok) return { discovered: [{ type: a.id, url }], resources: [{ source: "openapi", sourceUrl: url, type: "openapi", name: det.title, url }] };
+          continue;
+        }
         let text;
         try { text = await get(path); } catch { continue; }
         if (validateProbeContent(a.kind, text) && probeShapeOk(a.id, a.kind, text)) {
-          const url = "https://" + domain + path;
           return { discovered: [{ type: a.id, url }], resources: normalizeResources(a.id, a.kind, text, url) };
         }
       }
@@ -525,4 +582,4 @@ export function sameRegCanonicalHost(finalUrl, domain) {
   return h.endsWith("." + domain) ? h : null;
 }
 
-export default { resolve, normalizeResources, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, ADAPTERS };
+export default { resolve, normalizeResources, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, ADAPTERS };

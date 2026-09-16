@@ -3,10 +3,10 @@
   "protocols": 13,
   "protocolVersions": 17,
   "adapters": 14,
-  "fixtures": 21,
-  "positiveFixtures": 14,
+  "fixtures": 25,
+  "positiveFixtures": 18,
   "rejectFixtures": 7,
-  "realWorldFixtures": 1,
+  "realWorldFixtures": 2,
   "officialVectorsPassing": 0,
   "distinctQuirksHandled": 7,
   "note": "unseen-domain metrics live in benchmarks/unseen-baseline-analysis.json (separate ruler). No confidence scores anywhere."

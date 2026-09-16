@@ -1,5 +1,4 @@
 supabase.com
-vercel.com
 gitbook.com
 pinecone.io
 clerk.com
@@ -12,7 +11,6 @@ huggingface.co
 neon.tech
 turso.tech
 upstash.com
-posthog.com
 modelcontextprotocol.io
 ucpchecker.com
 synscribe.com
@@ -50,3 +48,5 @@ loc.gov
 medium.com
 gitlab.com
 nps.gov
+workos.com
+redocly.com

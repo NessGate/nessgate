@@ -19,6 +19,10 @@
 
 const FETCH_TIMEOUT_MS = 8000;
 const MAX_JSON_BYTES = 1_000_000; // 1 MB cap on any fetched document
+// OpenAPI specs are frequently multi-MB, but detection + our pointer-only record
+// live in the document HEAD, so we read only a bounded prefix for /openapi.json —
+// separate from the generic cap, so other protocols keep the 1 MB limit.
+const OPENAPI_PREFIX_BYTES = 65536;
 const MAX_REDIRECTS = 3;
 const HSTS = "max-age=31536000; includeSubDomains";
 
@@ -584,14 +588,51 @@ function normalizeResources(type, kind, text, sourceUrl) {
 // human-readable domain page so all three can never disagree.
 // Run one adapter over its channel and return {discovered, resources}. Every
 // failure collapses to [] so a single bad channel never breaks resolution.
+// OpenAPI detection from a (possibly truncated) document HEAD — byte-for-byte
+// the same logic as the embeddable library (packages/resolver, public/resolver.mjs).
+// A small spec is parsed authoritatively; a large one is confirmed by the version
+// marker that opens the document, so a multi-MB spec is found from its first bytes.
+export function detectOpenApi(text) {
+  if (typeof text !== "string" || !text) return { ok: false };
+  try {
+    const o = JSON.parse(text);
+    if (o && typeof o === "object" && (typeof o.openapi === "string" || typeof o.swagger === "string")) {
+      return { ok: true, title: o.info && typeof o.info.title === "string" ? o.info.title : undefined };
+    }
+    return { ok: false };
+  } catch {
+    if (!/^﻿?\s*\{/.test(text)) return { ok: false };
+    const ver = /"(?:openapi|swagger)"\s*:\s*"(\d[^"]*)"/.exec(text);
+    if (!ver) return { ok: false };
+    const title = /"title"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(text);
+    return { ok: true, title: title ? title[1] : undefined, truncated: true };
+  }
+}
+
+// Fetch a bounded prefix of an on-domain document (for OpenAPI: read only the
+// head, truncating at the cap instead of failing on a huge body).
+async function getOnDomainPrefix(domain, path, env, ctx, prefixBytes) {
+  if (domain === SELF_DOMAIN) return getOnDomain(domain, path, env, ctx); // self docs are small
+  return safeFetch(`https://${domain}${path}`, domain, prefixBytes, false, DISCOVER_UA, false, false, true);
+}
+
 async function runAdapter(a, domain, env, ctx) {
   try {
     if (a.channel === "well-known") {
       for (const path of a.paths) {
+        const url = `https://${domain}${path}`;
+        // OpenAPI: bounded-prefix read + head detection, so large specs are found
+        // without downloading/parsing megabytes.
+        if (a.id === "openapi") {
+          let text;
+          try { text = await getOnDomainPrefix(domain, path, env, ctx, OPENAPI_PREFIX_BYTES); } catch { continue; }
+          const det = detectOpenApi(text);
+          if (det.ok) return { discovered: [{ type: a.id, url }], resources: [{ source: "openapi", sourceUrl: url, type: "openapi", name: det.title, url }] };
+          continue;
+        }
         let text;
         try { text = await getOnDomain(domain, path, env, ctx); } catch { continue; }
         if (validateProbeContent(a.kind, text) && probeShapeOk(a.id, a.kind, text)) {
-          const url = `https://${domain}${path}`;
           return { discovered: [{ type: a.id, url }], resources: normalizeResources(a.id, a.kind, text, url) };
         }
       }
@@ -1629,7 +1670,7 @@ function hostAllowedForDomain(host, domain) {
 // Fetch constrained to the target domain: HTTPS only, public DNS only,
 // redirects kept on-domain, capped size, short timeout. With strictHosts,
 // every hop (including redirects) must stay on the apex of the domain.
-async function safeFetch(url, allowedDomain, maxBytes, strictHosts = false, userAgent = "NessGate-Discover/1.0 (+https://nessgate.com)", allowCrossHost = false, returnMeta = false) {
+async function safeFetch(url, allowedDomain, maxBytes, strictHosts = false, userAgent = "NessGate-Discover/1.0 (+https://nessgate.com)", allowCrossHost = false, returnMeta = false, truncateAtCap = false) {
   let current = url;
   const redirectChain = []; // every validated URL actually fetched, in order
   const hosts = new Set(); // every host touched, including via redirects
@@ -1683,15 +1724,19 @@ async function safeFetch(url, allowedDomain, maxBytes, strictHosts = false, user
     const reader = res.body.getReader();
     const chunks = [];
     let size = 0;
+    let capped = false;
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
+      chunks.push(value);
       size += value.length;
-      if (size > maxBytes) {
+      if (size >= maxBytes) {
+        // truncateAtCap (OpenAPI prefix reads): stop and keep the bounded head
+        // instead of failing on a legitimately huge document.
+        if (truncateAtCap) { capped = true; try { await reader.cancel(); } catch {} break; }
         await reader.cancel();
         throw new Error("the response is too large");
       }
-      chunks.push(value);
     }
     const buf = new Uint8Array(size);
     let off = 0;
@@ -1699,7 +1744,7 @@ async function safeFetch(url, allowedDomain, maxBytes, strictHosts = false, user
       buf.set(c, off);
       off += c.length;
     }
-    const text = new TextDecoder().decode(buf);
+    const text = new TextDecoder().decode(capped && size > maxBytes ? buf.subarray(0, maxBytes) : buf);
     // Explore mode needs the final URL (redirects can move content to another
     // host), every host touched (so redirect hosts count against the budget) and
     // the byte count (for the global byte budget). /discover callers get the

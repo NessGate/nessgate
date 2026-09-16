@@ -1,0 +1,15 @@
+{
+  "id": "openapi/reject/detect-no-marker",
+  "protocol": "openapi",
+  "kind": "json",
+  "origin": "synthetic",
+  "detect": "openapi",
+  "input": {
+    "url": "https://x.com/openapi.json",
+    "body": "{\"hello\":\"world\",\"paths\":{}}"
+  },
+  "expect": {
+    "ok": false
+  },
+  "notes": "JSON object without openapi/swagger marker → rejected"
+}
