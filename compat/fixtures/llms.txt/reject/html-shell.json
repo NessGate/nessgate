@@ -1,0 +1,14 @@
+{
+  "id": "llms.txt/reject/html-shell",
+  "protocol": "llms.txt",
+  "kind": "text",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/probe",
+    "body": "<!DOCTYPE html><html><head><title>SPA</title></head><body></body></html>"
+  },
+  "expect": {
+    "reject": true
+  },
+  "notes": "SPA HTML shell served for every path must not pass as llms.txt"
+}

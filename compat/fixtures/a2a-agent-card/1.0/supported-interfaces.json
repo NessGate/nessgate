@@ -1,0 +1,23 @@
+{
+  "id": "a2a-agent-card/1.0/supported-interfaces",
+  "protocol": "a2a-agent-card",
+  "version": "1.0",
+  "surface": "/.well-known/agent-card.json",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/.well-known/agent-card.json",
+    "body": "{\"name\":\"Ag\",\"supportedInterfaces\":[{\"url\":\"https://x.com/a2a\",\"transport\":\"JSONRPC\"}]}"
+  },
+  "expect": {
+    "relationship": "publisher-hosted",
+    "level": 1,
+    "resources": [
+      {
+        "source": "a2a-agent-card",
+        "url": "https://x.com/a2a"
+      }
+    ]
+  },
+  "notes": "A2A v1.0: url from supportedInterfaces[0]"
+}

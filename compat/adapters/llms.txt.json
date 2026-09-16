@@ -1,0 +1,20 @@
+{
+  "id": "llms.txt",
+  "channel": "well-known",
+  "surfaces": [
+    "/llms.txt"
+  ],
+  "versions": [
+    "1.0"
+  ],
+  "authority": "publisher-hosted",
+  "canEstablishAuthority": true,
+  "normalizeAs": "llms.txt",
+  "provenanceRequired": true,
+  "officialSuite": null,
+  "deviations": [],
+  "fixtures": [
+    "llms.txt/1.0/pointer",
+    "llms.txt/reject/html-shell"
+  ]
+}

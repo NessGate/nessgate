@@ -1,0 +1,29 @@
+{
+  "id": "awp/draft/protocols-object-and-string",
+  "protocol": "awp",
+  "version": "draft",
+  "surface": "/.well-known/awp.json",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/.well-known/awp.json",
+    "body": "{\"protocols\":{\"mcp\":{\"url\":\"https://mcp.x.com\"},\"a2a\":\"https://x.com/.well-known/agent.json\"}}"
+  },
+  "expect": {
+    "relationship": "publisher-hosted",
+    "level": 1,
+    "resources": [
+      {
+        "source": "awp",
+        "type": "mcp",
+        "url": "https://mcp.x.com"
+      },
+      {
+        "source": "awp",
+        "type": "a2a",
+        "url": "https://x.com/.well-known/agent.json"
+      }
+    ]
+  },
+  "notes": "object-form and string-form protocol entries both extracted"
+}

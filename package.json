@@ -6,8 +6,11 @@
     "deploy": "node scripts/deploy.mjs",
     "test": "node scripts/test.mjs",
     "test:v2": "node scripts/test-v2.mjs",
+    "test:compat": "node scripts/test-compat.mjs",
+    "compat:matrix": "node scripts/compat-matrix.mjs",
+    "bench:unseen": "node scripts/../benchmarks/bench-unseen.mjs benchmarks/unseen-latest.jsonl",
     "smoke": "node scripts/smoke.mjs",
-    "check": "node scripts/test.mjs && node scripts/smoke.mjs",
+    "check": "node scripts/test.mjs && node scripts/test-v2.mjs && node scripts/test-compat.mjs && node scripts/compat-matrix.mjs && node scripts/smoke.mjs",
     "rollback": "wrangler rollback"
   },
   "devDependencies": {

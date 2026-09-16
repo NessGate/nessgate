@@ -1,0 +1,26 @@
+{
+  "id": "ard-catalog/0.91/basic-url-entry",
+  "protocol": "ard-catalog",
+  "version": "0.91",
+  "surface": "/.well-known/ard.json",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/.well-known/ard.json",
+    "body": "{\"entries\":[{\"identifier\":\"urn:air:x.com:n:r-1\",\"displayName\":\"Data\",\"type\":\"application/json\",\"url\":\"https://x.com/a.json\"},{\"displayName\":\"no url\"}]}"
+  },
+  "expect": {
+    "verification": "verified",
+    "relationship": "publisher-hosted",
+    "level": 1,
+    "resources": [
+      {
+        "source": "ard-catalog",
+        "type": "application/json",
+        "url": "https://x.com/a.json",
+        "id": "urn:air:x.com:n:r-1"
+      }
+    ]
+  },
+  "notes": "only entries with a url; source media type reused; identifier preserved"
+}

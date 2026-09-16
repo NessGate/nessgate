@@ -1,0 +1,17 @@
+{
+  "id": "ai-info.json",
+  "channel": "well-known",
+  "surfaces": [
+    "/ai-info.json"
+  ],
+  "versions": [
+    "draft"
+  ],
+  "authority": "publisher-hosted",
+  "canEstablishAuthority": true,
+  "normalizeAs": "ai-info.json",
+  "provenanceRequired": true,
+  "officialSuite": null,
+  "deviations": [],
+  "fixtures": []
+}

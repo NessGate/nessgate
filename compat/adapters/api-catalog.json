@@ -1,0 +1,20 @@
+{
+  "id": "api-catalog",
+  "channel": "well-known",
+  "surfaces": [
+    "/.well-known/api-catalog"
+  ],
+  "versions": [
+    "rfc9727"
+  ],
+  "authority": "publisher-hosted",
+  "canEstablishAuthority": true,
+  "normalizeAs": "api-catalog",
+  "provenanceRequired": true,
+  "officialSuite": null,
+  "deviations": [],
+  "fixtures": [
+    "api-catalog/rfc9727/linkset-service-desc",
+    "api-catalog/reject/no-linkset"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "id": "ard-catalog",
+  "channel": "well-known",
+  "surfaces": [
+    "/.well-known/ard.json",
+    "/.well-known/ai-catalog.json"
+  ],
+  "versions": [
+    "0.91"
+  ],
+  "authority": "publisher-hosted",
+  "canEstablishAuthority": true,
+  "normalizeAs": "ard-catalog",
+  "provenanceRequired": true,
+  "officialSuite": null,
+  "deviations": [],
+  "fixtures": [
+    "ard-catalog/0.91/basic-url-entry",
+    "ard-catalog/0.91/inline-data-entry",
+    "ard-catalog/reject/catch-all-empty",
+    "ard-catalog/reject/malformed-json"
+  ]
+}

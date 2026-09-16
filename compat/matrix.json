@@ -1,0 +1,259 @@
+{
+  "llms.txt": {
+    "1.0": {
+      "surfaces": [
+        "/llms.txt"
+      ],
+      "parser": "normalizeResources('llms.txt')",
+      "authority": "publisher-hosted (Level 1) — the domain's own surface",
+      "officialSuite": null,
+      "deviations": [],
+      "fixtures": [
+        "llms.txt/1.0/pointer",
+        "llms.txt/reject/html-shell"
+      ]
+    }
+  },
+  "ard-catalog": {
+    "0.91": {
+      "surfaces": [
+        "robots agentmap:"
+      ],
+      "parser": "normalizeResources('ard-catalog')",
+      "authority": "publisher-hosted (Level 1) — the domain's own surface",
+      "officialSuite": null,
+      "deviations": [],
+      "fixtures": [
+        "ard-catalog/0.91/basic-url-entry",
+        "ard-catalog/0.91/inline-data-entry",
+        "ard-catalog/reject/catch-all-empty",
+        "ard-catalog/reject/malformed-json"
+      ]
+    }
+  },
+  "a2a-agent-card": {
+    "1.0": {
+      "surfaces": [
+        "/.well-known/agent-card.json",
+        "/.well-known/agent.json"
+      ],
+      "parser": "normalizeResources('a2a-agent-card')",
+      "authority": "publisher-hosted (Level 1) — the domain's own surface",
+      "officialSuite": null,
+      "deviations": [],
+      "fixtures": [
+        "a2a-agent-card/1.0/supported-interfaces",
+        "a2a-agent-card/legacy/top-level-url",
+        "gbz-185-4/2.2/acs-at-agent-card",
+        "a2a-agent-card/reject/empty"
+      ]
+    },
+    "legacy": {
+      "surfaces": [
+        "/.well-known/agent-card.json",
+        "/.well-known/agent.json"
+      ],
+      "parser": "normalizeResources('a2a-agent-card')",
+      "authority": "publisher-hosted (Level 1) — the domain's own surface",
+      "officialSuite": null,
+      "deviations": [],
+      "fixtures": [
+        "a2a-agent-card/1.0/supported-interfaces",
+        "a2a-agent-card/legacy/top-level-url",
+        "gbz-185-4/2.2/acs-at-agent-card",
+        "a2a-agent-card/reject/empty"
+      ]
+    },
+    "gbz-185-4": {
+      "surfaces": [
+        "/.well-known/agent-card.json",
+        "/.well-known/agent.json"
+      ],
+      "parser": "normalizeResources('a2a-agent-card')",
+      "authority": "publisher-hosted (Level 1) — the domain's own surface",
+      "officialSuite": null,
+      "deviations": [],
+      "fixtures": [
+        "a2a-agent-card/1.0/supported-interfaces",
+        "a2a-agent-card/legacy/top-level-url",
+        "gbz-185-4/2.2/acs-at-agent-card",
+        "a2a-agent-card/reject/empty"
+      ]
+    }
+  },
+  "api-catalog": {
+    "rfc9727": {
+      "surfaces": [
+        "/.well-known/api-catalog"
+      ],
+      "parser": "normalizeResources('api-catalog')",
+      "authority": "publisher-hosted (Level 1) — the domain's own surface",
+      "officialSuite": null,
+      "deviations": [],
+      "fixtures": [
+        "api-catalog/rfc9727/linkset-service-desc",
+        "api-catalog/reject/no-linkset"
+      ]
+    }
+  },
+  "ai-info.json": {
+    "draft": {
+      "surfaces": [
+        "/ai-info.json"
+      ],
+      "parser": "normalizeResources('ai-info.json')",
+      "authority": "publisher-hosted (Level 1) — the domain's own surface",
+      "officialSuite": null,
+      "deviations": [],
+      "fixtures": []
+    }
+  },
+  "openapi": {
+    "3.0": {
+      "surfaces": [
+        "/openapi.json"
+      ],
+      "parser": "normalizeResources('openapi')",
+      "authority": "publisher-hosted (Level 1) — the domain's own surface",
+      "officialSuite": null,
+      "deviations": [
+        "specs >1MB exceed the resolver maxBytes cap and are currently missed (see benchmarks/V2-ALPHA-REPORT-... ; fix will add a resolve-level fixture per the corpus rule)"
+      ],
+      "fixtures": [
+        "openapi/3.0/basic",
+        "openapi/reject/no-openapi-field"
+      ]
+    },
+    "3.1": {
+      "surfaces": [
+        "/openapi.json"
+      ],
+      "parser": "normalizeResources('openapi')",
+      "authority": "publisher-hosted (Level 1) — the domain's own surface",
+      "officialSuite": null,
+      "deviations": [
+        "specs >1MB exceed the resolver maxBytes cap and are currently missed (see benchmarks/V2-ALPHA-REPORT-... ; fix will add a resolve-level fixture per the corpus rule)"
+      ],
+      "fixtures": [
+        "openapi/3.0/basic",
+        "openapi/reject/no-openapi-field"
+      ]
+    },
+    "2.0": {
+      "surfaces": [
+        "/openapi.json"
+      ],
+      "parser": "normalizeResources('openapi')",
+      "authority": "publisher-hosted (Level 1) — the domain's own surface",
+      "officialSuite": null,
+      "deviations": [
+        "specs >1MB exceed the resolver maxBytes cap and are currently missed (see benchmarks/V2-ALPHA-REPORT-... ; fix will add a resolve-level fixture per the corpus rule)"
+      ],
+      "fixtures": [
+        "openapi/3.0/basic",
+        "openapi/reject/no-openapi-field"
+      ]
+    }
+  },
+  "ord": {
+    "1": {
+      "surfaces": [
+        "/.well-known/open-resource-discovery"
+      ],
+      "parser": "normalizeResources('ord')",
+      "authority": "publisher-hosted (Level 1) — the domain's own surface",
+      "officialSuite": null,
+      "deviations": [],
+      "fixtures": [
+        "ord/1/pointer"
+      ]
+    }
+  },
+  "awp": {
+    "draft": {
+      "surfaces": [
+        "/.well-known/awp.json"
+      ],
+      "parser": "normalizeResources('awp')",
+      "authority": "publisher-hosted (Level 1) — the domain's own surface",
+      "officialSuite": null,
+      "deviations": [],
+      "fixtures": [
+        "awp/draft/protocols-object-and-string"
+      ]
+    }
+  },
+  "host-meta": {
+    "rfc6415": {
+      "surfaces": [
+        "/.well-known/host-meta.json"
+      ],
+      "parser": "normalizeResources('host-meta')",
+      "authority": "publisher-hosted (Level 1) — the domain's own surface",
+      "officialSuite": null,
+      "deviations": [],
+      "fixtures": [
+        "host-meta/rfc6415/links"
+      ]
+    }
+  },
+  "anp": {
+    "draft": {
+      "surfaces": [
+        "/.well-known/agent-descriptions"
+      ],
+      "parser": "normalizeResources('anp')",
+      "authority": "publisher-hosted (Level 1) — the domain's own surface",
+      "officialSuite": null,
+      "deviations": [],
+      "fixtures": [
+        "anp/draft/collectionpage-items"
+      ]
+    }
+  },
+  "ucp": {
+    "2026-01": {
+      "surfaces": [
+        "/.well-known/ucp",
+        "/.well-known/ucp/manifest.json"
+      ],
+      "parser": "normalizeResources('ucp')",
+      "authority": "publisher-hosted (Level 1) — the domain's own surface",
+      "officialSuite": null,
+      "deviations": [],
+      "fixtures": [
+        "ucp/2026-01/capabilities-transports",
+        "ucp/2026-01/no-endpoints-points-to-profile",
+        "ucp/reject/catch-all"
+      ]
+    }
+  },
+  "aid": {
+    "aid1": {
+      "surfaces": [
+        "DNS TXT _agent"
+      ],
+      "parser": "normalizeResources('aid')",
+      "authority": "publisher-hosted (Level 1) — the domain's own surface",
+      "officialSuite": null,
+      "deviations": [],
+      "fixtures": []
+    }
+  },
+  "gbz-185-4": {
+    "2.2": {
+      "surfaces": [
+        "/.well-known/agent-card.json (content-recognized)"
+      ],
+      "parser": "normalizeResources('gbz-185-4') / isAcs",
+      "authority": "publisher-hosted (Level 1)",
+      "officialSuite": null,
+      "deviations": [
+        "recognized by content (aic / certificate.requestedValidity), never a guessed path"
+      ],
+      "fixtures": [
+        "gbz-185-4/2.2/acs-at-agent-card"
+      ]
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "id": "a2a-agent-card",
+  "channel": "well-known",
+  "surfaces": [
+    "/.well-known/agent-card.json",
+    "/.well-known/agent.json"
+  ],
+  "versions": [
+    "1.0",
+    "legacy",
+    "gbz-185-4"
+  ],
+  "authority": "publisher-hosted",
+  "canEstablishAuthority": true,
+  "normalizeAs": "a2a-agent-card",
+  "provenanceRequired": true,
+  "officialSuite": null,
+  "deviations": [],
+  "fixtures": [
+    "a2a-agent-card/1.0/supported-interfaces",
+    "a2a-agent-card/legacy/top-level-url",
+    "gbz-185-4/2.2/acs-at-agent-card",
+    "a2a-agent-card/reject/empty"
+  ]
+}

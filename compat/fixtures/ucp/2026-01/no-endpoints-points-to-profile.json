@@ -1,0 +1,23 @@
+{
+  "id": "ucp/2026-01/no-endpoints-points-to-profile",
+  "protocol": "ucp",
+  "version": "2026-01",
+  "surface": "/.well-known/ucp",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/.well-known/ucp",
+    "body": "{\"ucp_version\":\"2026-01\",\"capabilities\":[]}"
+  },
+  "expect": {
+    "relationship": "publisher-hosted",
+    "level": 1,
+    "resources": [
+      {
+        "source": "ucp",
+        "url": "https://x.com/.well-known/ucp"
+      }
+    ]
+  },
+  "notes": "no endpoints → points to the profile"
+}

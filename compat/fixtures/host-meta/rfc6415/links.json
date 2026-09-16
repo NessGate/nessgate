@@ -1,0 +1,25 @@
+{
+  "id": "host-meta/rfc6415/links",
+  "protocol": "host-meta",
+  "version": "rfc6415",
+  "surface": "/.well-known/host-meta.json",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/.well-known/host-meta.json",
+    "body": "{\"links\":[{\"rel\":\"hub\",\"type\":\"application/json\",\"href\":\"https://x.com/h\"},{\"rel\":\"noHref\"}]}"
+  },
+  "expect": {
+    "relationship": "publisher-hosted",
+    "level": 1,
+    "resources": [
+      {
+        "source": "host-meta",
+        "type": "application/json",
+        "rel": "hub",
+        "url": "https://x.com/h"
+      }
+    ]
+  },
+  "notes": "legacy RFC 6415; only links with href; rel/type reused"
+}

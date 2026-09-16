@@ -1,0 +1,17 @@
+{
+  "id": "aid",
+  "channel": "dns",
+  "surfaces": [
+    "DNS TXT _agent"
+  ],
+  "versions": [
+    "aid1"
+  ],
+  "authority": "publisher-hosted",
+  "canEstablishAuthority": true,
+  "normalizeAs": "aid",
+  "provenanceRequired": true,
+  "officialSuite": null,
+  "deviations": [],
+  "fixtures": []
+}

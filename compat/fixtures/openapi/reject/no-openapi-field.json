@@ -1,0 +1,14 @@
+{
+  "id": "openapi/reject/no-openapi-field",
+  "protocol": "openapi",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/probe",
+    "body": "{\"hello\":\"world\"}"
+  },
+  "expect": {
+    "reject": true
+  },
+  "notes": "generic JSON without openapi/swagger → rejected"
+}

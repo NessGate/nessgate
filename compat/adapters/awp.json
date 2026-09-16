@@ -1,0 +1,19 @@
+{
+  "id": "awp",
+  "channel": "well-known",
+  "surfaces": [
+    "/.well-known/awp.json"
+  ],
+  "versions": [
+    "draft"
+  ],
+  "authority": "publisher-hosted",
+  "canEstablishAuthority": true,
+  "normalizeAs": "awp",
+  "provenanceRequired": true,
+  "officialSuite": null,
+  "deviations": [],
+  "fixtures": [
+    "awp/draft/protocols-object-and-string"
+  ]
+}

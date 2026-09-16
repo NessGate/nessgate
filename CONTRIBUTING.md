@@ -53,10 +53,22 @@ Each standard NessGate reads is a small, independent **adapter** on one of four 
 5. Add a conformance test (a sample document → expected records) and update the docs that list the
    supported set: `README.md`, the spec/api pages under `public/`, `public/openapi.json`
    (`checked[]`), `public/llms.txt`, and `public/ai-info.json`.
-6. `npm test` and `npm run smoke` must pass.
+6. **Add compatibility corpus entries** in `compat/`: an adapter manifest (`compat/adapters/<id>.json`),
+   a matrix entry (`compat/matrix.json`), and at least one `positive` and one `reject` fixture under
+   `compat/fixtures/`. See `compat/README.md`.
+7. `npm run check` must pass (regression + v2 + compatibility corpus + matrix consistency + smoke).
 
 New standards are **outputs of the architecture, never competitors** — a new adapter, not a new
 format NessGate defines.
+
+## The compatibility rule (non-negotiable)
+
+> **Never fix a compatibility problem only in code. Every real compatibility fix MUST add a
+> permanent regression fixture in `compat/fixtures/`.** A code fix without a fixture fails review.
+
+This is what makes the corpus a durable moat rather than a pile of one-off patches. If an unseen
+domain (see `benchmarks/holdout-unseen.json`) teaches a fix, turn it into a fixture and replace it
+in the holdout with a fresh unseen domain — never tune against the holdout.
 
 ## Independent implementations
 You do not need to contribute here to use the specification. Anyone may build a

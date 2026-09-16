@@ -1,0 +1,29 @@
+{
+  "id": "ucp/2026-01/capabilities-transports",
+  "protocol": "ucp",
+  "version": "2026-01",
+  "surface": "/.well-known/ucp",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/.well-known/ucp",
+    "body": "{\"ucp_version\":\"2026-01\",\"capabilities\":[{\"name\":\"checkout\",\"transports\":[{\"type\":\"mcp\",\"url\":\"https://x.com/mcp\"},{\"type\":\"rest\",\"endpoint\":\"https://x.com/api\"}]}]}"
+  },
+  "expect": {
+    "relationship": "publisher-hosted",
+    "level": 1,
+    "resources": [
+      {
+        "source": "ucp",
+        "type": "mcp",
+        "url": "https://x.com/mcp"
+      },
+      {
+        "source": "ucp",
+        "type": "rest",
+        "url": "https://x.com/api"
+      }
+    ]
+  },
+  "notes": "one record per transport binding; endpoint alias"
+}

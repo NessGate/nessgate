@@ -1,0 +1,14 @@
+{
+  "id": "ard-catalog/reject/malformed-json",
+  "protocol": "ard-catalog",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/probe",
+    "body": "{not json"
+  },
+  "expect": {
+    "reject": true
+  },
+  "notes": "malformed JSON → rejected, never throws"
+}

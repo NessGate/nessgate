@@ -1,0 +1,25 @@
+{
+  "id": "anp/draft/collectionpage-items",
+  "protocol": "anp",
+  "version": "draft",
+  "surface": "/.well-known/agent-descriptions",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/.well-known/agent-descriptions",
+    "body": "{\"@type\":\"CollectionPage\",\"items\":[{\"@type\":\"ad:AgentDescription\",\"name\":\"Bot\",\"@id\":\"https://x.com/agents/bot.json\"},{\"name\":\"no id\"}]}"
+  },
+  "expect": {
+    "relationship": "publisher-hosted",
+    "level": 1,
+    "resources": [
+      {
+        "source": "anp",
+        "type": "agent-description",
+        "name": "Bot",
+        "url": "https://x.com/agents/bot.json"
+      }
+    ]
+  },
+  "notes": "only items with @id; @id becomes url"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "api-catalog/rfc9727/linkset-service-desc",
+  "protocol": "api-catalog",
+  "version": "rfc9727",
+  "surface": "/.well-known/api-catalog",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/.well-known/api-catalog",
+    "body": "{\"linkset\":[{\"anchor\":\"https://x.com/api\",\"service-desc\":[{\"href\":\"https://x.com/openapi.json\",\"type\":\"application/openapi+json\"}]}]}"
+  },
+  "expect": {
+    "relationship": "publisher-hosted",
+    "level": 1,
+    "resources": [
+      {
+        "source": "api-catalog",
+        "rel": "service-desc",
+        "url": "https://x.com/openapi.json"
+      }
+    ]
+  },
+  "notes": "iterate rel arrays; scalar anchor skipped"
+}

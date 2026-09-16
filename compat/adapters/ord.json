@@ -1,0 +1,19 @@
+{
+  "id": "ord",
+  "channel": "well-known",
+  "surfaces": [
+    "/.well-known/open-resource-discovery"
+  ],
+  "versions": [
+    "1"
+  ],
+  "authority": "publisher-hosted",
+  "canEstablishAuthority": true,
+  "normalizeAs": "ord",
+  "provenanceRequired": true,
+  "officialSuite": null,
+  "deviations": [],
+  "fixtures": [
+    "ord/1/pointer"
+  ]
+}

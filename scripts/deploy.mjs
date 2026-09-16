@@ -8,13 +8,21 @@ if (execSync("git status --porcelain").toString().trim()) {
   console.error("ERROR: working tree has uncommitted changes. Commit first, then deploy.");
   process.exit(1);
 }
-// Hard pre-deployment gate: the full regression suite must pass locally
-// before anything ships. (Deploys run from this machine, not from GitHub,
-// so CI alone cannot gate them — this line is the actual gate.)
-const t = spawnSync("npm", ["test"], { stdio: "inherit", shell: true });
-if (t.status !== 0) {
-  console.error("ERROR: regression suite failed. Nothing was deployed.");
-  process.exit(1);
+// Hard pre-deployment gate: the full offline suite must pass locally before
+// anything ships. (Deploys run from this machine, not from GitHub, so CI alone
+// cannot gate them — this is the actual gate.) Regression + v2 alpha +
+// compatibility corpus + matrix consistency.
+for (const [label, args] of [
+  ["regression", ["test"]],
+  ["v2 alpha", ["run", "test:v2"]],
+  ["compatibility corpus", ["run", "test:compat"]],
+  ["matrix consistency", ["run", "compat:matrix"]],
+]) {
+  const t = spawnSync("npm", args, { stdio: "inherit", shell: true });
+  if (t.status !== 0) {
+    console.error(`ERROR: ${label} suite failed. Nothing was deployed.`);
+    process.exit(1);
+  }
 }
 const build = sha;
 console.log("Deploying build", build);

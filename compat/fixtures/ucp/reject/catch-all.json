@@ -1,0 +1,14 @@
+{
+  "id": "ucp/reject/catch-all",
+  "protocol": "ucp",
+  "kind": "json",
+  "origin": "real-world",
+  "input": {
+    "url": "https://x.com/probe",
+    "body": "{\"message\":\"not found\"}"
+  },
+  "expect": {
+    "reject": true
+  },
+  "notes": "real-world: a 200 JSON at /.well-known/ucp without capabilities/ucp_version (observed on ucpchecker.com) → rejected"
+}

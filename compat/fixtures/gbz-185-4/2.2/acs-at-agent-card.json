@@ -1,0 +1,24 @@
+{
+  "id": "gbz-185-4/2.2/acs-at-agent-card",
+  "protocol": "a2a-agent-card",
+  "version": "gbz-185-4",
+  "surface": "/.well-known/agent-card.json",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/.well-known/agent-card.json",
+    "body": "{\"aic\":\"urn:acps:001\",\"protocolVersion\":\"02.02\",\"name\":\"registry-service\",\"version\":\"2.2.0\",\"securitySchemes\":{\"mtls\":{\"type\":\"mutualTLS\"}},\"certificate\":{\"requestedValidity\":1825},\"endPoints\":[{\"url\":\"https://x.com/agent\"}],\"skills\":[]}"
+  },
+  "expect": {
+    "relationship": "publisher-hosted",
+    "level": 1,
+    "resources": [
+      {
+        "source": "gbz-185-4",
+        "type": "gbz-185-4-acs",
+        "url": "https://x.com/agent"
+      }
+    ]
+  },
+  "notes": "China GB/Z 185.4 ACS recognized by content at the agent-card location; labelled gbz-185-4 not A2A"
+}

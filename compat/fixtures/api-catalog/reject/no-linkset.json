@@ -1,0 +1,14 @@
+{
+  "id": "api-catalog/reject/no-linkset",
+  "protocol": "api-catalog",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/probe",
+    "body": "{\"data\":[]}"
+  },
+  "expect": {
+    "reject": true
+  },
+  "notes": "no linkset[] → rejected"
+}

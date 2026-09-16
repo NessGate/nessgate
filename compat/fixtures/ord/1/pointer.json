@@ -1,0 +1,24 @@
+{
+  "id": "ord/1/pointer",
+  "protocol": "ord",
+  "version": "1",
+  "surface": "/.well-known/open-resource-discovery",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/.well-known/open-resource-discovery",
+    "body": "{\"openResourceDiscoveryV1\":{}}"
+  },
+  "expect": {
+    "relationship": "publisher-hosted",
+    "level": 1,
+    "resources": [
+      {
+        "source": "ord",
+        "type": "ord",
+        "url": "https://x.com/.well-known/open-resource-discovery"
+      }
+    ]
+  },
+  "notes": "pointer only; no enterprise-schema interpretation"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "openapi/3.0/basic",
+  "protocol": "openapi",
+  "version": "3.0",
+  "surface": "/openapi.json",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/openapi.json",
+    "body": "{\"openapi\":\"3.0.0\",\"info\":{\"title\":\"Acme API\"},\"paths\":{}}"
+  },
+  "expect": {
+    "relationship": "publisher-hosted",
+    "level": 1,
+    "resources": [
+      {
+        "source": "openapi",
+        "type": "openapi",
+        "name": "Acme API",
+        "url": "https://x.com/openapi.json"
+      }
+    ]
+  },
+  "notes": "pointer; title surfaced as name"
+}

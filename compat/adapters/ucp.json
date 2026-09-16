@@ -1,0 +1,22 @@
+{
+  "id": "ucp",
+  "channel": "well-known",
+  "surfaces": [
+    "/.well-known/ucp",
+    "/.well-known/ucp/manifest.json"
+  ],
+  "versions": [
+    "2026-01"
+  ],
+  "authority": "publisher-hosted",
+  "canEstablishAuthority": true,
+  "normalizeAs": "ucp",
+  "provenanceRequired": true,
+  "officialSuite": null,
+  "deviations": [],
+  "fixtures": [
+    "ucp/2026-01/capabilities-transports",
+    "ucp/2026-01/no-endpoints-points-to-profile",
+    "ucp/reject/catch-all"
+  ]
+}

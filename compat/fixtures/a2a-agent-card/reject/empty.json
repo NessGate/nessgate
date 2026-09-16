@@ -1,0 +1,14 @@
+{
+  "id": "a2a-agent-card/reject/empty",
+  "protocol": "a2a-agent-card",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/probe",
+    "body": "{\"foo\":1}"
+  },
+  "expect": {
+    "reject": true
+  },
+  "notes": "no name/url/supportedInterfaces → rejected"
+}

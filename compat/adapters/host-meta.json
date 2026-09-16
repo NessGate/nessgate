@@ -1,0 +1,19 @@
+{
+  "id": "host-meta",
+  "channel": "well-known",
+  "surfaces": [
+    "/.well-known/host-meta.json"
+  ],
+  "versions": [
+    "rfc6415"
+  ],
+  "authority": "publisher-hosted",
+  "canEstablishAuthority": true,
+  "normalizeAs": "host-meta",
+  "provenanceRequired": true,
+  "officialSuite": null,
+  "deviations": [],
+  "fixtures": [
+    "host-meta/rfc6415/links"
+  ]
+}

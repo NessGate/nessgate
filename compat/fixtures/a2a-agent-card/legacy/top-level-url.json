@@ -1,0 +1,23 @@
+{
+  "id": "a2a-agent-card/legacy/top-level-url",
+  "protocol": "a2a-agent-card",
+  "version": "legacy",
+  "surface": "/.well-known/agent-card.json",
+  "kind": "json",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/.well-known/agent-card.json",
+    "body": "{\"name\":\"Ag\",\"url\":\"https://x.com/legacy\"}"
+  },
+  "expect": {
+    "relationship": "publisher-hosted",
+    "level": 1,
+    "resources": [
+      {
+        "source": "a2a-agent-card",
+        "url": "https://x.com/legacy"
+      }
+    ]
+  },
+  "notes": "legacy: explicit top-level url preferred"
+}

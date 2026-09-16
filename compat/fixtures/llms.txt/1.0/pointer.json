@@ -1,0 +1,23 @@
+{
+  "id": "llms.txt/1.0/pointer",
+  "protocol": "llms.txt",
+  "version": "1.0",
+  "surface": "/llms.txt",
+  "kind": "text",
+  "origin": "synthetic",
+  "input": {
+    "url": "https://x.com/llms.txt",
+    "body": "# Acme\n> stuff"
+  },
+  "expect": {
+    "relationship": "publisher-hosted",
+    "level": 1,
+    "resources": [
+      {
+        "source": "llms.txt",
+        "url": "https://x.com/llms.txt"
+      }
+    ]
+  },
+  "notes": "pointer standard: points to the file, prose not parsed"
+}

@@ -1,0 +1,19 @@
+{
+  "id": "anp",
+  "channel": "well-known",
+  "surfaces": [
+    "/.well-known/agent-descriptions"
+  ],
+  "versions": [
+    "draft"
+  ],
+  "authority": "publisher-hosted",
+  "canEstablishAuthority": true,
+  "normalizeAs": "anp",
+  "provenanceRequired": true,
+  "officialSuite": null,
+  "deviations": [],
+  "fixtures": [
+    "anp/draft/collectionpage-items"
+  ]
+}
