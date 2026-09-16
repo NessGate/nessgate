@@ -31,14 +31,11 @@ simple = { limit = 10, period = 60 }
 # per discovery call, no domains/bodies/IPs/identities. Aggregated only at query
 # time; Cloudflare samples and retains ~3 months. See scripts/mcp-metrics.mjs.
 #
-# PENDING ACTIVATION: Analytics Engine must be enabled on the account first
-# (dash.cloudflare.com/<account>/workers/analytics-engine — error 10089 until
-# then). The worker's recordDiscovery() guards on `env.METRICS`, so with this
-# binding commented out the metric is a safe no-op (no events, no errors).
-# Uncomment and redeploy once Analytics Engine is enabled to start collecting.
-# [[analytics_engine_datasets]]
-# binding = "METRICS"
-# dataset = "nessgate_discovery_v1"
+# The worker's recordDiscovery() guards on `env.METRICS`, so if this binding
+# is ever removed the metric degrades to a safe no-op (no events, no errors).
+[[analytics_engine_datasets]]
+binding = "METRICS"
+dataset = "nessgate_discovery_v1"
 
 # No D1, no cron, no secrets: NessGate is a stateless resolver. It reads what a
 # domain publishes on each request and stores nothing beyond the rate-limit
