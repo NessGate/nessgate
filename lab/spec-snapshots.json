@@ -1,0 +1,27 @@
+{
+  "openapi:https://raw.githubusercontent.com/OAI/learn.openapis.org/main/examples/v3.0/petstore.json": {
+    "hash": "d27ff28ca7d7795f",
+    "bytes": 4140,
+    "seen": "2026-09-16"
+  },
+  "api-catalog:https://www.rfc-editor.org/rfc/rfc9727.txt": {
+    "hash": "0443a555bae6a2dc",
+    "bytes": 33090,
+    "seen": "2026-09-16"
+  },
+  "host-meta:https://www.rfc-editor.org/rfc/rfc6415.txt": {
+    "hash": "6844be94c0281ba9",
+    "bytes": 32018,
+    "seen": "2026-09-16"
+  },
+  "ard-catalog:https://agenticresourcediscovery.org/ai_catalog_spec/": {
+    "hash": "0706ba0a563ae999",
+    "bytes": 462,
+    "seen": "2026-09-16"
+  },
+  "a2a-agent-card:https://a2a-protocol.org/latest/specification/": {
+    "hash": "4805254c10d8cbde",
+    "bytes": 617177,
+    "seen": "2026-09-16"
+  }
+}

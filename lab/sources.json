@@ -1,0 +1,10 @@
+{
+  "note": "Spec/schema/vendor sources the Lab watches for drift. Adding a protocol here means we intend to track its upstream and keep a conformance vector current. Not exhaustive of the ecosystem — only what we vendor or intend to.",
+  "sources": [
+    { "protocol": "openapi", "kind": "vendored-source", "url": "https://raw.githubusercontent.com/OAI/learn.openapis.org/main/examples/v3.0/petstore.json", "note": "OAI petstore — our vendored openapi 3.0 vector" },
+    { "protocol": "api-catalog", "kind": "spec", "url": "https://www.rfc-editor.org/rfc/rfc9727.txt", "note": "RFC 9727 (api-catalog); stable" },
+    { "protocol": "host-meta", "kind": "spec", "url": "https://www.rfc-editor.org/rfc/rfc6415.txt", "note": "RFC 6415 (host-meta); stable" },
+    { "protocol": "ard-catalog", "kind": "spec", "url": "https://agenticresourcediscovery.org/ai_catalog_spec/", "note": "ARD ai-catalog spec (draft; expect churn)" },
+    { "protocol": "a2a-agent-card", "kind": "spec", "url": "https://a2a-protocol.org/latest/specification/", "note": "A2A protocol spec (Linux Foundation)" }
+  ]
+}

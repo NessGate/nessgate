@@ -12,9 +12,10 @@
     "compat:matrix": "node scripts/compat-matrix.mjs",
     "bench:unseen": "node scripts/../benchmarks/bench-unseen.mjs benchmarks/unseen-latest.jsonl",
     "smoke": "node scripts/smoke.mjs",
-    "check": "node scripts/test.mjs && node scripts/test-v2.mjs && node scripts/test-compat.mjs && node scripts/test-openapi.mjs && node scripts/test-conformance.mjs && node scripts/test-contract.mjs && node scripts/compat-matrix.mjs && node scripts/smoke.mjs",
+    "check": "node scripts/test.mjs && node scripts/test-v2.mjs && node scripts/test-compat.mjs && node scripts/test-openapi.mjs && node scripts/test-conformance.mjs && node scripts/test-contract.mjs && node scripts/test-lab-isolation.mjs && node scripts/compat-matrix.mjs && node scripts/smoke.mjs",
     "rollback": "wrangler rollback",
-    "test:contract": "node scripts/test-contract.mjs"
+    "test:contract": "node scripts/test-contract.mjs",
+    "test:lab": "node scripts/test-lab-isolation.mjs"
   },
   "devDependencies": {
     "wrangler": "^4"
