@@ -1,0 +1,7 @@
+{
+ "subject": "https://example.com/",
+ "links": [
+  { "rel": "lrdd", "type": "application/xrd+xml", "template": "https://example.com/describe?uri={uri}" },
+  { "rel": "hub", "href": "https://hub.example.com/" }
+ ]
+}

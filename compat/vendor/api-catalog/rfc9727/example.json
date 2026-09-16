@@ -1,0 +1,28 @@
+{
+ "linkset": [
+  {
+   "anchor": "https://developer.example.com/apis/foo_api",
+   "service-desc": [
+    { "href": "https://developer.example.com/apis/foo_api/spec", "type": "application/yaml" }
+   ],
+   "status": [
+    { "href": "https://developer.example.com/apis/foo_api/status", "type": "application/json" }
+   ],
+   "service-doc": [
+    { "href": "https://developer.example.com/apis/foo_api/doc", "type": "text/html" }
+   ],
+   "service-meta": [
+    { "href": "https://developer.example.com/apis/foo_api/policies", "type": "text/xml" }
+   ]
+  },
+  {
+   "anchor": "https://apis.example.net/apis/cantona_api",
+   "service-desc": [
+    { "href": "https://apis.example.net/apis/cantona_api/spec", "type": "text/n3" }
+   ],
+   "service-doc": [
+    { "href": "https://apis.example.net/apis/cantona_api/doc", "type": "text/html" }
+   ]
+  }
+ ]
+}

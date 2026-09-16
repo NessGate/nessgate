@@ -7,7 +7,7 @@
   "positiveFixtures": 18,
   "rejectFixtures": 7,
   "realWorldFixtures": 2,
-  "officialVectorsPassing": 0,
+  "officialVectorsVendored": 3,
   "distinctQuirksHandled": 7,
   "note": "unseen-domain metrics live in benchmarks/unseen-baseline-analysis.json (separate ruler). No confidence scores anywhere."
 }

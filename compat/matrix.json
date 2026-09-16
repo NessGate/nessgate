@@ -88,7 +88,7 @@
       ],
       "parser": "normalizeResources('api-catalog')",
       "authority": "publisher-hosted (Level 1) — the domain's own surface",
-      "officialSuite": null,
+      "officialSuite": "vendor/api-catalog/rfc9727/ (RFC 9727 §A)",
       "deviations": [],
       "fixtures": [
         "api-catalog/rfc9727/linkset-service-desc",
@@ -115,7 +115,7 @@
       ],
       "parser": "normalizeResources('openapi')",
       "authority": "publisher-hosted (Level 1) — the domain's own surface",
-      "officialSuite": null,
+      "officialSuite": "vendor/openapi/3.0/ (OAI petstore, Apache-2.0)",
       "deviations": [
         "specs >1MB exceed the resolver maxBytes cap and are currently missed (see benchmarks/V2-ALPHA-REPORT-... ; fix will add a resolve-level fixture per the corpus rule)"
       ],
@@ -190,7 +190,7 @@
       ],
       "parser": "normalizeResources('host-meta')",
       "authority": "publisher-hosted (Level 1) — the domain's own surface",
-      "officialSuite": null,
+      "officialSuite": "vendor/host-meta/rfc6415/ (RFC 6415 §A)",
       "deviations": [],
       "fixtures": [
         "host-meta/rfc6415/links"

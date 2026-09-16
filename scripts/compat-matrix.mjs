@@ -52,6 +52,9 @@ if (noFixture.length) console.log(`  note  protocols without a direct fixture ye
 const positive = fixtures.filter((f) => !(f.expect && f.expect.reject));
 const reject = fixtures.filter((f) => f.expect && f.expect.reject);
 const realWorld = fixtures.filter((f) => f.origin === "real-world");
+// Official conformance vectors vendored under compat/vendor/** (exclude SOURCE.md).
+let vendored = [];
+try { vendored = walk(base + "vendor").filter((p) => !/SOURCE\.md$/.test(p)); } catch {}
 const metrics = {
   generatedAt: new Date().toISOString().slice(0, 10),
   protocols: Object.keys(matrix).length,
@@ -61,7 +64,7 @@ const metrics = {
   positiveFixtures: positive.length,
   rejectFixtures: reject.length,
   realWorldFixtures: realWorld.length,
-  officialVectorsPassing: 0,   // populated in M2
+  officialVectorsVendored: vendored.length,  // compat/vendor/** (see test-conformance.mjs)
   distinctQuirksHandled: reject.length,
   note: "unseen-domain metrics live in benchmarks/unseen-baseline-analysis.json (separate ruler). No confidence scores anywhere.",
 };
