@@ -48,7 +48,14 @@ async function one(entry) {
   const found = new Set(row.foundProtocols || []);
   row.recallHits = [...gt].filter((p) => found.has(p));
   row.missed = [...gt].filter((p) => !found.has(p));
-  row.falsePositives = [...found].filter((p) => !gt.has(p));
+  const fp = [...found].filter((p) => !gt.has(p));
+  // Blocked-stratum domains challenge or vary their responses per caller (the
+  // freeze notes record gitlab serving llms.txt "once — nondeterministic
+  // challenge", and an audit re-run reproduced exactly that). Ground truth
+  // there is UNSTABLE, so a finding on a blocked domain is reported separately
+  // — it is neither a resolver false positive nor proof the resolver is right.
+  if (entry.stratum === "blocked") { row.unstableFindings = fp; row.falsePositives = []; }
+  else row.falsePositives = fp;
   appendFileSync(outFile, JSON.stringify(row) + "\n");
   process.stdout.write(`${entry.stratum.padEnd(16)} ${entry.domain}: gt=[${entry.groundTruthProtocols.join(",")}] found=[${(row.foundProtocols||[]).join(",")}] ${row.error ? "ERR:"+row.error : ""} ${Math.round(row.ms/1000)}s\n`);
 }

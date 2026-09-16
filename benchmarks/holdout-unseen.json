@@ -15,6 +15,7 @@
     "total": 52,
     "ecosystemNote": "Genuine surfaces found in the wild: llms.txt, ard-catalog, api-catalog, openapi, a2a-agent-card. NOT found in this pool: ord, awp, host-meta, anp, ucp, aid, gbz-185-4 (near-zero public adoption) — those are covered by compat corpus fixtures, not this recall benchmark.",
     "rule": "Never optimize/hardcode around these domains. If one teaches a fix: retire it, make a compat fixture, replace with a fresh unseen domain.",
+    "groundTruthAging": "Ground truth is a snapshot and DRIFTS as sites change (audit 2026-09-16: gitlab.com, blocked stratum, served llms.txt in a re-run). Policy: re-probe ground truth (probe-groundtruth.mjs + verify-groundtruth.mjs) at every re-freeze and before quoting benchmark numbers older than ~60 days; blocked-stratum domains vary responses per caller, so bench-unseen.mjs reports their findings as unstableFindings, never in the false-positive headline.",
     "corrections": [
       "2026-09-15: neon.tech +ard-catalog (probe miss, independently re-confirmed)",
       "2026-09-15: RETIRED vercel.com + posthog.com (exposed the >1MB OpenAPI recall gap) → moved into compat fixtures; REPLACED with fresh unseen workos.com + redocly.com; holdout re-frozen before designing the fix."
