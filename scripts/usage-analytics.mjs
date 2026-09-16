@@ -60,10 +60,15 @@ const ENDPOINTS = [
   { key: "/check", label: "Compatibility   (/check*)", filter: { clientRequestPath_like: "/check%" } },
 ];
 
-const MONITOR_RE = /bot|crawl|spider|probe|monitor|liveness|audit|research|collector|watch|witness|beat|sentinel|registry|scan|health|uptime|checker|rugpull/i;
+const MONITOR_RE = /bot|crawl|spider|probe|monitor|liveness|audit|research|collector|watch|witness|beat|sentinel|registry|scan|health|uptime|checker|rugpull|census|grader|observatory|oracle/i;
+// The self-identifying bot convention — a "(+https://…)" info URL in the UA — is
+// the most robust monitor signal: registry/health/security probes announce an
+// info page this way (Googlebot-style), genuine agent clients almost never do.
+// Catches monitors that dodge the keyword list (mcpqueen-grader, aiagentboard-hub…).
+const ANNOUNCED_URL_RE = /\(\+https?:\/\//i;
 function classOf(ip, ua) {
   if (FIRST_PARTY.some((p) => ip.startsWith(p))) return "first-party";
-  if (MONITOR_RE.test(ua || "")) return "monitoring";
+  if (MONITOR_RE.test(ua || "") || ANNOUNCED_URL_RE.test(ua || "")) return "monitoring";
   if (!ua || !ua.trim()) return "unidentified";
   return "independent";
 }
