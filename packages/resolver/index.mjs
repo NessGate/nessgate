@@ -43,13 +43,14 @@ export const ADAPTERS = [
   { id: "aid", channel: "dns", node: "_agent" }, // AID TXT (v=aid1) at _agent — NOT the IETF DNS-AID SVCB draft (_agents), a separate mechanism
 ];
 
-// The <link rel> and robots-Agentmap channels are non-canonical ALTERNATE
-// locators for an ARD catalog — which is already probed at its well-known path
-// by default. They cost a homepage + robots.txt fetch on every resolution and,
-// on measured corpora, add no coverage the well-known path misses. So they are
-// OPT-IN via opts.deep (resolve) / ?deep=1 (hosted) rather than a per-request
-// cost. The mechanism is preserved, just not default. Cuts ~2 requests/resolve.
-const DEEP_CHANNELS = new Set(["link-rel", "robots"]);
+// Alternate ARD locators beyond the well-known path. Per ARD v0.91 a conforming
+// consumer MUST honour the rel="ard" HTML link (link-rel channel), so it runs in
+// DEFAULT (complete) mode. The robots.txt Agentmap directive is optional for
+// consumers, but is also included by default for complete discovery. The opt-in
+// `fast` mode (opts.fast / ?fast=1) SKIPS both to save a homepage + robots fetch
+// — a labeled performance trade that is NOT fully ARD-conformant (a catalog
+// advertised only via <link rel="ard"> can be missed). Default stays conformant.
+const FAST_MODE_SKIP = new Set(["link-rel", "robots"]);
 
 const MAX_DISCOVER_RESOURCES = 200;
 const MAX_PER_SOURCE = 50;
@@ -550,9 +551,10 @@ async function queryGbzGateway(gbz, timeoutMs) {
 // resources  = the normalized union of what those documents contain
 // Every resource carries `source`, `sourceUrl` (fetch it to verify against the
 // domain directly), `url`, and, where useful, name/rel/id/raw.
-// opts.deep (optional): also run the alternate ARD locators (homepage <link rel>,
-//   robots Agentmap). Off by default — they cost 2 extra fetches and add no
-//   coverage the well-known ARD path misses on measured corpora.
+// opts.fast (optional): SKIP the alternate ARD locators (homepage <link rel="ard">,
+//   robots Agentmap) to save 2 fetches. NOT fully ARD-conformant (v0.91 requires
+//   honouring rel="ard"), so it is opt-in and the result is labeled mode:"fast".
+//   Default discovery is complete and conformant.
 // opts.gbz (optional, Node/embedded only): { gatewayUrl, fetch, query, headers }
 //   enables GB/Z 185.5 discovery against a caller-CONFIGURED ACPs gateway with a
 //   caller-supplied authenticated fetch. Never auto-discovered; never used by the
@@ -565,9 +567,10 @@ export async function resolve(domain, opts = {}) {
   const d = normalizeDomain(domain);
   if (!d) throw new Error("invalid domain");
 
-  // Default = canonical surfaces only (well-known + DNS). opts.deep also runs the
-  // alternate ARD locators (homepage <link rel>, robots Agentmap) — see DEEP_CHANNELS.
-  const active = opts.deep ? ADAPTERS : ADAPTERS.filter((a) => !DEEP_CHANNELS.has(a.channel));
+  // Default = COMPLETE, ARD-conformant discovery (all channels incl. the required
+  // rel="ard" link). opts.fast SKIPS the alternate ARD locators for speed — a
+  // labeled, non-conformant performance trade (see FAST_MODE_SKIP).
+  const active = opts.fast ? ADAPTERS.filter((a) => !FAST_MODE_SKIP.has(a.channel)) : ADAPTERS;
   const results = await Promise.all(active.map((a) => runAdapter(a, d, fetchImpl, timeoutMs, maxBytes)));
   const discovered = results.flatMap((r) => r.discovered);
   let resources = results.flatMap((r) => r.resources);
@@ -602,7 +605,9 @@ export async function resolve(domain, opts = {}) {
     checked.push("gbz-185-5");
   }
   resources = resources.slice(0, MAX_DISCOVER_RESOURCES).map((r) => ({ ...r, class: classifyResource(r, d) }));
-  return { domain: d, provenance: "self-published", discovered, resources, checked };
+  const out = { domain: d, provenance: "self-published", discovered, resources, checked };
+  if (opts.fast) out.mode = "fast"; // labeled: alternate ARD locators skipped, not fully conformant
+  return out;
 }
 
 // Label each resource by how much NessGate actually verified it — an additive DX

@@ -239,12 +239,13 @@ const ADAPTERS = [
 // conformance. 185.5 gateway querying exists ONLY in the embeddable library
 // (opts.gbz — caller-configured URL + bring-your-own auth, no auto-discovery);
 // it is deliberately never run by this hosted worker.
-// The <link rel> and robots-Agentmap channels are non-canonical ALTERNATE
-// locators for an ARD catalog — already probed at its well-known path by default.
-// They cost a homepage + robots.txt fetch on every resolution and, on measured
-// corpora, add no coverage the well-known path misses. So they are OPT-IN via
-// ?deep=1 rather than a per-request cost. Cuts ~2 requests/resolution by default.
-const DEEP_CHANNELS = new Set(["link-rel", "robots"]);
+// Alternate ARD locators beyond the well-known path. Per ARD v0.91 a conforming
+// consumer MUST honour the rel="ard" HTML link (link-rel), so it runs in DEFAULT
+// (complete) mode; robots Agentmap is included too. The opt-in `fast` mode
+// (?fast=1) SKIPS both to save a homepage + robots fetch — a LABELED performance
+// trade (result carries mode:"fast") that is not fully ARD-conformant. Default
+// discovery stays complete and conformant; the optimization is never silent.
+const FAST_MODE_SKIP = new Set(["link-rel", "robots"]);
 const DISCOVER_CACHE_SECONDS = 600;
 const DISCOVER_RATE_LIMIT_PER_HOUR = 120;
 const DISCOVER_UA = "NessGate-Discover/1.0 (+https://nessgate.com)";
@@ -703,12 +704,13 @@ async function runAdapter(a, domain, env, ctx) {
 async function discoverData(raw, env, ctx, request) {
   const domain = normalizeDomain(raw, true);
   if (!domain) return { status: 400, body: { error: "Invalid domain" } };
-  // ?deep=1 also runs the alternate ARD locators (homepage <link rel>, robots
-  // Agentmap). Default omits them (2 fewer fetches; no coverage the well-known
-  // ARD path misses). Deep results are cached under a separate key.
-  let deep = false;
-  try { deep = new URL(request.url).searchParams.get("deep") === "1"; } catch {}
-  const active = deep ? ADAPTERS : ADAPTERS.filter((a) => !DEEP_CHANNELS.has(a.channel));
+  // Default = COMPLETE, ARD-conformant discovery (all channels incl. the required
+  // rel="ard" link). ?fast=1 SKIPS the alternate ARD locators (homepage <link rel>,
+  // robots Agentmap) to save 2 fetches — a labeled, non-conformant speed trade,
+  // cached under a separate key and flagged mode:"fast" in the response.
+  let fast = false;
+  try { fast = new URL(request.url).searchParams.get("fast") === "1"; } catch {}
+  const active = fast ? ADAPTERS.filter((a) => !FAST_MODE_SKIP.has(a.channel)) : ADAPTERS;
   const cache = caches.default;
   // Cloudflare logs every Cache API op into the worker zone's request
   // analytics regardless of the key's hostname (match miss = empty-UA GET 504,
@@ -716,7 +718,7 @@ async function discoverData(raw, env, ctx, request) {
   // /cache-op/ prefix keeps that bookkeeping out of every /discover//explore
   // path-filtered metric, where misses read as phantom caller-facing 504s.
   // (.invalid host = RFC 2606, clearly synthetic; keys are never fetched.)
-  const key = new Request(`https://resolver-cache.nessgate.invalid/cache-op/discover/${deep ? "deep/" : ""}${domain}`);
+  const key = new Request(`https://resolver-cache.nessgate.invalid/cache-op/discover/${fast ? "fast/" : ""}${domain}`);
   const hit = await cache.match(key);
   if (hit) return { status: 200, body: await hit.json(), cached: true };
   if (!(await rateLimit(env, request, "disc", DISCOVER_RATE_LIMIT_PER_HOUR))) {
@@ -757,7 +759,8 @@ async function discoverData(raw, env, ctx, request) {
   const body = {
     domain,
     provenance: "self-published",
-    note: DISCOVER_NOTE,
+    note: fast ? DISCOVER_NOTE + " (fast mode: the optional alternate ARD locators — rel=\"ard\" link and robots Agentmap — were skipped for speed; a catalog advertised only via those may be missed. Omit ?fast for complete, ARD-conformant discovery.)" : DISCOVER_NOTE,
+    ...(fast ? { mode: "fast" } : {}),
     discovered,
     resources,
     checked: active.map((a) => a.id),

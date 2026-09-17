@@ -24,10 +24,10 @@
             "schema": { "type": "string", "example": "example.com" }
           },
           {
-            "name": "deep",
+            "name": "fast",
             "in": "query",
             "required": false,
-            "description": "Set to 1 to also probe the non-canonical alternate ARD locators (homepage <link rel>, robots Agentmap). Off by default: they cost 2 extra requests and add no coverage the well-known ARD path misses on measured corpora. When off, 'checked' omits ard-link and ard-agentmap.",
+            "description": "Set to 1 for fast mode: SKIPS the alternate ARD locators (homepage rel=\"ard\" link and robots Agentmap) to save 2 requests. This is a labeled performance trade and is NOT fully ARD v0.91-conformant (a catalog advertised only via rel=\"ard\" can be missed) — the response is flagged mode:\"fast\" and 'checked' omits ard-link/ard-agentmap. Default (omit ?fast) is complete and conformant.",
             "schema": { "type": "string", "enum": ["1"], "example": "1" }
           }
         ],
@@ -42,6 +42,7 @@
                     "domain": { "type": "string", "example": "example.com" },
                     "provenance": { "type": "string", "enum": ["self-published"], "example": "self-published" },
                     "note": { "type": "string" },
+                    "mode": { "type": "string", "enum": ["fast"], "description": "Present only when ?fast=1 was used: signals the alternate ARD locators were skipped (not fully ARD-conformant). Absent for the default complete mode." },
                     "discovered": {
                       "type": "array",
                       "description": "The routing map: which standards the domain publishes, and where.",
@@ -62,7 +63,7 @@
                       "type": "array",
                       "description": "Every standard NessGate probed for, so an empty result is still informative.",
                       "items": { "type": "string" },
-                      "example": ["llms.txt", "ard-catalog", "a2a-agent-card", "api-catalog", "ai-info.json", "openapi", "ord", "awp", "host-meta", "anp", "ucp", "aid"]
+                      "example": ["llms.txt", "ard-catalog", "a2a-agent-card", "api-catalog", "ai-info.json", "openapi", "ord", "awp", "host-meta", "anp", "ucp", "ard-link", "ard-agentmap", "aid"]
                     }
                   },
                   "required": ["domain", "provenance", "discovered", "resources", "checked"]
