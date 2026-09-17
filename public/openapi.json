@@ -22,6 +22,13 @@
             "required": true,
             "description": "Domain name, e.g. example.com. Scheme, path, port, and a leading www. are ignored; ASCII/punycode form required.",
             "schema": { "type": "string", "example": "example.com" }
+          },
+          {
+            "name": "deep",
+            "in": "query",
+            "required": false,
+            "description": "Set to 1 to also probe the non-canonical alternate ARD locators (homepage <link rel>, robots Agentmap). Off by default: they cost 2 extra requests and add no coverage the well-known ARD path misses on measured corpora. When off, 'checked' omits ard-link and ard-agentmap.",
+            "schema": { "type": "string", "enum": ["1"], "example": "1" }
           }
         ],
         "responses": {
@@ -55,7 +62,7 @@
                       "type": "array",
                       "description": "Every standard NessGate probed for, so an empty result is still informative.",
                       "items": { "type": "string" },
-                      "example": ["llms.txt", "ard-catalog", "a2a-agent-card", "api-catalog", "ai-info.json", "openapi", "ord", "awp", "host-meta", "anp", "ucp", "ard-link", "ard-agentmap", "aid"]
+                      "example": ["llms.txt", "ard-catalog", "a2a-agent-card", "api-catalog", "ai-info.json", "openapi", "ord", "awp", "host-meta", "anp", "ucp", "aid"]
                     }
                   },
                   "required": ["domain", "provenance", "discovered", "resources", "checked"]

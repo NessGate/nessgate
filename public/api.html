@@ -72,7 +72,7 @@ yet read.) See the
   ],
   "checked": ["llms.txt","ard-catalog","a2a-agent-card","api-catalog",
               "ai-info.json","openapi","ord","awp","host-meta",
-              "anp","ucp","ard-link","ard-agentmap","aid"]
+              "anp","ucp","aid"]
 }
 
 400 Bad Request      — input is not a valid domain
@@ -84,6 +84,13 @@ open <code>type</code> label (never a closed set), and, where the source provide
 <code>name</code>/<code>id</code>/<code>raw</code>. <code>checked</code> lists every standard
 probed, so an empty <code>discovered</code> is still a successful <code>200</code> observation.
 Answers are cached 10 minutes. See the <a href="/spec">specification</a> for the full contract.</p>
+<p class="note">By default NessGate probes the <strong>canonical</strong> surfaces (each standard's
+well-known path, plus DNS). Two non-canonical alternate ARD locators — a homepage
+<code>&lt;link rel="ard"&gt;</code> and a <code>robots.txt</code> <code>Agentmap:</code> directive — cost an
+extra homepage and robots fetch and, on measured corpora, surface no ARD catalog the well-known
+path misses, so they are <strong>opt-in</strong>: add <code>?deep=1</code> for exhaustive discovery
+(<code>checked</code> then also lists <code>ard-link</code> and <code>ard-agentmap</code>). The same
+applies to the library via <code>resolve(domain, {deep:true})</code>.</p>
 <p class="note">Every resource also carries a <code>class</code> so your agent knows how far NessGate
 verified it — with no extra requests:</p>
 <table>

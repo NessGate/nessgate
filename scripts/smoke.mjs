@@ -40,11 +40,23 @@ await check("discover returns the normalized answer shape, labeled self-publishe
   const d = await r.json();
   if (d.provenance !== "self-published") throw new Error("missing provenance label");
   if (typeof d.note !== "string" || d.note.length < 10) throw new Error("missing note");
-  if (!Array.isArray(d.checked) || d.checked.length !== 14) throw new Error(`checked list should have 14 adapters, got ${d.checked && d.checked.length}`);
-  for (const want of ["ard-link", "ard-agentmap", "aid", "anp", "ucp"]) {
-    if (!d.checked.includes(want)) throw new Error(`checked list missing new adapter ${want}`);
+  if (!Array.isArray(d.checked) || d.checked.length !== 12) throw new Error(`default checked list should have 12 adapters (deep adds 2), got ${d.checked && d.checked.length}`);
+  for (const want of ["aid", "anp", "ucp"]) {
+    if (!d.checked.includes(want)) throw new Error(`checked list missing adapter ${want}`);
+  }
+  // The alternate ARD locators are opt-in; they must NOT be probed by default.
+  for (const deepOnly of ["ard-link", "ard-agentmap"]) {
+    if (d.checked.includes(deepOnly)) throw new Error(`${deepOnly} should be deep-only, not in default checked`);
   }
   if (!Array.isArray(d.discovered)) throw new Error("discovered not an array");
+});
+
+await check("?deep=1 re-enables the alternate ARD locators (opt-in exhaustive mode)", async () => {
+  const d = await (await get("/discover/nessgate.com?deep=1")).json();
+  if (!Array.isArray(d.checked) || d.checked.length !== 14) throw new Error(`deep checked should have 14, got ${d.checked && d.checked.length}`);
+  for (const want of ["ard-link", "ard-agentmap"]) {
+    if (!d.checked.includes(want)) throw new Error(`deep checked missing ${want}`);
+  }
 });
 
 await check("resolver discovers NessGate's OWN first-party files (self-probe path)", async () => {
