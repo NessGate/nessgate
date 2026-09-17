@@ -304,8 +304,10 @@ footer p { margin: .7rem 0 0; }
 
 @media (max-width: 640px) {
   body { padding: 1.6rem 1.15rem 1.5rem; }
-  .site-head { margin-bottom: 1.6rem; padding-bottom: .9rem; }
-  .top-nav { gap: .85rem; }
+  .site-head { margin-bottom: 1.6rem; padding-bottom: .9rem; flex-wrap: wrap; row-gap: .55rem; }
+  /* Let the nav wrap instead of forcing horizontal page scroll on narrow phones
+     (6 items + brand overflow ~375px otherwise, pushing GitHub off-screen). */
+  .top-nav { gap: .5rem .85rem; flex-wrap: wrap; }
   .top-nav a { font-size: .82rem; }
   /* Spec: minimum full-lockup height is 20px; 24px keeps logo + nav
      comfortably inside 320px-wide screens. */
