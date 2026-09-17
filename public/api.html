@@ -67,7 +67,8 @@ yet read.) See the
       "sourceUrl": "https://example.com/.well-known/ard.json",
       "type": "application/json",
       "name": "Company data",
-      "url": "https://example.com/ai-info.json" }
+      "url": "https://example.com/ai-info.json",
+      "class": "publisher-declared" }
   ],
   "checked": ["llms.txt","ard-catalog","a2a-agent-card","api-catalog",
               "ai-info.json","openapi","ord","awp","host-meta",
@@ -83,6 +84,18 @@ open <code>type</code> label (never a closed set), and, where the source provide
 <code>name</code>/<code>id</code>/<code>raw</code>. <code>checked</code> lists every standard
 probed, so an empty <code>discovered</code> is still a successful <code>200</code> observation.
 Answers are cached 10 minutes. See the <a href="/spec">specification</a> for the full contract.</p>
+<p class="note">Every resource also carries a <code>class</code> so your agent knows how far NessGate
+verified it — with no extra requests:</p>
+<table>
+<tr><td><code>verified-publisher-location</code></td><td>NessGate fetched <em>and</em> validated this surface on the domain's own registrable domain — the resource <em>is</em> the document that was read.</td></tr>
+<tr><td><code>publisher-declared</code></td><td>Declared inside a fetched catalog, with a target on the same registrable domain (including subdomains). NessGate did not fetch the target itself.</td></tr>
+<tr><td><code>declared-external-pointer</code></td><td>Declared inside a fetched catalog, but the target is on a <em>different</em> registrable domain. The publisher asserts it; NessGate did not verify it — treat with caution.</td></tr>
+<tr><td><code>unsupported</code></td><td>The record has no usable target URL to locate the resource.</td></tr>
+</table>
+<p class="note"><code>/discover</code> never fetches declared pointers (that keeps request counts low), so it
+emits no <em>inaccessible</em> class; a <em>third-party association</em> only appears under
+<code>/explore</code>'s <code>related[]</code>. Same field on the embeddable library's
+<code>resolve()</code>, so hosted and in-agent results are identical.</p>
 
 <h2>Explore a domain (evidence-based, v2)</h2>
 <pre><code>GET /explore/{domain}</code></pre>

@@ -60,9 +60,13 @@ await check("resolver NORMALIZES documents into resource records (source + sourc
   if (!Array.isArray(d.resources) || d.resources.length < 4) {
     throw new Error(`resources missing/short (${d.resources && d.resources.length})`);
   }
+  const CLASSES = new Set(["verified-publisher-location", "publisher-declared", "declared-external-pointer", "unsupported"]);
   for (const res of d.resources) {
     if (!res.source || !res.sourceUrl || !res.type || !res.url) throw new Error("resource record missing source/sourceUrl/type/url");
+    if (!CLASSES.has(res.class)) throw new Error(`resource missing/invalid class label: ${res.class}`);
   }
+  // nessgate.com's own surfaces are all fetched+validated on its own host.
+  if (!d.resources.some((x) => x.class === "verified-publisher-location")) throw new Error("expected at least one verified-publisher-location on self-discover");
   // api-catalog (a linkset) must flatten into multiple api-catalog-sourced records.
   const apiCat = d.resources.filter((x) => x.source === "api-catalog");
   if (apiCat.length < 2) throw new Error(`api-catalog linkset not flattened (${apiCat.length})`);

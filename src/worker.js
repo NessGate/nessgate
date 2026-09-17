@@ -741,7 +741,7 @@ async function discoverData(raw, env, ctx, request) {
       }
     } catch {}
   }
-  resources = resources.slice(0, MAX_DISCOVER_RESOURCES);
+  resources = resources.slice(0, MAX_DISCOVER_RESOURCES).map((r) => ({ ...r, class: classifyResource(r, domain) }));
   const body = {
     domain,
     provenance: "self-published",
@@ -852,6 +852,26 @@ function isCrossRegistrable(host, domain) {
   if (typeof host !== "string" || !host) return false;
   const h = host.toLowerCase().replace(/\.+$/, "");
   return h !== domain && !h.endsWith("." + domain);
+}
+
+// Label each resource by how much NessGate actually verified it — an additive DX
+// field on /discover results, derived with NO extra requests:
+//   verified-publisher-location — the surface NessGate fetched AND validated, on
+//     the domain's own registrable domain (the resource IS the fetched document).
+//   publisher-declared — declared inside a fetched catalog, target on the same
+//     registrable domain (incl. subdomains); the target itself was NOT fetched.
+//   declared-external-pointer — declared inside a fetched catalog, target on a
+//     DIFFERENT registrable domain; the publisher asserts it, NessGate did not verify.
+//   unsupported — no usable target URL to locate the resource.
+// Two taxonomy classes are deliberately NOT emitted here: a "third-party
+// association" is an /explore concept, and flagging an "inaccessible" resource
+// would require fetching every declared pointer — which /discover avoids to keep
+// request counts low. Kept byte-identical to the library (packages/resolver).
+function classifyResource(r, domain) {
+  let host;
+  try { host = new URL(r.url).hostname.toLowerCase().replace(/\.+$/, ""); } catch { return "unsupported"; }
+  if (r.url === r.sourceUrl) return "verified-publisher-location";
+  return (host !== domain && !host.endsWith("." + domain)) ? "declared-external-pointer" : "publisher-declared";
 }
 
 // Pure: the same-registrable-domain canonical host implied by a homepage final
@@ -2061,4 +2081,4 @@ function selfDomain() { return SELF_DOMAIN; }
 function apiCatalog() { return API_CATALOG; }
 function mcpTools() { return MCP_TOOLS; }
 function adapters() { return ADAPTERS; }
-export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, assertPublicDns, hostAllowedForDomain, isForbiddenHost, normalizeResources, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, orgRecordsFromDoc, docRecords, isCrossRegistrable, sameRegCanonicalHost, probeShapeOkObj, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters };
+export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, assertPublicDns, hostAllowedForDomain, isForbiddenHost, normalizeResources, classifyResource, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, orgRecordsFromDoc, docRecords, isCrossRegistrable, sameRegCanonicalHost, probeShapeOkObj, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters };

@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "NessGate API",
-    "version": "1.6.0",
+    "version": "1.7.0",
     "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads whatever that domain already publishes across the standard machine-discovery locations (llms.txt, ARD / ai-catalog.json, A2A agent card, RFC 9727 API catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP manifest, RFC 6415 host-meta) and returns one normalized answer, each record carrying a sourceUrl back to the domain. NessGate stores nothing, never crawls or indexes, and makes no ownership or safety claim. Read endpoints are public, unauthenticated, and CORS-open. The response contract is stable and additive: new optional fields may appear; clients must ignore unknown fields.",
     "contact": { "email": "contact@nessgate.com", "url": "https://nessgate.com/contact" },
     "termsOfService": "https://nessgate.com/terms",
@@ -190,12 +190,18 @@
           "sourceUrl": { "type": "string", "description": "The native document the record was read from — authoritative; follow it to verify.", "example": "https://example.com/.well-known/ard.json" },
           "type": { "type": "string", "description": "An open label taken from the source. Not a closed set.", "example": "application/json" },
           "url": { "type": "string", "example": "https://example.com/ai-info.json" },
+          "class": {
+            "type": "string",
+            "description": "How much NessGate verified this resource (no extra requests): verified-publisher-location = the surface NessGate fetched and validated on the domain's own registrable domain; publisher-declared = declared inside a fetched catalog, target on the same registrable domain, target not itself fetched; declared-external-pointer = declared but the target is on a different registrable domain (unverified); unsupported = no usable target URL. A 'third-party association' is an /explore concept; /discover never fetches declared pointers, so it emits no 'inaccessible' class.",
+            "enum": ["verified-publisher-location", "publisher-declared", "declared-external-pointer", "unsupported"],
+            "example": "verified-publisher-location"
+          },
           "name": { "type": "string" },
           "id": { "type": "string" },
           "rel": { "type": "string" },
           "raw": { "type": "object" }
         },
-        "required": ["source", "sourceUrl", "type", "url"]
+        "required": ["source", "sourceUrl", "type", "url", "class"]
       },
       "Error": {
         "type": "object",

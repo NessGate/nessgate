@@ -16,6 +16,7 @@ import {
   apiCatalog,
   mcpTools,
   normalizeResources,
+  classifyResource,
   isAcs,
   parseLlmsLinks,
   looksMachineReadable,
@@ -509,6 +510,31 @@ console.log("--- npm package parity (packages/resolver)");
   const served = readFileSync(new URL("../public/resolver.mjs", import.meta.url), "utf8");
   const pkg = readFileSync(new URL("../packages/resolver/index.mjs", import.meta.url), "utf8");
   is(served === pkg, true, "packages/resolver/index.mjs is byte-identical to public/resolver.mjs");
+}
+
+console.log("--- resource result taxonomy (class field) — DX self-explaining results");
+{
+  const D = "acme.com";
+  // The surface NessGate fetched + validated (resource IS the document).
+  is(classifyResource({ url: "https://acme.com/llms.txt", sourceUrl: "https://acme.com/llms.txt" }, D), "verified-publisher-location", "class: fetched surface → verified-publisher-location");
+  // Declared inside a catalog, target on the apex (not itself fetched).
+  is(classifyResource({ url: "https://acme.com/mcp", sourceUrl: "https://acme.com/.well-known/ard.json" }, D), "publisher-declared", "class: on-domain declared pointer → publisher-declared");
+  // Declared, target on the publisher's own SUBDOMAIN (still same registrable domain).
+  is(classifyResource({ url: "https://mcp.acme.com/mcp", sourceUrl: "https://acme.com/.well-known/ard.json" }, D), "publisher-declared", "class: subdomain declared pointer → publisher-declared");
+  // Declared, target on a DIFFERENT registrable domain → unverified external.
+  is(classifyResource({ url: "https://github.com/acme/x", sourceUrl: "https://acme.com/.well-known/ard.json" }, D), "declared-external-pointer", "class: cross-registrable pointer → declared-external-pointer");
+  // A look-alike suffix domain must NOT count as same-registrable.
+  is(classifyResource({ url: "https://notacme.com/x", sourceUrl: "https://acme.com/.well-known/ard.json" }, D), "declared-external-pointer", "class: suffix look-alike → declared-external-pointer (not same registrable)");
+  // No usable URL.
+  is(classifyResource({ url: "::::", sourceUrl: "https://acme.com/.well-known/ard.json" }, D), "unsupported", "class: unparseable url → unsupported");
+  // Parity: worker and library classify identically.
+  const lib = await import("../public/resolver.mjs");
+  for (const c of [
+    { url: "https://acme.com/llms.txt", sourceUrl: "https://acme.com/llms.txt" },
+    { url: "https://mcp.acme.com/mcp", sourceUrl: "https://acme.com/.well-known/ard.json" },
+    { url: "https://other.org/x", sourceUrl: "https://acme.com/.well-known/ard.json" },
+    { url: "bad", sourceUrl: "https://acme.com/x" },
+  ]) is(lib.classifyResource(c, D), classifyResource(c, D), `classifyResource library/worker parity for ${c.url}`);
 }
 
 console.log("--- self ARD catalog is served at BOTH canonical names");

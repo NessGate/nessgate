@@ -587,8 +587,27 @@ export async function resolve(domain, opts = {}) {
     resources.push(...g.resources);
     checked.push("gbz-185-5");
   }
-  resources = resources.slice(0, MAX_DISCOVER_RESOURCES);
+  resources = resources.slice(0, MAX_DISCOVER_RESOURCES).map((r) => ({ ...r, class: classifyResource(r, d) }));
   return { domain: d, provenance: "self-published", discovered, resources, checked };
+}
+
+// Label each resource by how much NessGate actually verified it — an additive DX
+// field on results, derived with NO extra requests:
+//   verified-publisher-location — the surface NessGate fetched AND validated, on
+//     the domain's own registrable domain (the resource IS the fetched document).
+//   publisher-declared — declared inside a fetched catalog, target on the same
+//     registrable domain (incl. subdomains); the target itself was NOT fetched.
+//   declared-external-pointer — declared inside a fetched catalog, target on a
+//     DIFFERENT registrable domain; the publisher asserts it, NessGate did not verify.
+//   unsupported — no usable target URL to locate the resource.
+// A "third-party association" is an /explore concept, and flagging an
+// "inaccessible" resource would require fetching every declared pointer — which
+// resolve() avoids to keep request counts low. Kept byte-identical to src/worker.js.
+export function classifyResource(r, domain) {
+  let host;
+  try { host = new URL(r.url).hostname.toLowerCase().replace(/\.+$/, ""); } catch { return "unsupported"; }
+  if (r.url === r.sourceUrl) return "verified-publisher-location";
+  return (host !== domain && !host.endsWith("." + domain)) ? "declared-external-pointer" : "publisher-declared";
 }
 
 // Pure: the same-registrable-domain canonical host implied by a homepage final
@@ -600,4 +619,4 @@ export function sameRegCanonicalHost(finalUrl, domain) {
   return h.endsWith("." + domain) ? h : null;
 }
 
-export default { resolve, normalizeResources, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, fetchBounded, ADAPTERS };
+export default { resolve, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, fetchBounded, ADAPTERS };
