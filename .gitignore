@@ -27,3 +27,6 @@ benchmarks/*.err
 # competitive-benchmark transient outputs (results-holdout.jsonl + REPORT committed)
 benchmarks/competitive/*.log
 benchmarks/competitive/results-smoke.jsonl
+
+# real-world benchmark transient logs (corpus.json + results.jsonl + REPORT committed)
+benchmarks/realworld/*.log

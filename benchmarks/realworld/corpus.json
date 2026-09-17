@@ -1,0 +1,1732 @@
+{
+  "generatedAt": "2026-09-17",
+  "method": "Independent ground truth: each path fetched directly and validated by this script's own shape checks; NessGate's resolver was NOT consulted. Bounded (HTTPS, 12s timeout, 512KB cap), no bypass of 403/bot-walls, no credentials.",
+  "totalDomains": 86,
+  "domains": [
+    {
+      "domain": "agenticresourcediscovery.org",
+      "category": "standards",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "airbnb.com",
+      "category": "negative-biz",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "alibaba.com",
+      "category": "international",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "anthropic.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "apache.org",
+      "category": "dev-docs",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "assemblyai.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "openapi"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://assemblyai.com/llms.txt",
+          "host": "assemblyai.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json",
+          "sourceUrl": "https://assemblyai.com/openapi.json",
+          "host": "assemblyai.com",
+          "version": "3.1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "astro.build",
+      "category": "dev-docs",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "baidu.com",
+      "category": "international",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "bbc.com",
+      "category": "negative-news",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "bestbuy.com",
+      "category": "negative-biz",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "booking.com",
+      "category": "negative-biz",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "bun.sh",
+      "category": "dev-docs",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://bun.sh/llms.txt",
+          "host": "bun.sh",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "clerk.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "api-catalog",
+        "openapi"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://clerk.com/llms.txt",
+          "host": "clerk.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog",
+          "sourceUrl": "https://clerk.com/.well-known/api-catalog",
+          "host": "clerk.com",
+          "version": "rfc9727",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json",
+          "sourceUrl": "https://clerk.com/openapi.json",
+          "host": "clerk.com",
+          "version": "3.0.3",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "cloudflare.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "a2a-agent-card",
+        "openapi"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://cloudflare.com/llms.txt",
+          "host": "cloudflare.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "a2a-agent-card",
+          "path": "/.well-known/agent.json",
+          "sourceUrl": "https://cloudflare.com/.well-known/agent.json",
+          "host": "cloudflare.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json",
+          "sourceUrl": "https://cloudflare.com/openapi.json",
+          "host": "cloudflare.com",
+          "version": "3.1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "cloudflare.net",
+      "category": "negative-misc",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "cnn.com",
+      "category": "negative-news",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "cocacola.com",
+      "category": "negative-biz",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "cohere.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://cohere.com/llms.txt",
+          "host": "cohere.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "cursor.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://cursor.com/llms.txt",
+          "host": "cursor.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "deepgram.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://deepgram.com/llms.txt",
+          "host": "deepgram.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "deno.com",
+      "category": "dev-docs",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "elevenlabs.io",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "api-catalog"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://elevenlabs.io/llms.txt",
+          "host": "elevenlabs.io",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog",
+          "sourceUrl": "https://elevenlabs.io/.well-known/api-catalog",
+          "host": "elevenlabs.io",
+          "version": "rfc9727",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "example.com",
+      "category": "negative-misc",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "fanar.qa",
+      "category": "stress",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "fly.io",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog",
+        "api-catalog"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://fly.io/llms.txt",
+          "host": "fly.io",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json",
+          "sourceUrl": "https://fly.io/.well-known/ai-catalog.json",
+          "host": "fly.io",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog",
+          "sourceUrl": "https://fly.io/.well-known/api-catalog",
+          "host": "fly.io",
+          "version": "rfc9727",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "gitbook.com",
+      "category": "stress",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog",
+        "api-catalog"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://gitbook.com/llms.txt",
+          "host": "gitbook.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json",
+          "sourceUrl": "https://gitbook.com/.well-known/ai-catalog.json",
+          "host": "gitbook.com",
+          "version": "0.1",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog",
+          "sourceUrl": "https://gitbook.com/.well-known/api-catalog",
+          "host": "gitbook.com",
+          "version": "rfc9727",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "gitlab.com",
+      "category": "dev-docs",
+      "reachable": true,
+      "blocked": true,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://about.gitlab.com/llms.txt",
+          "host": "about.gitlab.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "homedepot.com",
+      "category": "negative-biz",
+      "reachable": false,
+      "blocked": true,
+      "stratum": "blocked",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": [
+        "home 403"
+      ]
+    },
+    {
+      "domain": "huggingface.co",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "ard-catalog",
+        "api-catalog"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json",
+          "sourceUrl": "https://huggingface.co/.well-known/ai-catalog.json",
+          "host": "huggingface.co",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog",
+          "sourceUrl": "https://huggingface.co/.well-known/api-catalog",
+          "host": "huggingface.co",
+          "version": "rfc9727",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "iana.org",
+      "category": "negative-gov-edu",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "irs.gov",
+      "category": "negative-gov-edu",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "kernel.org",
+      "category": "dev-docs",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "langchain.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "lemonde.fr",
+      "category": "negative-news",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "medium.com",
+      "category": "stress",
+      "reachable": false,
+      "blocked": true,
+      "stratum": "blocked",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": [
+        "home 403"
+      ]
+    },
+    {
+      "domain": "mintlify.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://mintlify.com/llms.txt",
+          "host": "mintlify.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "mistral.ai",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://mistral.ai/llms.txt",
+          "host": "mistral.ai",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "mit.edu",
+      "category": "negative-gov-edu",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "modal.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://modal.com/llms.txt",
+          "host": "modal.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "modelcontextprotocol.io",
+      "category": "standards",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "a2a-agent-card"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://modelcontextprotocol.io/llms.txt",
+          "host": "modelcontextprotocol.io",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "a2a-agent-card",
+          "path": "/.well-known/agent-card.json",
+          "sourceUrl": "https://modelcontextprotocol.io/.well-known/agent-card.json",
+          "host": "modelcontextprotocol.io",
+          "version": "0.3",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "mozilla.org",
+      "category": "negative-misc",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "n8n.io",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://n8n.io/llms.txt",
+          "host": "n8n.io",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "nasa.gov",
+      "category": "negative-gov-edu",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "naver.com",
+      "category": "international",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "neon.tech",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog",
+        "api-catalog",
+        "openapi"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://neon.tech/llms.txt",
+          "host": "neon.tech",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json",
+          "sourceUrl": "https://neon.tech/.well-known/ai-catalog.json",
+          "host": "neon.tech",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog",
+          "sourceUrl": "https://neon.tech/.well-known/api-catalog",
+          "host": "neon.tech",
+          "version": "rfc9727",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json",
+          "sourceUrl": "https://neon.tech/openapi.json",
+          "host": "neon.tech",
+          "version": "3.0.3",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "nike.com",
+      "category": "negative-biz",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "notion.so",
+      "category": "stress",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://notion.so/llms.txt",
+          "host": "notion.so",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "npmjs.com",
+      "category": "dev-docs",
+      "reachable": false,
+      "blocked": true,
+      "stratum": "blocked",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": [
+        "home 403"
+      ]
+    },
+    {
+      "domain": "nytimes.com",
+      "category": "negative-news",
+      "reachable": false,
+      "blocked": true,
+      "stratum": "blocked",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": [
+        "home 403"
+      ]
+    },
+    {
+      "domain": "openai.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": true,
+      "stratum": "blocked",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "perplexity.ai",
+      "category": "stress",
+      "reachable": false,
+      "blocked": true,
+      "stratum": "blocked",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": [
+        "home 403"
+      ]
+    },
+    {
+      "domain": "pinecone.io",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "a2a-agent-card",
+        "api-catalog",
+        "openapi"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://pinecone.io/llms.txt",
+          "host": "pinecone.io",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "a2a-agent-card",
+          "path": "/.well-known/agent-card.json",
+          "sourceUrl": "https://pinecone.io/.well-known/agent-card.json",
+          "host": "pinecone.io",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog",
+          "sourceUrl": "https://pinecone.io/.well-known/api-catalog",
+          "host": "pinecone.io",
+          "version": "rfc9727",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json",
+          "sourceUrl": "https://pinecone.io/openapi.json",
+          "host": "pinecone.io",
+          "version": "3.0.3",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "planetscale.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "api-catalog"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://planetscale.com/llms.txt",
+          "host": "planetscale.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog",
+          "sourceUrl": "https://planetscale.com/.well-known/api-catalog",
+          "host": "planetscale.com",
+          "version": "rfc9727",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "post.dz",
+      "category": "international",
+      "reachable": false,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "posthog.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "openapi"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://posthog.com/llms.txt",
+          "host": "posthog.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json",
+          "sourceUrl": "https://posthog.com/openapi.json",
+          "host": "posthog.com",
+          "version": "3.1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "prisma.io",
+      "category": "dev-docs",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://prisma.io/llms.txt",
+          "host": "prisma.io",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "python.org",
+      "category": "dev-docs",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "railway.app",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog",
+        "api-catalog",
+        "openapi"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://railway.app/llms.txt",
+          "host": "railway.app",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ard.json",
+          "sourceUrl": "https://railway.app/.well-known/ard.json",
+          "host": "railway.app",
+          "version": "0.91",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog",
+          "sourceUrl": "https://railway.app/.well-known/api-catalog",
+          "host": "railway.app",
+          "version": "rfc9727",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json",
+          "sourceUrl": "https://railway.app/openapi.json",
+          "host": "railway.app",
+          "version": "3.1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "rakuten.co.jp",
+      "category": "international",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "reddit.com",
+      "category": "negative-misc",
+      "reachable": true,
+      "blocked": true,
+      "stratum": "blocked",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "redocly.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "a2a-agent-card"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://redocly.com/llms.txt",
+          "host": "redocly.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "a2a-agent-card",
+          "path": "/.well-known/agent-card.json",
+          "sourceUrl": "https://redocly.com/.well-known/agent-card.json",
+          "host": "redocly.com",
+          "version": "0.3.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "render.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "api-catalog",
+        "openapi"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://render.com/llms.txt",
+          "host": "render.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog",
+          "sourceUrl": "https://render.com/.well-known/api-catalog",
+          "host": "render.com",
+          "version": "rfc9727",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json",
+          "sourceUrl": "https://render.com/openapi.json",
+          "host": "render.com",
+          "version": "3.1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "replit.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://replit.com/llms.txt",
+          "host": "replit.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "resend.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "api-catalog",
+        "openapi"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://resend.com/llms.txt",
+          "host": "resend.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog",
+          "sourceUrl": "https://resend.com/.well-known/api-catalog",
+          "host": "resend.com",
+          "version": "rfc9727",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json",
+          "sourceUrl": "https://resend.com/openapi.json",
+          "host": "resend.com",
+          "version": "3.0.3",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "retool.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://retool.com/llms.txt",
+          "host": "retool.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "spiegel.de",
+      "category": "negative-news",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "stanford.edu",
+      "category": "negative-gov-edu",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "stripe.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://stripe.com/llms.txt",
+          "host": "stripe.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "supabase.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog",
+        "api-catalog",
+        "openapi"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://supabase.com/llms.txt",
+          "host": "supabase.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ard.json",
+          "sourceUrl": "https://supabase.com/.well-known/ard.json",
+          "host": "supabase.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog",
+          "sourceUrl": "https://supabase.com/.well-known/api-catalog",
+          "host": "supabase.com",
+          "version": "rfc9727",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json",
+          "sourceUrl": "https://supabase.com/openapi.json",
+          "host": "supabase.com",
+          "version": "3.0.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "svelte.dev",
+      "category": "dev-docs",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://svelte.dev/llms.txt",
+          "host": "svelte.dev",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "tailwindcss.com",
+      "category": "dev-docs",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "target.com",
+      "category": "negative-biz",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://target.com/llms.txt",
+          "host": "target.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "together.ai",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://together.ai/llms.txt",
+          "host": "together.ai",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "toyota.com",
+      "category": "negative-biz",
+      "reachable": true,
+      "blocked": true,
+      "stratum": "blocked",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "turso.tech",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "openapi"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://turso.tech/llms.txt",
+          "host": "turso.tech",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json",
+          "sourceUrl": "https://turso.tech/openapi.json",
+          "host": "turso.tech",
+          "version": "3.0.1",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "ucpchecker.com",
+      "category": "standards",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog",
+        "ard-agentmap"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://ucpchecker.com/llms.txt",
+          "host": "ucpchecker.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ard.json",
+          "sourceUrl": "https://ucpchecker.com/.well-known/ard.json",
+          "host": "ucpchecker.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "ard-agentmap",
+          "path": "/robots.txt",
+          "sourceUrl": "https://ucpchecker.com/robots.txt",
+          "version": "0.91",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "upstash.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "api-catalog"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://upstash.com/llms.txt",
+          "host": "upstash.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog",
+          "sourceUrl": "https://upstash.com/.well-known/api-catalog",
+          "host": "upstash.com",
+          "version": "rfc9727",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "vercel.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog",
+        "api-catalog",
+        "openapi"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://vercel.com/llms.txt",
+          "host": "vercel.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json",
+          "sourceUrl": "https://vercel.com/.well-known/ai-catalog.json",
+          "host": "vercel.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog",
+          "sourceUrl": "https://vercel.com/.well-known/api-catalog",
+          "host": "vercel.com",
+          "version": "rfc9727",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json",
+          "sourceUrl": "https://vercel.com/openapi.json",
+          "host": "vercel.com",
+          "version": "3.0.3",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "walmart.com",
+      "category": "negative-biz",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "weaviate.io",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://weaviate.io/llms.txt",
+          "host": "weaviate.io",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json",
+          "sourceUrl": "https://weaviate.io/.well-known/ai-catalog.json",
+          "host": "weaviate.io",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "whitehouse.gov",
+      "category": "negative-gov-edu",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "wikipedia.org",
+      "category": "negative-misc",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "wordpress.com",
+      "category": "stress",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "single",
+      "groundTruthProtocols": [
+        "llms.txt"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://wordpress.com/llms.txt",
+          "host": "wordpress.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "workos.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "openapi"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://workos.com/llms.txt",
+          "host": "workos.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json",
+          "sourceUrl": "https://workos.com/openapi.json",
+          "host": "workos.com",
+          "version": "3.1.1",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "domain": "yandex.ru",
+      "category": "international",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "negative",
+      "groundTruthProtocols": [],
+      "groundTruth": [],
+      "notes": []
+    },
+    {
+      "domain": "zapier.com",
+      "category": "ai-dev",
+      "reachable": true,
+      "blocked": false,
+      "stratum": "multi",
+      "groundTruthProtocols": [
+        "llms.txt",
+        "ard-catalog",
+        "api-catalog",
+        "ard-link",
+        "ard-agentmap"
+      ],
+      "groundTruth": [
+        {
+          "protocol": "llms.txt",
+          "path": "/llms.txt",
+          "sourceUrl": "https://zapier.com/llms.txt",
+          "host": "zapier.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "ard-catalog",
+          "path": "/.well-known/ai-catalog.json",
+          "sourceUrl": "https://zapier.com/.well-known/ai-catalog.json",
+          "host": "zapier.com",
+          "version": "1.0",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "api-catalog",
+          "path": "/.well-known/api-catalog",
+          "sourceUrl": "https://zapier.com/.well-known/api-catalog",
+          "host": "zapier.com",
+          "version": "rfc9727",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "ard-link",
+          "path": "/",
+          "sourceUrl": "https://zapier.com/",
+          "version": "0.91",
+          "verifiedAt": "2026-09-17"
+        },
+        {
+          "protocol": "ard-agentmap",
+          "path": "/robots.txt",
+          "sourceUrl": "https://zapier.com/robots.txt",
+          "version": "0.91",
+          "verifiedAt": "2026-09-17"
+        }
+      ],
+      "notes": []
+    }
+  ]
+}

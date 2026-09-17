@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-09-16",
+  "generatedAt": "2026-09-17",
   "protocols": 13,
   "protocolVersions": 17,
   "adapters": 14,
-  "fixtures": 29,
-  "positiveFixtures": 19,
+  "fixtures": 31,
+  "positiveFixtures": 21,
   "rejectFixtures": 10,
-  "realWorldFixtures": 2,
+  "realWorldFixtures": 4,
   "officialVectorsVendored": 3,
   "distinctQuirksHandled": 10,
   "note": "unseen-domain metrics live in benchmarks/unseen-baseline-analysis.json (separate ruler). No confidence scores anywhere."

@@ -126,9 +126,11 @@
         "openapi/3.0/basic",
         "openapi/3.0/detect-large-truncated",
         "openapi/3.0/detect-small-full",
+        "openapi/3.0/detect-real-world-head",
         "openapi/reject/detect-complete-malformed",
         "openapi/reject/detect-html",
         "openapi/reject/detect-no-marker",
+        "openapi/reject/detect-redirect-stub",
         "openapi/reject/no-openapi-field"
       ]
     },
@@ -146,9 +148,11 @@
         "openapi/3.0/basic",
         "openapi/3.0/detect-large-truncated",
         "openapi/3.0/detect-small-full",
+        "openapi/3.0/detect-real-world-head",
         "openapi/reject/detect-complete-malformed",
         "openapi/reject/detect-html",
         "openapi/reject/detect-no-marker",
+        "openapi/reject/detect-redirect-stub",
         "openapi/reject/no-openapi-field"
       ]
     },
@@ -166,9 +170,11 @@
         "openapi/3.0/basic",
         "openapi/3.0/detect-large-truncated",
         "openapi/3.0/detect-small-full",
+        "openapi/3.0/detect-real-world-head",
         "openapi/reject/detect-complete-malformed",
         "openapi/reject/detect-html",
         "openapi/reject/detect-no-marker",
+        "openapi/reject/detect-redirect-stub",
         "openapi/reject/no-openapi-field"
       ]
     }

@@ -1,0 +1,16 @@
+{
+  "id": "openapi/reject/detect-redirect-stub",
+  "protocol": "openapi",
+  "kind": "json",
+  "origin": "real-world",
+  "detect": "openapi",
+  "truncated": false,
+  "input": {
+    "url": "https://clerk.com/openapi.json",
+    "body": "Redirecting..."
+  },
+  "expect": {
+    "ok": false
+  },
+  "notes": "Real-world (clerk.com, pinecone.io 2026-09-17): /openapi.json serves a bare 'Redirecting...' stub that redirects to the real spec. The stub body ALONE must never be detected as openapi — only the actual spec fetched after the on-domain redirect counts."
+}

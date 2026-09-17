@@ -1,0 +1,18 @@
+{
+  "id": "openapi/3.0/detect-real-world-head",
+  "protocol": "openapi",
+  "kind": "json",
+  "origin": "real-world",
+  "detect": "openapi",
+  "truncated": true,
+  "input": {
+    "url": "https://assemblyai.com/openapi.json",
+    "body": "{\n  \"openapi\": \"3.1.0\",\n  \"info\": {\n    \"title\": \"AssemblyAI API\",\n    \"description\": \"AssemblyAI API\",\n    \"version\": \"1.3.4\",\n    \"termsOfService\": \"https://www.assemblyai.com/legal/terms-of-service\",\n    \"contact\": {\n      \"name\": \"API Support\",\n      \"email\": \"support@assemblyai.com\",\n      \"url\": \"https://www.assemblyai.com/docs/\"\n    }\n  },\n  \"servers\": [\n    {\n      \"url\": \"https://api.asse"
+  },
+  "expect": {
+    "ok": true,
+    "title": "AssemblyAI API",
+    "truncated": true
+  },
+  "notes": "Real-world (assemblyai.com 2026-09-17): head of an actual multi-hundred-KB openapi 3.1 spec, truncated at the read cap — must be detected from the head marker with its title, without parsing the whole document."
+}
