@@ -30,3 +30,7 @@ benchmarks/competitive/results-smoke.jsonl
 
 # real-world benchmark transient logs (corpus.json + results.jsonl + REPORT committed)
 benchmarks/realworld/*.log
+
+# Python bytecode from running the examples
+__pycache__/
+*.pyc

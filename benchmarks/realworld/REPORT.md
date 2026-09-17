@@ -36,7 +36,7 @@ The ground truth is honest about my priors: `target.com`, which I filed under
 "negative-biz", actually publishes an llms.txt — the independent probe caught it and
 reclassified it, and NessGate found it.
 
-### Real-world adoption per standard (of 82 reachable domains)
+### Real-world adoption per standard (publisher counts across the 86 domains)
 
 | Standard | Domains publishing |
 |---|---|
@@ -57,13 +57,28 @@ Eight of the fourteen supported channels have **zero** observed publishers in th
 | Metric | Value |
 |---|---|
 | Ground-truth resources on positive domains | 86 |
-| **Correct discoveries** | **86 / 86 (100% recall)** |
+| **Correct discoveries (library)** | **86 / 86 (100% recall)** |
 | Missed resources | 0 |
 | False positives (after investigation) | 0 |
-| Incorrect attribution (source off-domain) | 0 |
+| Incorrect attribution (recorded source off-domain) | 0 |
 | Negative controls that produced any output | 0 / 36 |
 | Latency (library, same egress) | p50 1.8 s · p90 5.3 s |
 | Request count per resolution | p50 18 · range 16–20 |
+
+> **Library vs. hosted worker (important).** These figures are for the reference
+> **library**, which follows redirects with `redirect:"follow"`. The **hosted
+> `/discover` worker is domain-locked** and deliberately **refuses cross-registrable
+> redirects** (SSRF safety). Two corpus domains wholesale-rebranded and redirect
+> across a registrable-domain boundary — `neon.tech → neon.com` and
+> `railway.app → railway.com` — so the worker finds **nothing** on them while the
+> library follows the hop. **Hosted `/discover` recall on this corpus is therefore
+> ~91% (78/86), not 100%** — the 8-resource gap is exactly these two rebrands, which
+> the worker blocks by design. Two related caveats: (1) for such a followed hop the
+> library records the **pre-redirect** URL as `sourceUrl` and labels it
+> `verified-publisher-location`, so the label understates that the bytes came from a
+> different registrable domain (recommended fix: record the final post-redirect URL);
+> (2) the "incorrect attribution" check inspects that recorded label, not the actual
+> post-redirect byte origin, so it cannot see a cross-domain hop.
 
 Request count reflects the **complete, ARD v0.91-conformant default** (all channels incl.
 the required `rel="ard"` link + robots Agentmap + a DNS lookup); the opt-in `?fast=1`
