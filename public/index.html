@@ -13,7 +13,7 @@
 <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#0F2D4A">
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0F2D4A">
-<link rel="stylesheet" href="/style.css?v=10">
+<link rel="stylesheet" href="/style.css?v=11">
 <meta property="og:site_name" content="NessGate">
 <meta property="og:type" content="website">
 <meta property="og:title" content="NessGate — the neutral resolver for the agentic web">
@@ -114,21 +114,24 @@ const { resources } = await resolve("example.com");</code></pre>
   </div>
 
   <section class="why" aria-label="Why NessGate">
+    <h2 class="why-lead">One domain. Many standards. One trustworthy discovery interface.</h2>
     <div>
-      <h3>Reads what you publish</h3>
-      <p>NessGate never asks you to adopt a new format. It reads the standards you already use
-         (ARD, A2A, llms.txt, API catalogs) and normalizes them. A new standard is just a
+      <h3>Companies keep publishing as they already do</h3>
+      <p>No new format to adopt. NessGate reads the standards a domain already supports (ARD, A2A,
+         llms.txt, API catalogs, and more) in their canonical locations. A new standard is just a
          new adapter, never a competitor.</p>
     </div>
     <div>
-      <h3>One interface</h3>
-      <p>Every domain, one normalized answer, with a link back to each source. Agents stop
-         probing ten locations and guessing which one is official.</p>
+      <h3>Developers integrate once</h3>
+      <p>One request per domain instead of maintaining a separate discovery implementation for
+         every standard. Agents stop probing ten locations and guessing which answer is official —
+         NessGate does it and keeps up with the ecosystem so you don't have to.</p>
     </div>
     <div>
-      <h3>No lock-in</h3>
-      <p>Open protocol, open-source resolver, no accounts, no fees, no ranking. Run it yourself
-         or call ours — the domain always stays the authority.</p>
+      <h3>Consistent results, with evidence</h3>
+      <p>One normalized answer, each record labeled by how far it was verified and linked back to
+         its source so an agent can check against the domain directly. Open protocol, no lock-in,
+         the domain always stays the authority — plus ongoing compatibility as standards evolve.</p>
     </div>
   </section>
 </main>

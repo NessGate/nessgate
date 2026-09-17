@@ -276,6 +276,10 @@ button.copy:hover { background: var(--surface); }
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.6rem;
   margin-top: 3.25rem; padding-top: 2.1rem; border-top: 1px solid var(--border);
 }
+.why-lead {
+  grid-column: 1 / -1; margin: 0 0 .4rem; text-align: center;
+  font-size: 1.35rem; line-height: 1.3; letter-spacing: -0.01em;
+}
 .why h3 {
   font-size: .76rem; font-weight: 600; text-transform: uppercase;
   letter-spacing: .07em; color: var(--muted); margin: 0 0 .4rem;
