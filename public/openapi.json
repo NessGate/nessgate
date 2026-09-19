@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "NessGate API",
-    "version": "1.8.0",
+    "version": "1.9.0",
     "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads whatever that domain already publishes across the standard machine-discovery locations (llms.txt, ARD / ai-catalog.json, A2A agent card, RFC 9727 API catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP manifest, RFC 6415 host-meta) and returns one normalized answer, each record carrying a sourceUrl back to the domain. NessGate stores nothing, never crawls or indexes, and makes no ownership or safety claim. Read endpoints are public, unauthenticated, and CORS-open. The response contract is stable and additive: new optional fields may appear; clients must ignore unknown fields.",
     "contact": { "email": "contact@nessgate.com", "url": "https://nessgate.com/contact" },
     "termsOfService": "https://nessgate.com/terms",
@@ -29,6 +29,13 @@
             "required": false,
             "description": "Set to 1 for fast mode: SKIPS the alternate ARD locators (homepage rel=\"ard\" link and robots Agentmap) to save 2 requests. This is a labeled performance trade and is NOT fully ARD v0.91-conformant (a catalog advertised only via rel=\"ard\" can be missed) — the response is flagged mode:\"fast\" and 'checked' omits ard-link/ard-agentmap. Default (omit ?fast) is complete and conformant.",
             "schema": { "type": "string", "enum": ["1"], "example": "1" }
+          },
+          {
+            "name": "mcp",
+            "in": "query",
+            "required": false,
+            "description": "Set to 1 to introspect DECLARED MCP endpoints read-only via the protocol's own handshake (initialize + tools/list only — never tools/call, no credentials, POSTs never follow redirects). HTTPS endpoints on the queried registrable domain only, max 3 per resolution, 256 KB response cap. Declared tools land verbatim in the resource's capabilities; the response is labeled introspected:[\"mcp\"]. Default (omit ?mcp) never introspects.",
+            "schema": { "type": "string", "enum": ["1"], "example": "1" }
           }
         ],
         "responses": {
@@ -43,6 +50,7 @@
                     "provenance": { "type": "string", "enum": ["self-published"], "example": "self-published" },
                     "note": { "type": "string" },
                     "mode": { "type": "string", "enum": ["fast"], "description": "Present only when ?fast=1 was used: signals the alternate ARD locators were skipped (not fully ARD-conformant). Absent for the default complete mode." },
+                    "introspected": { "type": "array", "items": { "type": "string", "enum": ["mcp"] }, "description": "Present only when ?mcp=1 was used: read-only MCP introspection ran on declared endpoints. Absent by default." },
                     "discovered": {
                       "type": "array",
                       "description": "The routing map: which standards the domain publishes, and where.",
@@ -213,6 +221,10 @@
             "items": { "type": "object" }
           },
           "capabilitiesTruncated": { "type": "boolean", "description": "True when the publisher declared more capabilities than the cap; the list is a labeled prefix, never a silent truncation." },
+          "introspection": {
+            "type": "object",
+            "description": "Only with ?mcp=1, on declared MCP endpoint resources: the result of the read-only MCP handshake (initialize + tools/list only — no tool execution, no credentials). ok:true carries the negotiated protocolVersion and the server's own serverInfo; ok:false carries status: auth-required | legacy-transport | error. Declared tools land verbatim in capabilities."
+          },
           "security": {
             "type": "array",
             "description": "Verbatim declared security schemes (OpenAPI components.securitySchemes / Swagger-2 securityDefinitions): { name, type, scheme, in }. Capped at 40; securityTruncated flags the cap.",

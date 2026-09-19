@@ -119,6 +119,18 @@ flagged <code>capabilitiesTruncated</code> when the publisher declares more. For
 larger than the 64&nbsp;KB detection prefix, NessGate performs one additional bounded read (1&nbsp;MB cap)
 to enumerate operations; a spec larger than that stays detected but not enumerated — never partially
 extracted.</p>
+<p class="note"><strong>MCP introspection (opt-in: <code>?mcp=1</code>).</strong> When a domain <em>declares</em>
+an MCP endpoint (via AWP, an AID record, a catalog entry — never a guessed path), NessGate can ask
+that server what <em>it</em> declares, using the protocol's own read-only handshake:
+<code>initialize</code> and <code>tools/list</code> — nothing else, ever. No tool is executed, no
+credentials are sent (an auth wall is reported as <code>introspection.status: "auth-required"</code>,
+not retried), POSTs never follow redirects, and only HTTPS endpoints on the queried domain qualify
+(max&nbsp;3 per resolution, 256&nbsp;KB response cap each). The server's declared tools — verbatim
+<code>name</code>/<code>description</code>/<code>inputSchema</code> — land in the same
+<code>capabilities</code> envelope, with <code>introspection</code> carrying the negotiated
+protocol version and <code>serverInfo</code>. The response is labeled top-level
+<code>"introspected": ["mcp"]</code>; the default response never introspects. The embeddable library
+does the same via <code>resolve(domain, {mcp: true})</code>.</p>
 
 <h2>Explore a domain (evidence-based, v2)</h2>
 <pre><code>GET /explore/{domain}</code></pre>

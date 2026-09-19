@@ -1,8 +1,12 @@
-# Design: MCP `tools/list` Introspection (NOT YET IMPLEMENTED)
+# Design: MCP `tools/list` Introspection
 
-Status: **design for review — no code exists**. Approved direction (2026-09-19):
-investigate only; read-only; no tool execution; no credentials; bounded requests;
-opt-in if needed. This document is the pre-implementation design that decision asked for.
+Status: **IMPLEMENTED 2026-09-19** (reviewer-approved same day) — library
+`resolve(domain, {mcp: true})` + hosted `?mcp=1`, per this design. Decisions taken on
+the open questions: endpoint cap N=3 (kept); single `auth-required` label for 401/403
+(no fingerprinting split); SSE parsing shipped hosted directly — `tools/list` responses
+are small text frames, no measurable CPU concern. Constraints below are the
+implemented behavior, enforced by the behavioral method-allowlist test in
+`scripts/test.mjs` and the live smoke check.
 
 ## What it is
 

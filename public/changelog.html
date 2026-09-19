@@ -31,6 +31,20 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h2>2026</h2>
 
+<h3 id="mcp-introspection-2026-09-19">Opt-in read-only MCP introspection (<code>?mcp=1</code>)</h3>
+<ul>
+<li>When a domain <em>declares</em> an MCP endpoint, <code>/discover/{domain}?mcp=1</code> (and the
+library's <code>resolve(domain, {mcp: true})</code>) can ask that server what it declares, using the
+protocol's own read-only handshake: <code>initialize</code> and <code>tools/list</code> — nothing
+else, ever. No tool execution, no credentials (auth walls are labeled
+<code>auth-required</code>, never retried), POSTs never follow redirects, HTTPS endpoints on the
+queried registrable domain only, max 3 per resolution, 256&nbsp;KB response cap. Declared tools
+(<code>name</code>/<code>description</code>/<code>inputSchema</code>) land verbatim in the existing
+<code>capabilities</code> envelope; <code>introspection</code> records the negotiated protocol
+version and <code>serverInfo</code>; responses are labeled <code>introspected:["mcp"]</code>.
+Off by default — the default response never introspects. Additive; library 1.8.0.</li>
+</ul>
+
 <h3 id="capabilities-2026-09-19">Declared capabilities on resources (verbatim) + honest redirect attribution in the library</h3>
 <ul>
 <li><code>/discover</code> resources (and the library's <code>resolve()</code>) can now carry a

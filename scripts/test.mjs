@@ -38,6 +38,8 @@ import {
   nsContained,
   adapters,
   extractOpenApiCapabilities,
+  parseMcpMessages,
+  mcpToolCapabilities,
 } from "../src/worker.js";
 
 const API_CATALOG = apiCatalog();
@@ -450,6 +452,84 @@ console.log("--- declared capabilities: verbatim publisher data only, never infe
   const oaBig2 = rBig2.resources.find((x) => x.source === "openapi");
   is(oaBig2.capabilities.length, 1, "large-but-under-cap spec: second bounded read enumerates declared operations");
   is(oaBig2.capabilities[0].operationId, "a", "large spec: operationId verbatim");
+}
+
+console.log("--- MCP introspection: read-only, opt-in, verbatim server declarations");
+{
+  const lib = await import("../public/resolver.mjs");
+  // Pure parsers: plain JSON and SSE framing, worker/library parity.
+  const sse = 'event: message\ndata: {"jsonrpc":"2.0",\ndata: "id":2,"result":{"tools":[]}}\n\n';
+  is(JSON.stringify(parseMcpMessages(sse, "text/event-stream; charset=utf-8")), JSON.stringify([{ jsonrpc: "2.0", id: 2, result: { tools: [] } }]), "SSE framing parsed (multi-line data accumulated per event)");
+  is(parseMcpMessages("{not json", "application/json").length, 0, "malformed body → no messages, never guessed");
+  is(JSON.stringify(lib.parseMcpMessages(sse, "text/event-stream")), JSON.stringify(parseMcpMessages(sse, "text/event-stream")), "parseMcpMessages worker/library parity");
+  const toolsResult = { tools: [{ name: "search", description: "Search things", inputSchema: { type: "object" } }, { name: "bare" }, { description: "no name — unusable" }, "junk"] };
+  const caps = mcpToolCapabilities(toolsResult);
+  is(caps.capabilities.length, 2, "tools without a name (spec-required) are skipped; junk dropped");
+  is(caps.capabilities[0].name, "search", "tool name verbatim");
+  is(caps.capabilities[0].description, "Search things", "tool description verbatim");
+  is(caps.capabilities[0].inputSchema.type, "object", "inputSchema verbatim");
+  is(JSON.stringify(lib.mcpToolCapabilities(toolsResult)), JSON.stringify(mcpToolCapabilities(toolsResult)), "mcpToolCapabilities worker/library parity");
+
+  // Behavioral: full library flow against a mock MCP server. Records EVERY
+  // JSON-RPC method sent — the read-only allowlist is proven, not assumed.
+  const sent = [];
+  const postsTo = [];
+  const mkMcpFetch = (mcpUrl, awpHost) => async (url, opts) => {
+    const u = String(url);
+    if (opts && opts.method === "POST") {
+      postsTo.push(u);
+      const frame = JSON.parse(opts.body);
+      sent.push(frame.method);
+      const H = (extra) => ({ get: (h) => { const k = h.toLowerCase(); if (k === "content-type") return extra.ct; if (k === "mcp-session-id") return extra.sess || null; return null; } });
+      if (frame.method === "initialize") return { ok: true, status: 200, url: u, headers: H({ ct: "application/json", sess: "sess-1" }), text: async () => JSON.stringify({ jsonrpc: "2.0", id: 1, result: { protocolVersion: "2025-06-18", serverInfo: { name: "CapMCP", version: "2.0" }, capabilities: {} } }) };
+      if (frame.method === "notifications/initialized") return { ok: true, status: 202, url: u, headers: H({ ct: "" }), text: async () => "" };
+      if (frame.method === "tools/list") {
+        // Session must be echoed (spec) — refuse otherwise so the test catches it.
+        if (!opts.headers || opts.headers["Mcp-Session-Id"] !== "sess-1") return { ok: false, status: 400, url: u, headers: H({ ct: "application/json" }), text: async () => JSON.stringify({ error: "missing session" }) };
+        return { ok: true, status: 200, url: u, headers: H({ ct: "text/event-stream" }), text: async () => 'data: {"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"search","description":"Search things","inputSchema":{"type":"object"}},{"name":"bare"}]}}\n\n' };
+      }
+      return { ok: false, status: 400, url: u, headers: H({ ct: "" }), text: async () => "" };
+    }
+    if (u === "https://" + awpHost + "/.well-known/awp.json") return { ok: true, status: 200, url: u, headers: { get: () => "application/json" }, text: async () => JSON.stringify({ protocols: { mcp: mcpUrl } }) };
+    return { ok: false, status: 404, url: u, headers: { get: () => "" }, text: async () => "" };
+  };
+
+  const r = await lib.resolve("capmcp.com", { fetch: mkMcpFetch("https://capmcp.com/mcp", "capmcp.com"), mcp: true });
+  is(JSON.stringify(r.introspected), JSON.stringify(["mcp"]), "introspection is labeled top-level");
+  const mcpRes = r.resources.find((x) => String(x.type).toLowerCase() === "mcp");
+  is(mcpRes.introspection.ok, true, "introspection succeeded");
+  is(mcpRes.introspection.serverInfo.name, "CapMCP", "serverInfo verbatim");
+  is(mcpRes.introspection.protocolVersion, "2025-06-18", "negotiated protocol version recorded");
+  is(mcpRes.capabilities.length, 2, "declared tools land in the capabilities envelope");
+  is(mcpRes.capabilities[0].name, "search", "tool surfaced verbatim via SSE response");
+  is(JSON.stringify(sent), JSON.stringify(["initialize", "notifications/initialized", "tools/list"]), "EXACTLY the read-only method set was sent — nothing else, ever");
+  is(sent.includes("tools/call"), false, "tools/call is never sent (structural allowlist, behaviorally proven)");
+
+  // OFF by default: no POST leaves the resolver without opts.mcp.
+  sent.length = 0; postsTo.length = 0;
+  const rOff = await lib.resolve("capmcp.com", { fetch: mkMcpFetch("https://capmcp.com/mcp", "capmcp.com") });
+  is(sent.length, 0, "opt-in: no introspection POSTs without opts.mcp");
+  is(rOff.introspected, undefined, "opt-in: no introspected label by default");
+  is(rOff.resources.find((x) => String(x.type).toLowerCase() === "mcp").introspection, undefined, "opt-in: no introspection field by default");
+
+  // Declared EXTERNAL endpoints are never introspected.
+  sent.length = 0; postsTo.length = 0;
+  const rExt = await lib.resolve("capmcp.com", { fetch: mkMcpFetch("https://other-registrable.com/mcp", "capmcp.com"), mcp: true });
+  is(sent.length, 0, "cross-registrable declared MCP endpoint: not introspected");
+  is(rExt.resources.find((x) => String(x.type).toLowerCase() === "mcp").introspection, undefined, "external endpoint carries no introspection result");
+
+  // Auth wall = honest observation, not an error and never retried.
+  const authFetch = async (url, opts) => {
+    const u = String(url);
+    if (opts && opts.method === "POST") return { ok: false, status: 401, url: u, headers: { get: () => "" }, text: async () => "" };
+    if (u === "https://authmcp.com/.well-known/awp.json") return { ok: true, status: 200, url: u, headers: { get: () => "application/json" }, text: async () => JSON.stringify({ protocols: { mcp: "https://authmcp.com/mcp" } }) };
+    return { ok: false, status: 404, url: u, headers: { get: () => "" }, text: async () => "" };
+  };
+  const rAuth = await lib.resolve("authmcp.com", { fetch: authFetch, mcp: true });
+  const authRes = rAuth.resources.find((x) => String(x.type).toLowerCase() === "mcp");
+  is(authRes.introspection.ok, false, "auth-walled endpoint: introspection not ok");
+  is(authRes.introspection.status, "auth-required", "auth wall labeled auth-required (no credentials, no retry)");
+  is(authRes.capabilities, undefined, "auth-walled endpoint: no capabilities invented");
 }
 
 console.log("--- Related Discovery (cross-domain; strict evidence model)");

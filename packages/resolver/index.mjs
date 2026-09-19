@@ -56,6 +56,19 @@ const MAX_DISCOVER_RESOURCES = 200;
 const MAX_PER_SOURCE = 50;
 const MAX_LINKED_CATALOGS = 5;
 const MAX_CAPABILITIES = 40; // cap on verbatim declared capabilities per resource
+// MCP introspection (opt-in): bounded, read-only enumeration of what an MCP
+// endpoint declares about itself via the protocol's own handshake.
+const MCP_INTROSPECT_MAX_ENDPOINTS = 3; // endpoints introspected per resolution
+const MCP_INTROSPECT_MAX_BYTES = 262144; // response cap per POST (tool lists are small)
+const MCP_PROTOCOL_VERSION = "2025-06-18"; // newest version this client implements
+// The COMPLETE set of JSON-RPC methods introspection may ever send. Read-only
+// metadata enumeration only — tools/call and every other method are
+// structurally absent (behaviorally negative-tested).
+const MCP_INTROSPECTION_METHODS = ["initialize", "notifications/initialized", "tools/list"];
+// Resource type labels that declare an MCP endpoint (the sources' own labels:
+// AWP protocol key / AID p=mcp / self-declared "mcp"; ARD's community media
+// type for server cards). No path guessing — only declared resources qualify.
+const MCP_TYPE_LABELS = new Set(["mcp", "application/mcp-server-card+json"]);
 // OpenAPI specs are frequently multi-MB, but detection (the openapi/swagger
 // version marker) and our pointer-only record (info.title) live in the document
 // HEAD. Read only a bounded prefix so a large spec is found without downloading
@@ -491,6 +504,131 @@ export function extractOpenApiCapabilities(text) {
   }
 }
 
+/* --- MCP introspection (opt-in, read-only) — pure parts parity-tested --- */
+
+// Parse the JSON-RPC message(s) out of a Streamable-HTTP response body: plain
+// JSON, or SSE framing (data: lines accumulated per event). Verbatim; malformed
+// frames are dropped, never guessed at.
+export function parseMcpMessages(text, contentType) {
+  const out = [];
+  const push = (s) => { if (!s) return; try { const o = JSON.parse(s); if (o && typeof o === "object") out.push(o); } catch {} };
+  const ct = String(contentType || "").split(";")[0].trim().toLowerCase();
+  if (ct === "text/event-stream") {
+    let data = [];
+    for (const raw of String(text).split(/\r?\n/)) {
+      if (raw === "") { push(data.join("\n")); data = []; continue; }
+      if (raw.startsWith("data:")) data.push(raw.slice(5).replace(/^ /, ""));
+    }
+    push(data.join("\n"));
+  } else {
+    push(text);
+  }
+  return out;
+}
+
+// The server's OWN declared tools → the unified capabilities envelope. Verbatim
+// name / description / inputSchema (the spec requires name; entries without one
+// carry nothing usable and are skipped). Capped and labeled, never silent.
+export function mcpToolCapabilities(result) {
+  const tools = result && typeof result === "object" && Array.isArray(result.tools) ? result.tools : [];
+  const out = [];
+  for (const t of tools) {
+    if (!t || typeof t !== "object" || typeof t.name !== "string") continue;
+    if (out.length >= MAX_CAPABILITIES) return { capabilities: out, capabilitiesTruncated: true };
+    out.push({
+      name: t.name,
+      description: typeof t.description === "string" ? t.description : undefined,
+      inputSchema: t.inputSchema && typeof t.inputSchema === "object" ? t.inputSchema : undefined,
+    });
+  }
+  return out.length ? { capabilities: out } : null;
+}
+
+// One bounded POST of one JSON-RPC frame. Never follows redirects (a redirected
+// POST is recorded as a failure, not chased). Returns status + content type +
+// capped body text + response headers.
+async function mcpPost(fetchImpl, url, frame, extraHeaders, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetchImpl(url, {
+      method: "POST",
+      redirect: "error",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+        "User-Agent": "NessGate-Introspect/1.0 (+https://nessgate.com)",
+        ...(extraHeaders || {}),
+      },
+      body: JSON.stringify(frame),
+    });
+    const text = await res.text();
+    if (text.length > MCP_INTROSPECT_MAX_BYTES) throw new Error("response too large");
+    return { status: res.status, contentType: (res.headers && typeof res.headers.get === "function" && res.headers.get("content-type")) || "", text, headers: res.headers };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Introspect ONE declared MCP endpoint with the protocol's own read-only
+// handshake: initialize → notifications/initialized → tools/list. Nothing else
+// is ever sent (MCP_INTROSPECTION_METHODS is the complete set): no tool
+// execution, no credentials — an auth wall is an honest observation
+// ("auth-required"), never retried with secrets. Failures collapse to labeled
+// statuses; nothing is guessed.
+async function introspectMcpEndpoint(fetchImpl, url, timeoutMs) {
+  const fail = (status) => ({ introspection: { ok: false, status } });
+  try {
+    const init = await mcpPost(fetchImpl, url, {
+      jsonrpc: "2.0", id: 1, method: MCP_INTROSPECTION_METHODS[0],
+      params: { protocolVersion: MCP_PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: "NessGate-Introspect", version: "1.0" } },
+    }, null, timeoutMs);
+    if (init.status === 401 || init.status === 403) return fail("auth-required");
+    if (init.status === 405) return fail("legacy-transport"); // pre-2025 HTTP+SSE servers reject POST at the SSE URL
+    if (init.status < 200 || init.status >= 300) return fail("error");
+    const initMsg = parseMcpMessages(init.text, init.contentType).find((m) => m.id === 1);
+    if (!initMsg || !initMsg.result || typeof initMsg.result !== "object") return fail("error");
+    const session = init.headers && typeof init.headers.get === "function" ? init.headers.get("mcp-session-id") : null;
+    const negotiated = typeof initMsg.result.protocolVersion === "string" ? initMsg.result.protocolVersion : undefined;
+    const extra = { ...(session ? { "Mcp-Session-Id": session } : {}), ...(negotiated ? { "MCP-Protocol-Version": negotiated } : {}) };
+    try { await mcpPost(fetchImpl, url, { jsonrpc: "2.0", method: MCP_INTROSPECTION_METHODS[1] }, extra, timeoutMs); } catch {}
+    const lst = await mcpPost(fetchImpl, url, { jsonrpc: "2.0", id: 2, method: MCP_INTROSPECTION_METHODS[2], params: {} }, extra, timeoutMs);
+    if (lst.status === 401 || lst.status === 403) return fail("auth-required");
+    if (lst.status < 200 || lst.status >= 300) return fail("error");
+    const lstMsg = parseMcpMessages(lst.text, lst.contentType).find((m) => m.id === 2);
+    if (!lstMsg || !lstMsg.result || typeof lstMsg.result !== "object") return fail("error");
+    const si = initMsg.result.serverInfo;
+    const serverInfo = si && typeof si === "object"
+      ? { name: typeof si.name === "string" ? si.name : undefined, version: typeof si.version === "string" ? si.version : undefined }
+      : undefined;
+    return { introspection: { ok: true, protocolVersion: negotiated, serverInfo }, ...(mcpToolCapabilities(lstMsg.result) || {}) };
+  } catch {
+    return fail("error");
+  }
+}
+
+// Pick the declared MCP endpoints eligible for introspection: declared type
+// label only (no path guessing), HTTPS, same registrable domain as the query,
+// deduped, capped. Declared EXTERNAL endpoints are never introspected.
+function mcpIntrospectionCandidates(resources, domain) {
+  const out = [];
+  const seen = new Set();
+  for (const r of resources) {
+    if (!MCP_TYPE_LABELS.has(String(r.type).toLowerCase())) continue;
+    let u;
+    try { u = new URL(r.url); } catch { continue; }
+    if (u.protocol !== "https:") continue;
+    const h = u.hostname.toLowerCase().replace(/\.+$/, "");
+    if (h !== domain && !h.endsWith("." + domain)) continue;
+    if (seen.has(r.url)) continue;
+    seen.add(r.url);
+    out.push(r);
+    if (out.length >= MCP_INTROSPECT_MAX_ENDPOINTS) break;
+  }
+  return out;
+}
+
 async function dohTxt(fetchImpl, name, timeoutMs) {
   try {
     const controller = new AbortController();
@@ -664,6 +802,12 @@ async function queryGbzGateway(gbz, timeoutMs) {
 //   enables GB/Z 185.5 discovery against a caller-CONFIGURED ACPs gateway with a
 //   caller-supplied authenticated fetch. Never auto-discovered; never used by the
 //   hosted resolver or in a browser.
+// opts.mcp (optional, OFF by default): read-only MCP introspection of declared
+//   MCP endpoints (initialize + tools/list only — never tools/call, never
+//   credentials). Adds the server's own declared tools to the resource's
+//   capabilities envelope and an `introspection` status; result is labeled
+//   top-level `introspected: ["mcp"]`. Same-registrable-domain HTTPS endpoints
+//   only, max 3 per resolution.
 export async function resolve(domain, opts = {}) {
   const fetchImpl = opts.fetch || globalThis.fetch;
   if (typeof fetchImpl !== "function") throw new Error("no fetch available; pass opts.fetch");
@@ -709,7 +853,15 @@ export async function resolve(domain, opts = {}) {
     checked.push("gbz-185-5");
   }
   resources = resources.slice(0, MAX_DISCOVER_RESOURCES).map((r) => ({ ...r, class: classifyResource(r, d) }));
+  // Opt-in MCP introspection: ask each declared (same-registrable, HTTPS) MCP
+  // endpoint what IT declares, via the protocol's own read-only handshake. The
+  // results land on the endpoint's own resource record — additive, verbatim.
+  if (opts.mcp) {
+    const cands = mcpIntrospectionCandidates(resources, d);
+    await Promise.all(cands.map(async (r) => { Object.assign(r, await introspectMcpEndpoint(fetchImpl, r.url, timeoutMs)); }));
+  }
   const out = { domain: d, provenance: "self-published", discovered, resources, checked };
+  if (opts.mcp) out.introspected = ["mcp"]; // labeled: read-only introspection ran
   if (opts.fast) out.mode = "fast"; // labeled: alternate ARD locators skipped, not fully conformant
   return out;
 }
@@ -748,4 +900,4 @@ export function sameRegCanonicalHost(finalUrl, domain) {
   return h.endsWith("." + domain) ? h : null;
 }
 
-export default { resolve, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, extractOpenApiCapabilities, fetchBounded, ADAPTERS };
+export default { resolve, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, extractOpenApiCapabilities, parseMcpMessages, mcpToolCapabilities, fetchBounded, ADAPTERS };

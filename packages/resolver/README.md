@@ -53,6 +53,14 @@ Where a source document itself declares operations or skills, the record carries
 - **A2A / GB-Z agent cards** — the card's own `skills` (`id`, `name`, `description`,
   `tags`); the card-level capabilities object rides along in `raw`.
 - **ARD** entries already carry their declared media types and metadata.
+- **MCP (opt-in)** — pass `{ mcp: true }` to introspect *declared* MCP endpoints with
+  the protocol's own read-only handshake: `initialize` + `tools/list` only — never
+  `tools/call`, no credentials (an auth wall is reported as
+  `introspection.status: "auth-required"`), POSTs never follow redirects, HTTPS
+  endpoints on the queried registrable domain only, max 3 per resolution. The
+  server's declared tools (`name`, `description`, `inputSchema`) land verbatim in
+  `capabilities`; `introspection` carries the negotiated protocol version and
+  `serverInfo`; the result is labeled top-level `introspected: ["mcp"]`.
 
 NessGate never infers, renames, or classifies a capability. `capabilities` is absent
 when the source declares none; lists are capped at 40 and flagged
