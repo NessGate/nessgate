@@ -4,7 +4,7 @@
     { "identifier": "urn:air:nessgate.com:site:ai-info", "displayName": "NessGate — machine-readable profile", "type": "application/json", "url": "https://nessgate.com/ai-info.json" },
     { "identifier": "urn:air:nessgate.com:site:openapi", "displayName": "NessGate — OpenAPI description", "type": "application/openapi+json", "url": "https://nessgate.com/openapi.json" },
     { "identifier": "urn:air:nessgate.com:site:api-catalog", "displayName": "NessGate — RFC 9727 API catalog", "type": "application/linkset+json", "url": "https://nessgate.com/.well-known/api-catalog" },
-    { "identifier": "urn:air:nessgate.com:site:mcp", "displayName": "NessGate — MCP server (discover_domain)", "type": "application/octet-stream", "url": "https://nessgate.com/mcp" },
+    { "identifier": "urn:air:nessgate.com:site:mcp", "displayName": "NessGate — MCP server (discover_domain)", "type": "application/mcp-server-card+json", "url": "https://nessgate.com/mcp" },
     { "identifier": "urn:air:nessgate.com:site:resolver", "displayName": "NessGate — embeddable resolver library", "type": "text/javascript", "url": "https://nessgate.com/resolver.mjs" },
     { "identifier": "urn:air:nessgate.com:site:docs", "displayName": "NessGate — API documentation", "type": "text/html", "url": "https://nessgate.com/api" }
   ]
