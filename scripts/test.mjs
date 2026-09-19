@@ -397,6 +397,12 @@ console.log("--- declared capabilities: verbatim publisher data only, never infe
   const bigDecl = extractOpenApiCapabilities(JSON.stringify(big));
   is(bigDecl.capabilities.length, 40, "openapi: capability list capped");
   is(bigDecl.capabilitiesTruncated, true, "openapi: cap is labeled, never silent");
+  // Security schemes obey the same no-silent-caps rule.
+  const manySchemes = {};
+  for (let i = 0; i < 45; i++) manySchemes["s" + i] = { type: "apiKey" };
+  const secDecl = extractOpenApiCapabilities(JSON.stringify({ openapi: "3.0.0", components: { securitySchemes: manySchemes } }));
+  is(secDecl.security.length, 40, "openapi: security list capped");
+  is(secDecl.securityTruncated, true, "openapi: security cap is labeled, never silent");
   is(JSON.stringify(lib.extractOpenApiCapabilities(spec)), JSON.stringify(extractOpenApiCapabilities(spec)), "extractOpenApiCapabilities worker/library parity");
   // A2A: declared skills verbatim on the normalized record.
   const card = JSON.stringify({ name: "Support Agent", url: "https://acme.com/a2a", capabilities: { streaming: true }, skills: [{ id: "faq", name: "Answer FAQs", description: "Answers product questions", tags: ["support"] }, "junk", { name: "Book demo" }] });
@@ -408,6 +414,9 @@ console.log("--- declared capabilities: verbatim publisher data only, never infe
   is(a2a[0].raw.capabilities.streaming, true, "a2a: card-level capabilities object preserved in raw");
   const plainCard = normalizeResources("a2a-agent-card", "json", JSON.stringify({ name: "NoSkills", url: "https://acme.com/a2a" }), "https://acme.com/.well-known/agent-card.json");
   is(plainCard[0].capabilities, undefined, "a2a: no declared skills → NO capabilities field (absence, not invention)");
+  // Skills that declare none of id/name/description surface nothing — no {} noise.
+  const emptySkills = normalizeResources("a2a-agent-card", "json", JSON.stringify({ name: "E", url: "https://acme.com/a2a", skills: [{}, { foo: 1 }] }), "https://acme.com/.well-known/agent-card.json");
+  is(emptySkills[0].capabilities, undefined, "a2a: skills declaring nothing usable → no capabilities field");
   is(JSON.stringify(lib.normalizeResources("a2a-agent-card", "json", card, "https://acme.com/.well-known/agent-card.json")), JSON.stringify(a2a), "a2a skills normalization worker/library parity");
   // End-to-end through the library adapter: a spec that fits the prefix carries
   // its declared operations on the discovered resource.

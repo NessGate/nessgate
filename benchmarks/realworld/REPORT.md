@@ -73,16 +73,23 @@ Eight of the fourteen supported channels have **zero** observed publishers in th
 > `railway.app → railway.com` — so the worker finds **nothing** on them while the
 > library follows the hop. **Hosted `/discover` recall on this corpus is therefore
 > ~91% (78/86), not 100%** — the 8-resource gap is exactly these two rebrands, which
-> the worker blocks by design. Two related caveats: (1) for such a followed hop the
-> library records the **pre-redirect** URL as `sourceUrl` and labels it
-> `verified-publisher-location`, so the label understates that the bytes came from a
-> different registrable domain (recommended fix: record the final post-redirect URL);
-> (2) the "incorrect attribution" check inspects that recorded label, not the actual
-> post-redirect byte origin, so it cannot see a cross-domain hop.
+> the worker blocks by design. Two related caveats: (1) *at the time of this run*
+> (library 1.6.0) a followed hop recorded the **pre-redirect** URL as `sourceUrl` and
+> labeled it `verified-publisher-location`, understating that the bytes came from a
+> different registrable domain — **fixed in library 1.7.0**, which records the final
+> post-redirect URL and labels cross-registrable landings `verified-external-location`;
+> (2) the "incorrect attribution" check inspects the recorded label, not the actual
+> post-redirect byte origin, so *this run* could not see a cross-domain hop (a re-run on
+> ≥1.7.0 would).
 
 Request count reflects the **complete, ARD v0.91-conformant default** (all channels incl.
 the required `rel="ard"` link + robots Agentmap + a DNS lookup); the opt-in `?fast=1`
 mode drops ~2.
+
+> **Post-run note (library ≥ 1.7.0):** capability enumeration adds **one** additional
+> bounded read (1 MB cap) on domains whose OpenAPI document exceeds the 64 KB detection
+> prefix and does not declare a `Content-Length` beyond the cap. The request-count
+> figures above were measured on 1.6.0 and predate that read.
 
 ## False-positive investigation (the honest part)
 

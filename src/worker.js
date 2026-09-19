@@ -451,8 +451,12 @@ function declaredSkills(obj) {
   const out = [];
   for (const s of skills) {
     if (!s || typeof s !== "object") continue;
+    const entry = { id: str(s.id), name: str(s.name), description: str(s.description), tags: Array.isArray(s.tags) ? s.tags.filter((t) => typeof t === "string").slice(0, 16) : undefined };
+    // A skill that declares none of id/name/description surfaces nothing — skip
+    // it (absence, not invention; empty {} entries would be pure noise).
+    if (entry.id === undefined && entry.name === undefined && entry.description === undefined) continue;
     if (out.length >= MAX_CAPABILITIES) return { capabilities: out, capabilitiesTruncated: true };
-    out.push({ id: str(s.id), name: str(s.name), description: str(s.description), tags: Array.isArray(s.tags) ? s.tags.filter((t) => typeof t === "string").slice(0, 16) : undefined });
+    out.push(entry);
   }
   return out.length ? { capabilities: out } : null;
 }
@@ -691,12 +695,13 @@ export function extractOpenApiCapabilities(text) {
           : null;
     if (schemes) {
       const sec = [];
+      let secMore = false;
       for (const [name, s] of Object.entries(schemes)) {
         if (!s || typeof s !== "object") continue;
-        if (sec.length >= MAX_CAPABILITIES) break;
+        if (sec.length >= MAX_CAPABILITIES) { secMore = true; break; }
         sec.push({ name, type: str(s.type), scheme: str(s.scheme), in: str(s.in) });
       }
-      if (sec.length) out.security = sec;
+      if (sec.length) { out.security = sec; if (secMore) out.securityTruncated = true; } // no silent caps
     }
     return out.capabilities || out.security ? out : null;
   } catch {

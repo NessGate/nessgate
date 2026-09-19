@@ -215,9 +215,10 @@
           "capabilitiesTruncated": { "type": "boolean", "description": "True when the publisher declared more capabilities than the cap; the list is a labeled prefix, never a silent truncation." },
           "security": {
             "type": "array",
-            "description": "Verbatim declared security schemes (OpenAPI components.securitySchemes / Swagger-2 securityDefinitions): { name, type, scheme, in }.",
+            "description": "Verbatim declared security schemes (OpenAPI components.securitySchemes / Swagger-2 securityDefinitions): { name, type, scheme, in }. Capped at 40; securityTruncated flags the cap.",
             "items": { "type": "object" }
           },
+          "securityTruncated": { "type": "boolean", "description": "True when the spec declares more security schemes than the cap; the list is a labeled prefix, never a silent truncation." },
           "raw": { "type": "object" }
         },
         "required": ["source", "sourceUrl", "type", "url", "class"]
