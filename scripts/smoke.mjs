@@ -60,9 +60,11 @@ await check("?fast=1 is a LABELED reduced mode (skips optional alternate ARD loc
 });
 
 await check("?mcp=1 introspects the self MCP server read-only (labeled, verbatim tools)", async () => {
+  const MCP_LABELS = ["mcp", "application/mcp-server-card+json"]; // same set as the introspection matcher
+  const isMcp = (x) => MCP_LABELS.includes(String(x.type).toLowerCase());
   const d = await (await get("/discover/nessgate.com?mcp=1")).json();
   if (!Array.isArray(d.introspected) || d.introspected[0] !== "mcp") throw new Error("introspected label missing");
-  const r = (d.resources || []).find((x) => String(x.type).toLowerCase() === "mcp");
+  const r = (d.resources || []).find(isMcp);
   if (!r) throw new Error("self mcp resource missing");
   if (!r.introspection || r.introspection.ok !== true) throw new Error(`self MCP introspection failed: ${JSON.stringify(r.introspection)}`);
   const names = (r.capabilities || []).map((c) => c.name);
@@ -70,7 +72,7 @@ await check("?mcp=1 introspects the self MCP server read-only (labeled, verbatim
   // Default (no ?mcp) must NOT introspect.
   const d0 = await (await get("/discover/nessgate.com")).json();
   if (d0.introspected) throw new Error("default response must not carry the introspected label");
-  const r0 = (d0.resources || []).find((x) => String(x.type).toLowerCase() === "mcp");
+  const r0 = (d0.resources || []).find(isMcp);
   if (r0 && r0.introspection) throw new Error("default response must not introspect");
 });
 
