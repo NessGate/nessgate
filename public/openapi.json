@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "NessGate API",
-    "version": "1.7.0",
+    "version": "1.8.0",
     "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads whatever that domain already publishes across the standard machine-discovery locations (llms.txt, ARD / ai-catalog.json, A2A agent card, RFC 9727 API catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP manifest, RFC 6415 host-meta) and returns one normalized answer, each record carrying a sourceUrl back to the domain. NessGate stores nothing, never crawls or indexes, and makes no ownership or safety claim. Read endpoints are public, unauthenticated, and CORS-open. The response contract is stable and additive: new optional fields may appear; clients must ignore unknown fields.",
     "contact": { "email": "contact@nessgate.com", "url": "https://nessgate.com/contact" },
     "termsOfService": "https://nessgate.com/terms",
@@ -207,6 +207,17 @@
           "name": { "type": "string" },
           "id": { "type": "string" },
           "rel": { "type": "string" },
+          "capabilities": {
+            "type": "array",
+            "description": "Verbatim publisher-declared capabilities from the source document itself — OpenAPI operations (method, path, operationId, summary) or A2A/GB-Z agent-card skills (id, name, description, tags). Copied 1:1 from the publisher's own words; never inferred, renamed, or reclassified. Absent when the source declares none. Capped at 40 (capabilitiesTruncated flags the cap).",
+            "items": { "type": "object" }
+          },
+          "capabilitiesTruncated": { "type": "boolean", "description": "True when the publisher declared more capabilities than the cap; the list is a labeled prefix, never a silent truncation." },
+          "security": {
+            "type": "array",
+            "description": "Verbatim declared security schemes (OpenAPI components.securitySchemes / Swagger-2 securityDefinitions): { name, type, scheme, in }.",
+            "items": { "type": "object" }
+          },
           "raw": { "type": "object" }
         },
         "required": ["source", "sourceUrl", "type", "url", "class"]

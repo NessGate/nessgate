@@ -25,7 +25,9 @@ function makeFetch(head, totalBytes, contentType) {
       },
       cancel() { tracker.canceled = true; },
     });
-    return { ok: true, status: 200, url: "https://x.com/openapi.json", headers: { get: (h) => (h.toLowerCase() === "content-type" ? contentType : null) }, body };
+    // Declares content-length like a real server: the resolver uses it to skip
+    // a capability-enumeration re-read that could never fit within the cap.
+    return { ok: true, status: 200, url: "https://x.com/openapi.json", headers: { get: (h) => { const k = h.toLowerCase(); if (k === "content-type") return contentType; if (k === "content-length") return String(totalBytes); return null; } }, body };
   };
   const fetch = async (url) => {
     const u = String(url);

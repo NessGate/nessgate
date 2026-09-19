@@ -96,14 +96,29 @@ Never enable it silently.</p>
 verified it — with no extra requests:</p>
 <table>
 <tr><td><code>verified-publisher-location</code></td><td>NessGate fetched <em>and</em> validated this surface on the domain's own registrable domain — the resource <em>is</em> the document that was read.</td></tr>
+<tr><td><code>verified-external-location</code></td><td>Library only: the fetched document's <em>final</em> URL (after redirects) sits on a different registrable domain — the queried domain redirected there (e.g. a wholesale rebrand). The hosted resolver never follows cross-domain redirects, so it never emits this.</td></tr>
 <tr><td><code>publisher-declared</code></td><td>Declared inside a fetched catalog, with a target on the same registrable domain (including subdomains). NessGate did not fetch the target itself.</td></tr>
 <tr><td><code>declared-external-pointer</code></td><td>Declared inside a fetched catalog, but the target is on a <em>different</em> registrable domain. The publisher asserts it; NessGate did not verify it — treat with caution.</td></tr>
 <tr><td><code>unsupported</code></td><td>The record has no usable target URL to locate the resource.</td></tr>
 </table>
 <p class="note"><code>/discover</code> never fetches declared pointers (that keeps request counts low), so it
 emits no <em>inaccessible</em> class; a <em>third-party association</em> only appears under
-<code>/explore</code>'s <code>related[]</code>. Same field on the embeddable library's
-<code>resolve()</code>, so hosted and in-agent results are identical.</p>
+<code>/explore</code>'s <code>related[]</code>. The embeddable library's <code>resolve()</code> carries the
+same field, with one deliberate divergence: the library follows redirects — recording the
+<em>final</em> URL as <code>sourceUrl</code> and labeling any cross-registrable landing
+<code>verified-external-location</code> — while the hosted resolver stays domain-locked.</p>
+<p class="note"><strong>Declared capabilities (verbatim, never inferred).</strong> Where a source document
+itself declares operations or skills, the resource carries a <code>capabilities</code> array copied 1:1
+from the publisher's own words: OpenAPI operations (<code>method</code>, <code>path</code>,
+<code>operationId</code>, <code>summary</code>) plus declared <code>security</code> schemes, and A2A /
+GB&#8209;Z agent-card skills (<code>id</code>, <code>name</code>, <code>description</code>, <code>tags</code>).
+ARD entries already carry their declared media types and metadata. NessGate never infers, renames,
+or reclassifies a capability — it surfaces exactly what the domain declares, or nothing
+(<code>capabilities</code> is simply absent when nothing is declared). Lists are capped at 40 and
+flagged <code>capabilitiesTruncated</code> when the publisher declares more. For an OpenAPI document
+larger than the 64&nbsp;KB detection prefix, NessGate performs one additional bounded read (1&nbsp;MB cap)
+to enumerate operations; a spec larger than that stays detected but not enumerated — never partially
+extracted.</p>
 
 <h2>Explore a domain (evidence-based, v2)</h2>
 <pre><code>GET /explore/{domain}</code></pre>

@@ -55,6 +55,7 @@ const FAST_MODE_SKIP = new Set(["link-rel", "robots"]);
 const MAX_DISCOVER_RESOURCES = 200;
 const MAX_PER_SOURCE = 50;
 const MAX_LINKED_CATALOGS = 5;
+const MAX_CAPABILITIES = 40; // cap on verbatim declared capabilities per resource
 // OpenAPI specs are frequently multi-MB, but detection (the openapi/swagger
 // version marker) and our pointer-only record (info.title) live in the document
 // HEAD. Read only a bounded prefix so a large spec is found without downloading
@@ -174,6 +175,22 @@ export function isAcs(obj) {
   return !!(typeof obj.name === "string" || Array.isArray(obj.skills) || (obj.capabilities && typeof obj.capabilities === "object"));
 }
 
+// Verbatim skill declarations (A2A agent cards + GB/Z ACS share the `skills`
+// shape) → the unified capabilities envelope. Publisher's OWN id / name /
+// description / tags, capped, nothing inferred, nothing renamed, nothing
+// classified. Returns null when the card declares no skills.
+function declaredSkills(obj) {
+  const skills = Array.isArray(obj.skills) ? obj.skills : [];
+  const str = (v) => (typeof v === "string" ? v : undefined);
+  const out = [];
+  for (const s of skills) {
+    if (!s || typeof s !== "object") continue;
+    if (out.length >= MAX_CAPABILITIES) return { capabilities: out, capabilitiesTruncated: true };
+    out.push({ id: str(s.id), name: str(s.name), description: str(s.description), tags: Array.isArray(s.tags) ? s.tags.filter((t) => typeof t === "string").slice(0, 16) : undefined });
+  }
+  return out.length ? { capabilities: out } : null;
+}
+
 function normalizeAcs(obj, sourceUrl) {
   const str = (v) => (typeof v === "string" ? v : undefined);
   const eps = Array.isArray(obj.endPoints) ? obj.endPoints : [];
@@ -184,6 +201,7 @@ function normalizeAcs(obj, sourceUrl) {
     type: "gbz-185-4-acs",
     name: str(obj.name),
     url: str(obj.webAppUrl) || epUrl || sourceUrl,
+    ...(declaredSkills(obj) || {}),
     raw: {
       aic: str(obj.aic),
       name: str(obj.name),
@@ -275,7 +293,9 @@ export function normalizeResources(type, kind, text, sourceUrl) {
         if (isAcs(obj)) return normalizeAcs(obj, sourceUrl);
         const ifaces = Array.isArray(obj.supportedInterfaces) ? obj.supportedInterfaces : [];
         const ifaceUrl = ifaces.map((i) => (i ? str(i.url) : undefined)).find(Boolean);
-        return [rec({ type: "a2a-agent-card", name: str(obj.name), url: str(obj.url) || ifaceUrl || sourceUrl, raw: { name: str(obj.name), description: str(obj.description), version: str(obj.version), url: str(obj.url), supportedInterfaces: ifaces.length ? ifaces : undefined } })];
+        // capabilities = the card's OWN declared skills (verbatim, capped); the
+        // card-level capabilities object (streaming etc.) rides along in raw.
+        return [rec({ type: "a2a-agent-card", name: str(obj.name), url: str(obj.url) || ifaceUrl || sourceUrl, ...(declaredSkills(obj) || {}), raw: { name: str(obj.name), description: str(obj.description), version: str(obj.version), url: str(obj.url), capabilities: obj.capabilities && typeof obj.capabilities === "object" && !Array.isArray(obj.capabilities) ? obj.capabilities : undefined, supportedInterfaces: ifaces.length ? ifaces : undefined } })];
       }
       case "openapi": {
         return [rec({ type: "openapi", name: obj.info && str(obj.info.title), url: sourceUrl })];
@@ -328,14 +348,18 @@ function onDomain(host, domain) {
   return host === domain || host === "www." + domain || host.endsWith("." + domain);
 }
 
-// Bounded read → { text, truncated }. LITERAL cap: at most maxBytes of body data
+// Bounded read → { text, truncated, finalUrl }. LITERAL cap: at most maxBytes of body data
 // are ever retained in memory — the final chunk is trimmed to the remaining
 // allowance before buffering, then the stream is cancelled. `truncated` is true
 // only when there were MORE bytes beyond the cap (a body that ends exactly at
 // the cap is complete, not truncated), so callers can tell a cap-truncated
 // document from a complete one. (The network/runtime may have buffered bytes
 // under fetch before we cancel; NessGate itself retains and processes no more
-// than maxBytes.)
+// than maxBytes.) `finalUrl` is the URL the bytes actually came from — the
+// post-redirect response URL when fetchImpl followed redirects (res.url), else
+// the requested URL — so callers can attribute content to its real origin.
+// `contentLength` is the server's own declared size (when present and sane) so
+// callers can skip re-reads that could never complete within a cap.
 export async function fetchBounded(fetchImpl, url, timeoutMs, maxBytes) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -345,6 +369,9 @@ export async function fetchBounded(fetchImpl, url, timeoutMs, maxBytes) {
       headers: { Accept: "application/json, text/plain;q=0.9, */*;q=0.1", "User-Agent": "NessGate-Resolver/1.3" },
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
+    const finalUrl = (typeof res.url === "string" && res.url) || url;
+    const clRaw = res.headers && typeof res.headers.get === "function" ? res.headers.get("content-length") : null;
+    const contentLength = clRaw != null && /^\d+$/.test(String(clRaw).trim()) ? Number(clRaw) : undefined;
     const reader = res.body && typeof res.body.getReader === "function" ? res.body.getReader() : null;
     if (reader) {
       const chunks = [];
@@ -368,17 +395,20 @@ export async function fetchBounded(fetchImpl, url, timeoutMs, maxBytes) {
       const buf = new Uint8Array(size);
       let off = 0;
       for (const c of chunks) { buf.set(c, off); off += c.length; }
-      return { text: new TextDecoder().decode(buf), truncated };
+      return { text: new TextDecoder().decode(buf), truncated, finalUrl, contentLength };
     }
     const text = await res.text();
-    return text.length > maxBytes ? { text: text.slice(0, maxBytes), truncated: true } : { text, truncated: false };
+    return text.length > maxBytes ? { text: text.slice(0, maxBytes), truncated: true, finalUrl, contentLength } : { text, truncated: false, finalUrl, contentLength };
   } finally {
     clearTimeout(timer);
   }
 }
 
+// → { text, finalUrl }: content plus the URL it actually came from, so probe
+// records can attribute redirected documents to their real (post-redirect) origin.
 async function fetchText(fetchImpl, url, timeoutMs, maxBytes) {
-  return (await fetchBounded(fetchImpl, url, timeoutMs, maxBytes)).text;
+  const r = await fetchBounded(fetchImpl, url, timeoutMs, maxBytes);
+  return { text: r.text, finalUrl: r.finalUrl };
 }
 
 // OpenAPI detection. If the body completed within our cap (`truncated` false) we
@@ -402,6 +432,57 @@ export function detectOpenApi(text, truncated = false) {
     if (!ver) return { ok: false };
     const title = /"title"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(text);
     return { ok: true, title: title ? title[1] : undefined, truncated: true };
+  }
+}
+
+// Verbatim OpenAPI declarations — the publisher's OWN operations (method, path,
+// operationId, summary) and security schemes (components.securitySchemes /
+// Swagger-2 securityDefinitions), extracted 1:1 from a COMPLETE document.
+// Nothing is inferred, renamed, or reclassified: NessGate surfaces what the
+// spec says or nothing at all (a truncated document yields no capabilities —
+// partial extraction could misrepresent the API). Returns null when the
+// document doesn't parse or declares nothing. Identical worker/library
+// (parity-tested).
+export function extractOpenApiCapabilities(text) {
+  try {
+    const obj = JSON.parse(text);
+    if (!obj || typeof obj !== "object") return null;
+    const str = (v) => (typeof v === "string" ? v : undefined);
+    const out = {};
+    const METHODS = ["get", "put", "post", "delete", "options", "head", "patch", "trace"];
+    const caps = [];
+    let more = false;
+    if (obj.paths && typeof obj.paths === "object") {
+      for (const [p, item] of Object.entries(obj.paths)) {
+        if (!item || typeof item !== "object") continue;
+        for (const m of METHODS) {
+          const op = item[m];
+          if (!op || typeof op !== "object") continue;
+          if (caps.length >= MAX_CAPABILITIES) { more = true; break; }
+          caps.push({ method: m.toUpperCase(), path: p, operationId: str(op.operationId), summary: str(op.summary) });
+        }
+        if (more) break;
+      }
+    }
+    if (caps.length) { out.capabilities = caps; if (more) out.capabilitiesTruncated = true; }
+    const schemes =
+      obj.components && typeof obj.components === "object" && obj.components.securitySchemes && typeof obj.components.securitySchemes === "object"
+        ? obj.components.securitySchemes
+        : obj.securityDefinitions && typeof obj.securityDefinitions === "object"
+          ? obj.securityDefinitions
+          : null;
+    if (schemes) {
+      const sec = [];
+      for (const [name, s] of Object.entries(schemes)) {
+        if (!s || typeof s !== "object") continue;
+        if (sec.length >= MAX_CAPABILITIES) break;
+        sec.push({ name, type: str(s.type), scheme: str(s.scheme), in: str(s.in) });
+      }
+      if (sec.length) out.security = sec;
+    }
+    return out.capabilities || out.security ? out : null;
+  } catch {
+    return null;
   }
 }
 
@@ -447,13 +528,29 @@ async function runAdapter(a, domain, fetchImpl, timeoutMs, maxBytes) {
           let r;
           try { r = await fetchBounded(fetchImpl, url, timeoutMs, OPENAPI_PREFIX_BYTES); } catch { continue; }
           const det = detectOpenApi(r.text, r.truncated);
-          if (det.ok) return { discovered: [{ type: a.id, url }], resources: [{ source: "openapi", sourceUrl: url, type: "openapi", name: det.title, url }] };
+          if (det.ok) {
+            // Declared capabilities need the COMPLETE document. If the prefix
+            // held it all, parse that; else ONE additional bounded fetch (the
+            // generic byte cap). A spec still larger than the cap stays
+            // detected-but-not-enumerated — never partially extracted.
+            let capSrc = r.truncated ? null : r.text;
+            // Content-Length guard: when the server itself declares a size
+            // beyond the byte cap, the full read can never complete — skip it.
+            if (r.truncated && !(typeof r.contentLength === "number" && r.contentLength > maxBytes)) {
+              try { const full = await fetchBounded(fetchImpl, url, timeoutMs, maxBytes); if (!full.truncated) capSrc = full.text; } catch {}
+            }
+            const decl = capSrc ? extractOpenApiCapabilities(capSrc) : null;
+            return { discovered: [{ type: a.id, url: r.finalUrl }], resources: [{ source: "openapi", sourceUrl: r.finalUrl, type: "openapi", name: det.title, url: r.finalUrl, ...(decl || {}) }] };
+          }
           continue;
         }
-        let text;
-        try { text = await get(path); } catch { continue; }
-        if (validateProbeContent(a.kind, text) && probeShapeOk(a.id, a.kind, text)) {
-          return { discovered: [{ type: a.id, url }], resources: normalizeResources(a.id, a.kind, text, url) };
+        let r;
+        try { r = await get(path); } catch { continue; }
+        if (validateProbeContent(a.kind, r.text) && probeShapeOk(a.id, a.kind, r.text)) {
+          // Record the FINAL (post-redirect) URL: when fetchImpl followed a
+          // redirect the bytes came from there, and classifyResource labels a
+          // cross-registrable landing honestly (verified-external-location).
+          return { discovered: [{ type: a.id, url: r.finalUrl }], resources: normalizeResources(a.id, a.kind, r.text, r.finalUrl) };
         }
       }
       return { discovered: [], resources: [] };
@@ -462,17 +559,19 @@ async function runAdapter(a, domain, fetchImpl, timeoutMs, maxBytes) {
       const src = a.channel === "link-rel" ? "/" : "/robots.txt";
       let doc;
       try { doc = await get(src); } catch { return { discovered: [], resources: [] }; }
-      const targets = a.channel === "link-rel" ? parseLinkRel(doc, a.rels) : parseAgentmap(doc, a.directive);
+      const targets = a.channel === "link-rel" ? parseLinkRel(doc.text, a.rels) : parseAgentmap(doc.text, a.directive);
       const discovered = [], resources = [];
       for (const t of targets.slice(0, MAX_LINKED_CATALOGS)) {
         let abs;
-        try { abs = new URL(t, "https://" + domain + "/"); } catch { continue; }
+        // Relative targets resolve against the document's FINAL URL (HTML base
+        // semantics: links belong to the page that actually served them).
+        try { abs = new URL(t, doc.finalUrl || "https://" + domain + "/"); } catch { continue; }
         if (abs.protocol !== "https:" || !onDomain(abs.hostname, domain)) continue; // on-domain only
-        let text;
-        try { text = await get(abs.toString()); } catch { continue; }
-        if (validateProbeContent("json", text) && probeShapeOk(a.normalizeAs, "json", text)) {
-          discovered.push({ type: a.id, url: abs.toString() });
-          resources.push(...normalizeResources(a.normalizeAs, "json", text, abs.toString()));
+        let r;
+        try { r = await get(abs.toString()); } catch { continue; }
+        if (validateProbeContent("json", r.text) && probeShapeOk(a.normalizeAs, "json", r.text)) {
+          discovered.push({ type: a.id, url: r.finalUrl });
+          resources.push(...normalizeResources(a.normalizeAs, "json", r.text, r.finalUrl));
         }
       }
       return { discovered, resources };
@@ -549,8 +648,9 @@ async function queryGbzGateway(gbz, timeoutMs) {
 // resolve(domain, opts) -> { domain, provenance, discovered, resources, checked }
 // discovered = which mechanisms the domain publishes and where (the routing map)
 // resources  = the normalized union of what those documents contain
-// Every resource carries `source`, `sourceUrl` (fetch it to verify against the
-// domain directly), `url`, and, where useful, name/rel/id/raw.
+// Every resource carries `source`, `sourceUrl` (the FINAL fetched URL after any
+// redirects — fetch it to verify directly), `url`, and, where useful,
+// name/rel/id/raw.
 // opts.fast (optional): SKIP the alternate ARD locators (homepage <link rel="ard">,
 //   robots Agentmap) to save 2 fetches. NOT fully ARD-conformant (v0.91 requires
 //   honouring rel="ard"), so it is opt-in and the result is labeled mode:"fast".
@@ -586,11 +686,10 @@ export async function resolve(domain, opts = {}) {
       if (canon) {
         for (const [path, type, kind] of [["/llms.txt", "llms.txt", "text"], ["/.well-known/ard.json", "ard-catalog", "json"]]) {
           try {
-            const text = await fetchText(fetchImpl, "https://" + canon + path, timeoutMs, maxBytes);
-            if (validateProbeContent(kind, text) && probeShapeOk(type, kind, text)) {
-              const url = "https://" + canon + path;
-              discovered.push({ type, url });
-              resources.push(...normalizeResources(type, kind, text, url));
+            const p = await fetchText(fetchImpl, "https://" + canon + path, timeoutMs, maxBytes);
+            if (validateProbeContent(kind, p.text) && probeShapeOk(type, kind, p.text)) {
+              discovered.push({ type, url: p.finalUrl });
+              resources.push(...normalizeResources(type, kind, p.text, p.finalUrl));
             }
           } catch {}
         }
@@ -614,6 +713,11 @@ export async function resolve(domain, opts = {}) {
 // field on results, derived with NO extra requests:
 //   verified-publisher-location — the surface NessGate fetched AND validated, on
 //     the domain's own registrable domain (the resource IS the fetched document).
+//   verified-external-location — the fetched-and-validated document itself, but
+//     its FINAL URL (after redirects) is on a DIFFERENT registrable domain: the
+//     queried domain redirected there (e.g. a wholesale rebrand). Only the
+//     library emits this — it follows redirects and records the final URL; the
+//     hosted resolver never leaves the queried domain, so it never emits it.
 //   publisher-declared — declared inside a fetched catalog, target on the same
 //     registrable domain (incl. subdomains); the target itself was NOT fetched.
 //   declared-external-pointer — declared inside a fetched catalog, target on a
@@ -625,8 +729,9 @@ export async function resolve(domain, opts = {}) {
 export function classifyResource(r, domain) {
   let host;
   try { host = new URL(r.url).hostname.toLowerCase().replace(/\.+$/, ""); } catch { return "unsupported"; }
-  if (r.url === r.sourceUrl) return "verified-publisher-location";
-  return (host !== domain && !host.endsWith("." + domain)) ? "declared-external-pointer" : "publisher-declared";
+  const sameReg = host === domain || host.endsWith("." + domain);
+  if (r.url === r.sourceUrl) return sameReg ? "verified-publisher-location" : "verified-external-location";
+  return sameReg ? "publisher-declared" : "declared-external-pointer";
 }
 
 // Pure: the same-registrable-domain canonical host implied by a homepage final
@@ -638,4 +743,4 @@ export function sameRegCanonicalHost(finalUrl, domain) {
   return h.endsWith("." + domain) ? h : null;
 }
 
-export default { resolve, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, fetchBounded, ADAPTERS };
+export default { resolve, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, extractOpenApiCapabilities, fetchBounded, ADAPTERS };

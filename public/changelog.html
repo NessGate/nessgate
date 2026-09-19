@@ -31,6 +31,24 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h2>2026</h2>
 
+<h3 id="capabilities-2026-09-19">Declared capabilities on resources (verbatim) + honest redirect attribution in the library</h3>
+<ul>
+<li><code>/discover</code> resources (and the library's <code>resolve()</code>) can now carry a
+<code>capabilities</code> array copied <em>1:1 from the publisher's own declarations</em>: OpenAPI
+operations (method, path, operationId, summary) with declared <code>security</code> schemes, and
+A2A / GB&#8209;Z agent-card skills. Nothing is inferred, renamed, or reclassified &mdash; a source that
+declares nothing simply has no <code>capabilities</code> field. Lists cap at 40 with a labeled
+<code>capabilitiesTruncated</code> flag. For OpenAPI documents larger than the 64&nbsp;KB detection
+prefix, one additional bounded read (1&nbsp;MB) enumerates operations; larger specs stay
+detected-but-not-enumerated.</li>
+<li>The embeddable library (<code>@nessgate/resolver</code> 1.7.0) now records the <em>final</em>
+post-redirect URL as <code>sourceUrl</code> and labels a fetched document whose final URL crossed to
+a different registrable domain <code>verified-external-location</code> instead of
+<code>verified-publisher-location</code> &mdash; accurate attribution for wholesale rebrands
+(e.g. <code>neon.tech&nbsp;&rarr;&nbsp;neon.com</code>). The hosted resolver remains domain-locked and never
+follows cross-domain redirects. Additive; existing fields are unchanged.</li>
+</ul>
+
 <h3 id="metrics-2026-09-16">Charter amended — anonymous operational measurement of discovery fulfilment</h3>
 <ul>
 <li>Charter <a href="/charter">Promise 6</a> and the <a href="/privacy">Privacy Policy</a> now permit

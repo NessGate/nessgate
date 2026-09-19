@@ -37,6 +37,7 @@ import {
   parseAssetLinksWeb,
   nsContained,
   adapters,
+  extractOpenApiCapabilities,
 } from "../src/worker.js";
 
 const API_CATALOG = apiCatalog();
@@ -324,6 +325,124 @@ console.log("--- canonical fallback engine path (library resolve() with mocked f
   is(r2.discovered.length, 0, "fallback: cross-registrable-domain redirect is NEVER followed");
 }
 
+console.log("--- library records the FINAL (post-redirect) URL and labels rebrands honestly");
+{
+  const lib = await import("../public/resolver.mjs");
+  // Wholesale rebrand: oldbrand.com/llms.txt redirects to newbrand.com/llms.txt.
+  // fetch (redirect:"follow") lands there; res.url carries the final URL. The
+  // record must attribute the bytes to their real origin and drop the
+  // "publisher" label — the hosted-vs-library divergence the real-world
+  // benchmark audit flagged (neon.tech→neon.com).
+  const rebrand = async (url) => {
+    const u = String(url);
+    if (u === "https://oldbrand.com/llms.txt") return { ok: true, status: 200, url: "https://newbrand.com/llms.txt", text: async () => "# NewBrand\n- [docs](https://newbrand.com/docs)" };
+    return { ok: false, status: 404, url: u, text: async () => "" };
+  };
+  const r = await lib.resolve("oldbrand.com", { fetch: rebrand });
+  is(r.resources.length >= 1, true, "rebrand: resource still found (the library follows the hop)");
+  is(r.resources[0].sourceUrl, "https://newbrand.com/llms.txt", "rebrand: sourceUrl is the FINAL post-redirect URL, not the requested one");
+  is(r.resources[0].class, "verified-external-location", "rebrand: labeled verified-external-location, NOT verified-publisher-location");
+  is(r.discovered[0].url, "https://newbrand.com/llms.txt", "rebrand: discovered map records the final URL");
+  // Same-registrable redirect (apex → www) records the final URL but keeps the
+  // publisher label — the content never left the domain's own registrable domain.
+  const www = async (url) => {
+    const u = String(url);
+    if (u === "https://samebrand.com/llms.txt") return { ok: true, status: 200, url: "https://www.samebrand.com/llms.txt", text: async () => "# SameBrand" };
+    return { ok: false, status: 404, url: u, text: async () => "" };
+  };
+  const r2 = await lib.resolve("samebrand.com", { fetch: www });
+  is(r2.resources[0].sourceUrl, "https://www.samebrand.com/llms.txt", "www redirect: final URL recorded");
+  is(r2.resources[0].class, "verified-publisher-location", "www redirect: same registrable domain stays verified-publisher-location");
+  // A fetch implementation that does not expose res.url falls back to the
+  // requested URL (bring-your-own-fetch stays supported).
+  const noUrl = async (url) => {
+    const u = String(url);
+    if (u === "https://plain.com/llms.txt") return { ok: true, status: 200, text: async () => "# Plain" };
+    return { ok: false, status: 404, text: async () => "" };
+  };
+  const r3 = await lib.resolve("plain.com", { fetch: noUrl });
+  is(r3.resources[0].sourceUrl, "https://plain.com/llms.txt", "no res.url: falls back to the requested URL");
+  is(r3.resources[0].class, "verified-publisher-location", "no res.url: classification unchanged");
+}
+
+console.log("--- declared capabilities: verbatim publisher data only, never inferred");
+{
+  const lib = await import("../public/resolver.mjs");
+  // OpenAPI: operations + security schemes 1:1 from the document.
+  const spec = JSON.stringify({
+    openapi: "3.0.0",
+    info: { title: "Pet API" },
+    paths: {
+      "/pets": { get: { operationId: "listPets", summary: "List all pets" }, post: { operationId: "createPet" } },
+      "/pets/{id}": { get: { summary: "Get one pet" }, "x-vendor": { ignored: true } },
+    },
+    components: { securitySchemes: { bearer: { type: "http", scheme: "bearer" }, key: { type: "apiKey", in: "header" } } },
+  });
+  const decl = extractOpenApiCapabilities(spec);
+  is(decl.capabilities.length, 3, "openapi: one capability per declared operation (vendor extensions ignored)");
+  is(decl.capabilities[0].method, "GET", "openapi: method verbatim");
+  is(decl.capabilities[0].path, "/pets", "openapi: path verbatim");
+  is(decl.capabilities[0].operationId, "listPets", "openapi: operationId verbatim");
+  is(decl.capabilities[0].summary, "List all pets", "openapi: summary verbatim");
+  is(decl.security.length, 2, "openapi: declared security schemes surfaced");
+  is(decl.security[0].name, "bearer", "openapi: scheme name is the publisher's own key");
+  is(decl.security[0].type, "http", "openapi: scheme type verbatim");
+  is(extractOpenApiCapabilities("{not json"), null, "openapi: malformed → null (never guessed)");
+  is(extractOpenApiCapabilities('{"openapi":"3.0.0"}'), null, "openapi: no declarations → null (absence, not invention)");
+  // Swagger 2 securityDefinitions are the same publisher declaration.
+  is(extractOpenApiCapabilities(JSON.stringify({ swagger: "2.0", securityDefinitions: { basic: { type: "basic" } } })).security[0].name, "basic", "openapi: swagger-2 securityDefinitions surfaced");
+  // Cap: more declared operations than the limit → labeled truncation, never silent.
+  const big = { openapi: "3.0.0", paths: {} };
+  for (let i = 0; i < 45; i++) big.paths["/p" + i] = { get: { operationId: "op" + i } };
+  const bigDecl = extractOpenApiCapabilities(JSON.stringify(big));
+  is(bigDecl.capabilities.length, 40, "openapi: capability list capped");
+  is(bigDecl.capabilitiesTruncated, true, "openapi: cap is labeled, never silent");
+  is(JSON.stringify(lib.extractOpenApiCapabilities(spec)), JSON.stringify(extractOpenApiCapabilities(spec)), "extractOpenApiCapabilities worker/library parity");
+  // A2A: declared skills verbatim on the normalized record.
+  const card = JSON.stringify({ name: "Support Agent", url: "https://acme.com/a2a", capabilities: { streaming: true }, skills: [{ id: "faq", name: "Answer FAQs", description: "Answers product questions", tags: ["support"] }, "junk", { name: "Book demo" }] });
+  const a2a = normalizeResources("a2a-agent-card", "json", card, "https://acme.com/.well-known/agent-card.json");
+  is(a2a[0].capabilities.length, 2, "a2a: declared skills → capabilities (non-object entries dropped)");
+  is(a2a[0].capabilities[0].name, "Answer FAQs", "a2a: skill name verbatim");
+  is(a2a[0].capabilities[0].description, "Answers product questions", "a2a: skill description verbatim");
+  is(a2a[0].capabilities[0].tags[0], "support", "a2a: tags verbatim");
+  is(a2a[0].raw.capabilities.streaming, true, "a2a: card-level capabilities object preserved in raw");
+  const plainCard = normalizeResources("a2a-agent-card", "json", JSON.stringify({ name: "NoSkills", url: "https://acme.com/a2a" }), "https://acme.com/.well-known/agent-card.json");
+  is(plainCard[0].capabilities, undefined, "a2a: no declared skills → NO capabilities field (absence, not invention)");
+  is(JSON.stringify(lib.normalizeResources("a2a-agent-card", "json", card, "https://acme.com/.well-known/agent-card.json")), JSON.stringify(a2a), "a2a skills normalization worker/library parity");
+  // End-to-end through the library adapter: a spec that fits the prefix carries
+  // its declared operations on the discovered resource.
+  const mockFetch = async (url) => {
+    const u = String(url);
+    if (u === "https://capdemo.com/openapi.json") return { ok: true, status: 200, url: u, text: async () => spec };
+    return { ok: false, status: 404, url: u, text: async () => "" };
+  };
+  const r = await lib.resolve("capdemo.com", { fetch: mockFetch });
+  const oa = r.resources.find((x) => x.source === "openapi");
+  is(oa.capabilities.length, 3, "resolve(): openapi resource carries declared operations");
+  is(oa.security.length, 2, "resolve(): openapi resource carries declared security schemes");
+  is(oa.class, "verified-publisher-location", "resolve(): capability-bearing resource keeps its class");
+  // A spec larger than the 64 KB prefix triggers ONE bounded full read; if that
+  // read ALSO truncates (doc bigger than the byte cap), the spec stays
+  // detected-but-not-enumerated — never a partial extraction. The head marker
+  // sits inside the prefix, so detection holds either way.
+  const bigSpec = '{"openapi":"3.0.0","info":{"title":"Big"},"pad":"' + "x".repeat(70000) + '","paths":{"/a":{"get":{"operationId":"a"}}}}';
+  const bigMock = async (url) => {
+    const u = String(url);
+    if (u === "https://bigcap.com/openapi.json") return { ok: true, status: 200, url: u, text: async () => bigSpec };
+    return { ok: false, status: 404, url: u, text: async () => "" };
+  };
+  // Cap below the doc size → full read truncates → detected, no capabilities.
+  const rBig = await lib.resolve("bigcap.com", { fetch: bigMock, maxBytes: 66000 });
+  const oaBig = rBig.resources.find((x) => x.source === "openapi");
+  is(!!oaBig, true, "oversized spec: still detected from the bounded prefix");
+  is(oaBig.capabilities, undefined, "oversized spec: NO capabilities from a truncated document (partial extraction forbidden)");
+  // Default cap (1 MB) fits the whole doc → the second bounded read enumerates it.
+  const rBig2 = await lib.resolve("bigcap.com", { fetch: bigMock });
+  const oaBig2 = rBig2.resources.find((x) => x.source === "openapi");
+  is(oaBig2.capabilities.length, 1, "large-but-under-cap spec: second bounded read enumerates declared operations");
+  is(oaBig2.capabilities[0].operationId, "a", "large spec: operationId verbatim");
+}
+
 console.log("--- Related Discovery (cross-domain; strict evidence model)");
 {
   is(isCrossRegistrable("googleapis.com", "google.com"), true, "cross: different registrable domain");
@@ -527,12 +646,17 @@ console.log("--- resource result taxonomy (class field) — DX self-explaining r
   is(classifyResource({ url: "https://notacme.com/x", sourceUrl: "https://acme.com/.well-known/ard.json" }, D), "declared-external-pointer", "class: suffix look-alike → declared-external-pointer (not same registrable)");
   // No usable URL.
   is(classifyResource({ url: "::::", sourceUrl: "https://acme.com/.well-known/ard.json" }, D), "unsupported", "class: unparseable url → unsupported");
+  // The fetched document itself, but its FINAL URL crossed the registrable-domain
+  // boundary (the library followed a rebrand redirect and recorded where the
+  // bytes actually came from) → honest external label, never "publisher".
+  is(classifyResource({ url: "https://newbrand.com/llms.txt", sourceUrl: "https://newbrand.com/llms.txt" }, D), "verified-external-location", "class: fetched cross-registrable final URL → verified-external-location");
   // Parity: worker and library classify identically.
   const lib = await import("../public/resolver.mjs");
   for (const c of [
     { url: "https://acme.com/llms.txt", sourceUrl: "https://acme.com/llms.txt" },
     { url: "https://mcp.acme.com/mcp", sourceUrl: "https://acme.com/.well-known/ard.json" },
     { url: "https://other.org/x", sourceUrl: "https://acme.com/.well-known/ard.json" },
+    { url: "https://newbrand.com/llms.txt", sourceUrl: "https://newbrand.com/llms.txt" },
     { url: "bad", sourceUrl: "https://acme.com/x" },
   ]) is(lib.classifyResource(c, D), classifyResource(c, D), `classifyResource library/worker parity for ${c.url}`);
 }

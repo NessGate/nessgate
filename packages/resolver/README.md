@@ -34,10 +34,41 @@ for (const r of resources) {
 `resolve(domain, opts)` returns `{ domain, provenance, discovered, resources, checked }`.
 
 - `resources` — the normalized union of what the domain publishes. Each record has
-  `source`, `sourceUrl`, `type` (the source's own label), `url`, and, where useful,
-  `name` / `rel` / `id` / `raw`.
+  `source`, `sourceUrl`, `type` (the source's own label), `url`, a `class`
+  (how far NessGate verified it), and, where useful, `name` / `rel` / `id` / `raw`.
 - `discovered` — the routing map: which standards were found, and where.
 - `checked` — the standards probed.
+
+### Declared capabilities (verbatim, never inferred)
+
+Where a source document itself declares operations or skills, the record carries a
+`capabilities` array copied 1:1 from the publisher's own words:
+
+- **OpenAPI** — one entry per declared operation (`method`, `path`, `operationId`,
+  `summary`), plus a `security` array from the spec's own
+  `components.securitySchemes` / Swagger-2 `securityDefinitions`. Operations are
+  enumerated only from a **complete** document (one extra bounded read up to
+  `maxBytes` when the spec exceeds the 64 KB detection prefix); a spec larger than
+  the cap stays detected but not enumerated — never partially extracted.
+- **A2A / GB-Z agent cards** — the card's own `skills` (`id`, `name`, `description`,
+  `tags`); the card-level capabilities object rides along in `raw`.
+- **ARD** entries already carry their declared media types and metadata.
+
+NessGate never infers, renames, or classifies a capability. `capabilities` is absent
+when the source declares none; lists are capped at 40 and flagged
+`capabilitiesTruncated` when the publisher declares more.
+
+### Redirects and the `class` label
+
+The library follows redirects and records the **final** URL as `sourceUrl`. A fetched
+document whose final URL crossed to a *different* registrable domain (e.g. a wholesale
+rebrand like `neon.tech → neon.com`) is labeled `class: "verified-external-location"` —
+never `verified-publisher-location`. The other classes are
+`publisher-declared` (declared in a fetched catalog, same registrable domain, target not
+fetched), `declared-external-pointer` (declared, different registrable domain,
+unverified), and `unsupported` (no usable URL). The hosted resolver at nessgate.com is
+domain-locked and never follows cross-domain redirects, so `verified-external-location`
+appears only in library results.
 
 Options: `{ fetch, timeoutMs = 8000, maxBytes = 1_000_000 }`. Bring your own `fetch` if the
 runtime has none.
@@ -48,9 +79,10 @@ your **own authenticated fetch** (mTLS/OIDC stays on your side — the library e
 credentials). Returned agent descriptions carry `provenance: "gbz-185-5-gateway"`. Nothing is
 auto-discovered; without `opts.gbz` no gateway is ever contacted.
 
-Also exported: `normalizeResources`, `normalizeDomain`, `validateProbeContent`,
-`probeShapeOk`, `parseLinkRel`, `parseAgentmap`, `parseAidRecord`, `isAcs`,
-`normalizeAcsGatewayResponse`, and the `ADAPTERS` table.
+Also exported: `normalizeResources`, `classifyResource`, `extractOpenApiCapabilities`,
+`normalizeDomain`, `validateProbeContent`, `probeShapeOk`, `parseLinkRel`,
+`parseAgentmap`, `parseAidRecord`, `isAcs`, `normalizeAcsGatewayResponse`, and the
+`ADAPTERS` table.
 
 ## In a browser
 

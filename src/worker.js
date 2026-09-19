@@ -252,6 +252,7 @@ const DISCOVER_UA = "NessGate-Discover/1.0 (+https://nessgate.com)";
 const MAX_DISCOVER_RESOURCES = 200; // cap on the normalized resource list
 const MAX_PER_SOURCE = 50; // cap per source document (defends against huge files)
 const MAX_LINKED_CATALOGS = 5; // cap on link-rel / Agentmap catalog follows
+const MAX_CAPABILITIES = 40; // cap on verbatim declared capabilities per resource
 const DISCOVER_NOTE =
   "These locations are published by the domain itself at standard discovery surfaces. " +
   "NessGate reads them as-is and links back to each source (sourceUrl) so a client can " +
@@ -439,6 +440,23 @@ function isAcs(obj) {
   return !!(typeof obj.name === "string" || Array.isArray(obj.skills) || (obj.capabilities && typeof obj.capabilities === "object"));
 }
 
+// Verbatim skill declarations (A2A agent cards + GB/Z ACS share the `skills`
+// shape) → the unified capabilities envelope. Publisher's OWN id / name /
+// description / tags, capped, nothing inferred, nothing renamed, nothing
+// classified. Returns null when the card declares no skills. Identical to the
+// library (packages/resolver), enforced by the normalization parity test.
+function declaredSkills(obj) {
+  const skills = Array.isArray(obj.skills) ? obj.skills : [];
+  const str = (v) => (typeof v === "string" ? v : undefined);
+  const out = [];
+  for (const s of skills) {
+    if (!s || typeof s !== "object") continue;
+    if (out.length >= MAX_CAPABILITIES) return { capabilities: out, capabilitiesTruncated: true };
+    out.push({ id: str(s.id), name: str(s.name), description: str(s.description), tags: Array.isArray(s.tags) ? s.tags.filter((t) => typeof t === "string").slice(0, 16) : undefined });
+  }
+  return out.length ? { capabilities: out } : null;
+}
+
 // Map a GB/Z 185.4 ACS document into NessGate's normalized record, preserving the
 // GB/Z-specific fields (aic, provider, securitySchemes, certificate, skills) and
 // provenance. One ACS describes one agent → one record.
@@ -452,6 +470,7 @@ function normalizeAcs(obj, sourceUrl) {
     type: "gbz-185-4-acs",
     name: str(obj.name),
     url: str(obj.webAppUrl) || epUrl || sourceUrl,
+    ...(declaredSkills(obj) || {}),
     raw: {
       aic: str(obj.aic),
       name: str(obj.name),
@@ -563,7 +582,9 @@ function normalizeResources(type, kind, text, sourceUrl) {
         // top-level url, then the first interface url, then the card itself.
         const ifaces = Array.isArray(obj.supportedInterfaces) ? obj.supportedInterfaces : [];
         const ifaceUrl = ifaces.map((i) => (i ? str(i.url) : undefined)).find(Boolean);
-        return [rec({ type: "a2a-agent-card", name: str(obj.name), url: str(obj.url) || ifaceUrl || sourceUrl, raw: { name: str(obj.name), description: str(obj.description), version: str(obj.version), url: str(obj.url), supportedInterfaces: ifaces.length ? ifaces : undefined } })];
+        // capabilities = the card's OWN declared skills (verbatim, capped); the
+        // card-level capabilities object (streaming etc.) rides along in raw.
+        return [rec({ type: "a2a-agent-card", name: str(obj.name), url: str(obj.url) || ifaceUrl || sourceUrl, ...(declaredSkills(obj) || {}), raw: { name: str(obj.name), description: str(obj.description), version: str(obj.version), url: str(obj.url), capabilities: obj.capabilities && typeof obj.capabilities === "object" && !Array.isArray(obj.capabilities) ? obj.capabilities : undefined, supportedInterfaces: ifaces.length ? ifaces : undefined } })];
       }
       case "openapi": {
         return [rec({ type: "openapi", name: obj.info && str(obj.info.title), url: sourceUrl })];
@@ -632,6 +653,57 @@ export function detectOpenApi(text, truncated = false) {
   }
 }
 
+// Verbatim OpenAPI declarations — the publisher's OWN operations (method, path,
+// operationId, summary) and security schemes (components.securitySchemes /
+// Swagger-2 securityDefinitions), extracted 1:1 from a COMPLETE document.
+// Nothing is inferred, renamed, or reclassified: NessGate surfaces what the
+// spec says or nothing at all (a truncated document yields no capabilities —
+// partial extraction could misrepresent the API). Returns null when the
+// document doesn't parse or declares nothing. Identical worker/library
+// (parity-tested).
+export function extractOpenApiCapabilities(text) {
+  try {
+    const obj = JSON.parse(text);
+    if (!obj || typeof obj !== "object") return null;
+    const str = (v) => (typeof v === "string" ? v : undefined);
+    const out = {};
+    const METHODS = ["get", "put", "post", "delete", "options", "head", "patch", "trace"];
+    const caps = [];
+    let more = false;
+    if (obj.paths && typeof obj.paths === "object") {
+      for (const [p, item] of Object.entries(obj.paths)) {
+        if (!item || typeof item !== "object") continue;
+        for (const m of METHODS) {
+          const op = item[m];
+          if (!op || typeof op !== "object") continue;
+          if (caps.length >= MAX_CAPABILITIES) { more = true; break; }
+          caps.push({ method: m.toUpperCase(), path: p, operationId: str(op.operationId), summary: str(op.summary) });
+        }
+        if (more) break;
+      }
+    }
+    if (caps.length) { out.capabilities = caps; if (more) out.capabilitiesTruncated = true; }
+    const schemes =
+      obj.components && typeof obj.components === "object" && obj.components.securitySchemes && typeof obj.components.securitySchemes === "object"
+        ? obj.components.securitySchemes
+        : obj.securityDefinitions && typeof obj.securityDefinitions === "object"
+          ? obj.securityDefinitions
+          : null;
+    if (schemes) {
+      const sec = [];
+      for (const [name, s] of Object.entries(schemes)) {
+        if (!s || typeof s !== "object") continue;
+        if (sec.length >= MAX_CAPABILITIES) break;
+        sec.push({ name, type: str(s.type), scheme: str(s.scheme), in: str(s.in) });
+      }
+      if (sec.length) out.security = sec;
+    }
+    return out.capabilities || out.security ? out : null;
+  } catch {
+    return null;
+  }
+}
+
 // Fetch a bounded prefix of an on-domain document (for OpenAPI: read only the
 // head). Returns { text, truncated } — truncated true only when the body
 // exceeded the cap, so the caller can distinguish a cap-truncated document from
@@ -652,7 +724,20 @@ async function runAdapter(a, domain, env, ctx) {
           let r;
           try { r = await getOnDomainPrefix(domain, path, env, ctx, OPENAPI_PREFIX_BYTES); } catch { continue; }
           const det = detectOpenApi(r.text, r.truncated);
-          if (det.ok) return { discovered: [{ type: a.id, url }], resources: [{ source: "openapi", sourceUrl: url, type: "openapi", name: det.title, url }] };
+          if (det.ok) {
+            // Declared capabilities need the COMPLETE document. If the prefix
+            // held it all, parse that; else ONE additional bounded fetch (the
+            // generic byte cap). A spec still larger than the cap stays
+            // detected-but-not-enumerated — never partially extracted.
+            let capSrc = r.truncated ? null : r.text;
+            // Content-Length guard: when the server itself declares a size
+            // beyond the byte cap, the full read can never complete — skip it.
+            if (r.truncated && !(typeof r.contentLength === "number" && r.contentLength > MAX_JSON_BYTES)) {
+              try { const full = await getOnDomainPrefix(domain, path, env, ctx, MAX_JSON_BYTES); if (!full.truncated) capSrc = full.text; } catch {}
+            }
+            const decl = capSrc ? extractOpenApiCapabilities(capSrc) : null;
+            return { discovered: [{ type: a.id, url }], resources: [{ source: "openapi", sourceUrl: url, type: "openapi", name: det.title, url, ...(decl || {}) }] };
+          }
           continue;
         }
         let text;
@@ -873,6 +958,11 @@ function isCrossRegistrable(host, domain) {
 // field on /discover results, derived with NO extra requests:
 //   verified-publisher-location — the surface NessGate fetched AND validated, on
 //     the domain's own registrable domain (the resource IS the fetched document).
+//   verified-external-location — the fetched-and-validated document itself, but
+//     its FINAL URL is on a DIFFERENT registrable domain. The hosted worker can
+//     NEVER emit this (safeFetch refuses cross-registrable redirects); only the
+//     embeddable library — which follows redirects and records the final URL —
+//     produces it. The branch lives here so worker and library stay identical.
 //   publisher-declared — declared inside a fetched catalog, target on the same
 //     registrable domain (incl. subdomains); the target itself was NOT fetched.
 //   declared-external-pointer — declared inside a fetched catalog, target on a
@@ -885,8 +975,9 @@ function isCrossRegistrable(host, domain) {
 function classifyResource(r, domain) {
   let host;
   try { host = new URL(r.url).hostname.toLowerCase().replace(/\.+$/, ""); } catch { return "unsupported"; }
-  if (r.url === r.sourceUrl) return "verified-publisher-location";
-  return (host !== domain && !host.endsWith("." + domain)) ? "declared-external-pointer" : "publisher-declared";
+  const sameReg = host === domain || host.endsWith("." + domain);
+  if (r.url === r.sourceUrl) return sameReg ? "verified-publisher-location" : "verified-external-location";
+  return sameReg ? "publisher-declared" : "declared-external-pointer";
 }
 
 // Pure: the same-registrable-domain canonical host implied by a homepage final
@@ -1845,7 +1936,13 @@ async function safeFetch(url, allowedDomain, maxBytes, strictHosts = false, user
       off += c.length;
     }
     const text = new TextDecoder().decode(buf);
-    if (truncateAtCap) return { text, truncated };
+    if (truncateAtCap) {
+      // Surface the server's OWN declared size so callers can decide whether a
+      // larger bounded read could ever complete (skip hopeless re-reads).
+      const clRaw = res.headers && typeof res.headers.get === "function" ? res.headers.get("content-length") : null;
+      const contentLength = clRaw != null && /^\d+$/.test(String(clRaw).trim()) ? Number(clRaw) : undefined;
+      return { text, truncated, contentLength };
+    }
     // Explore mode needs the final URL (redirects can move content to another
     // host), every host touched (so redirect hosts count against the budget) and
     // the byte count (for the global byte budget). /discover callers get the
