@@ -101,7 +101,7 @@
             "name": "org",
             "in": "query",
             "required": false,
-            "description": "Set to 1 to enable Organization Discovery: probe a bounded set of plausible same-registrable-domain hosts (homepage-linked subdomains plus a small conventional shortlist, max 4 hosts x 2 paths) and report only verified resources, labelled evidence same-domain-host. Hosts probed are listed in orgChecked.",
+            "description": "Set to 1 to enable Organization Discovery: probe a bounded set of plausible same-registrable-domain hosts (homepage-linked subdomains with developer/doc-facing labels first, then a conventional shortlist incl. docs./developers./cloud., max 6 hosts x 3 paths) and report only verified resources, labelled evidence same-domain-host. Hosts probed are listed in orgChecked; hosts that refused or blackholed every probe are listed in orgBlocked (absence there is unknown; a clean 404 counts as answered). A homepage redirect to a different registrable domain is reported as homepageRedirect {from,to} - an observation of the publisher's own configuration, never merged into resources.",
             "schema": { "type": "string", "enum": ["1"] }
           },
           {

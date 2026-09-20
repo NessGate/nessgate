@@ -152,12 +152,18 @@ an <code>evidence</code> class and a <code>provenance</code> chain:</p>
 <p><strong>Organization Discovery (opt-in).</strong> Add <code>?org=1</code> to look beyond the exact
 host: many organizations publish their machine-readable resources on a related subdomain (for
 example <code>developers.openai.com</code> rather than <code>openai.com</code>). Org mode probes a
-<em>bounded</em> set of plausible same-domain hosts — subdomains the homepage itself links to, plus
-a small conventional shortlist (<code>developers</code>, <code>docs</code>, <code>api</code>, …; at
-most 4 hosts, 2 paths each) — and reports <em>only</em> resources it actually verified, labelled
-<code>same-domain-host</code>. Hosts probed are listed in <code>orgChecked</code>. No brute-force
-scanning, no crawling; a host that serves nothing recognized is simply absent. For a related host's
-full resource graph, explore that host directly.</p>
+<em>bounded</em> set of plausible same-domain hosts — homepage-linked subdomains with
+developer/documentation-facing labels first, then a small conventional shortlist
+(<code>docs</code>, <code>developers</code>, <code>cloud</code>, <code>api</code>, …; at most 6
+hosts, 3 paths each) — and reports <em>only</em> resources it actually verified, labelled
+<code>same-domain-host</code>. Hosts probed are listed in <code>orgChecked</code>; hosts that
+refused or blackholed every probe (bot protection — absence there is <em>unknown</em>, a clean 404
+still counts as answered) are listed in <code>orgBlocked</code>. If the queried domain's own
+homepage redirects to a <em>different</em> registrable domain (<code>aws.com → aws.amazon.com</code>),
+that is reported as <code>homepageRedirect</code> — an observation of the publisher's own
+configuration, never merged into resources. No brute-force scanning, no crawling; a host that
+serves nothing recognized is simply absent. For a related host's full resource graph, explore that
+host directly.</p>
 <p><strong>Related Discovery (opt-in).</strong> Add <code>?related=1</code> for a clearly separate
 cross-domain layer, returned in <code>related[]</code> (never mixed with <code>resources[]</code>).
 Classes: <code>publisher-declared-related</code> — the queried domain itself serves a purpose-built
