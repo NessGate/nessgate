@@ -322,6 +322,9 @@ console.log("--- Explore v2 Organization Discovery (opt-in, bounded, verified-on
   is(orgHostResponded([0, 0, 0]), false, "orgHostResponded: network-level failures → NOT responded (blocked)");
   is(orgHostResponded([403, 403, 429]), false, "orgHostResponded: refusal statuses → NOT responded (blocked)");
   is(orgHostResponded([-1, -1, -1]), false, "orgHostResponded: all probes skipped → not responded");
+  // A host with NO public DNS record does not exist publicly — that IS an
+  // answer (nothing published there), never a block (cloud.figma.com case).
+  is(orgHostResponded([-2, -2, -2]), true, "orgHostResponded: NXDOMAIN host → answered (does not exist ≠ blocked)");
   // homepageRedirectInfo: the domain's OWN cross-domain redirect is reported;
   // same-registrable (www., subdomain) and garbage are not.
   is(JSON.stringify(homepageRedirectInfo("https://aws.amazon.com/", "aws.com")), JSON.stringify({ from: "https://aws.com/", to: "https://aws.amazon.com/" }), "homepageRedirect: cross-registrable target reported (aws.com case)");

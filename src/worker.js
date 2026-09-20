@@ -1144,13 +1144,15 @@ function homepageRedirectInfo(finalUrl, domain) {
   return isCrossRegistrable(h, domain) ? { from: "https://" + domain + "/", to: finalUrl } : null;
 }
 
-// Pure: probes genuinely REACHED a host when one returned content (200) or a
-// clean not-found (404/410 — the host answered; nothing is published there).
+// Pure: probes genuinely REACHED an answer for a host when one returned
+// content (200), a clean not-found (404/410 — the host answered; nothing is
+// published there), or the host has no public DNS record at all (-2 — it does
+// not publicly exist, which equally means nothing is published there).
 // Network-level failures and refusal statuses (401/403/405/429, 5xx) mean the
 // host would not let us look, so absence there is UNKNOWN — the org check
 // reports such hosts in orgBlocked instead of implying they publish nothing.
 function orgHostResponded(statuses) {
-  return statuses.some((s) => s === 200 || s === 404 || s === 410);
+  return statuses.some((s) => s === 200 || s === 404 || s === 410 || s === -2);
 }
 
 // Pure: choose WHICH bounded set of same-organization hosts to probe. Homepage
@@ -1525,10 +1527,13 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
     } catch (e) {
       // Optional failure classification for callers that must distinguish "the
       // host answered with an HTTP status" from "nothing answered at all"
-      // (org mode's blocked-vs-absent honesty). 0 = network-level failure.
+      // (org mode's blocked-vs-absent honesty). 0 = network-level failure;
+      // -2 = the host has no public DNS record (it does not publicly exist —
+      // nothing is published there, which is an ANSWER, not a block).
       if (failMeta) {
-        const m = /returned HTTP (\d+)/.exec(String(e && e.message));
-        failMeta.status = m ? Number(m[1]) : 0;
+        const msg = String(e && e.message);
+        const m = /returned HTTP (\d+)/.exec(msg);
+        failMeta.status = m ? Number(m[1]) : /does not resolve/.test(msg) ? -2 : 0;
       }
       return null;
     }
