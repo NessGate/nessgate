@@ -1132,6 +1132,17 @@ function orgRecordsFromDoc(url, text, via) {
   return docRecords(url, text, "same-domain-host", ["org:" + via, url]);
 }
 
+// Pure: the queried domain's OWN homepage redirect to a DIFFERENT registrable
+// domain (aws.com → aws.amazon.com). Publisher configuration, reported as an
+// honest observation so a caller isn't stranded on an empty shell domain —
+// never merged into resources, never treated as the same authoritative host.
+function homepageRedirectInfo(finalUrl, domain) {
+  if (!finalUrl) return null;
+  let h;
+  try { h = new URL(finalUrl).hostname.toLowerCase().replace(/^www\./, ""); } catch { return null; }
+  return isCrossRegistrable(h, domain) ? { from: "https://" + domain + "/", to: finalUrl } : null;
+}
+
 // Pure: choose WHICH bounded set of same-organization hosts to probe. Homepage
 // HTML yields every same-domain absolute URL in DOM order — on large sites
 // that is CDN/telemetry/nav hosts first (cdn-dynmedia-1., wcpstatic., tv.),
@@ -1612,6 +1623,12 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
   if (org || related) homeDoc = await fetchDoc(`https://${domain}/`);
 
   let orgChecked = null;
+  // Observation, org mode only: the domain's own homepage redirect to a
+  // different registrable domain (fetchDoc already followed it; the target's
+  // HTML never yields same-domain hosts, so the shell would otherwise read as
+  // a bare empty). See homepageRedirectInfo.
+  let homepageRedirect = null;
+  if (org && homeDoc) homepageRedirect = homepageRedirectInfo(homeDoc.finalUrl, domain);
   if (org) {
     let homepageHosts = [];
     if (homeDoc) homepageHosts = parseSameOrgHosts(homeDoc.text, domain);
@@ -1761,6 +1778,7 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
     note: org ? EXPLORE_NOTE + " " + ORG_NOTE : EXPLORE_NOTE,
     checked: ADAPTERS.map((a) => a.id),
     ...(orgChecked ? { orgChecked } : {}),
+    ...(homepageRedirect ? { homepageRedirect } : {}),
     resources,
     ...(relatedOut
       ? {
@@ -2412,4 +2430,4 @@ function selfDomain() { return SELF_DOMAIN; }
 function apiCatalog() { return API_CATALOG; }
 function mcpTools() { return MCP_TOOLS; }
 function adapters() { return ADAPTERS; }
-export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, assertPublicDns, hostAllowedForDomain, isForbiddenHost, normalizeResources, classifyResource, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, selectOrgHosts, orgRecordsFromDoc, docRecords, isCrossRegistrable, sameRegCanonicalHost, probeShapeOkObj, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters };
+export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, assertPublicDns, hostAllowedForDomain, isForbiddenHost, normalizeResources, classifyResource, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, selectOrgHosts, homepageRedirectInfo, orgRecordsFromDoc, docRecords, isCrossRegistrable, sameRegCanonicalHost, probeShapeOkObj, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters };

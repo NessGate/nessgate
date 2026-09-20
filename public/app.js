@@ -87,6 +87,7 @@ if (resolveForm) {
         let related = null; // null = the check itself failed/timed out
         let checkedHosts = [];
         let rateLimited = false;
+        let redirectTarget = null; // the domain's own cross-domain homepage redirect (aws.com → aws.amazon.com)
         try {
           const orgRes = await fetch("/explore/" + encodeURIComponent(domain) + "?org=1", { signal: ctrl.signal });
           if (orgRes.status === 429) {
@@ -98,6 +99,9 @@ if (resolveForm) {
                 (r) => r && r.evidence === "same-domain-host" && typeof r.url === "string" && r.url.startsWith("https://")
               );
               if (Array.isArray(orgData.orgChecked)) checkedHosts = orgData.orgChecked;
+              if (orgData.homepageRedirect && typeof orgData.homepageRedirect.to === "string") {
+                try { redirectTarget = new URL(orgData.homepageRedirect.to).hostname.replace(/^www\./, ""); } catch {}
+              }
             }
           }
         } catch {} finally {
@@ -133,6 +137,22 @@ if (resolveForm) {
               : "Nothing could be confirmed on common related hosts. ") +
             "Note: some sites' bot protection blocks checks from hosted infrastructure, so published files can be missed here.";
           box.append(p);
+        }
+        // The domain itself redirects to a different registrable domain — the
+        // publisher's own configuration. Offer to check that domain instead
+        // (its own resolution, under its own authority — never merged in here).
+        if (redirectTarget && redirectTarget !== domain) {
+          const p = document.createElement("p");
+          p.textContent = domain + " itself redirects to " + redirectTarget + " — its resources likely live under that domain.";
+          box.append(p);
+          const followBtn = document.createElement("button");
+          followBtn.type = "button";
+          followBtn.textContent = "Check " + redirectTarget + " →";
+          followBtn.addEventListener("click", () => {
+            $("resolveDomain").value = redirectTarget;
+            resolveForm.requestSubmit();
+          });
+          box.append(followBtn);
         }
       });
     } catch {

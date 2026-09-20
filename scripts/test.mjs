@@ -28,6 +28,7 @@ import {
   verifyCandidateRecords,
   parseSameOrgHosts,
   selectOrgHosts,
+  homepageRedirectInfo,
   orgRecordsFromDoc,
   docRecords,
   isCrossRegistrable,
@@ -309,6 +310,13 @@ console.log("--- Explore v2 Organization Discovery (opt-in, bounded, verified-on
   // Dedupe: homepage-linked docs. must not appear twice via the shortlist.
   const dd = selectOrgHosts(["docs.dup.com"], "dup.com");
   is(dd.filter((x) => x.h === "docs.dup.com").length, 1, "selectOrgHosts: homepage + conventional dedupe");
+  // homepageRedirectInfo: the domain's OWN cross-domain redirect is reported;
+  // same-registrable (www., subdomain) and garbage are not.
+  is(JSON.stringify(homepageRedirectInfo("https://aws.amazon.com/", "aws.com")), JSON.stringify({ from: "https://aws.com/", to: "https://aws.amazon.com/" }), "homepageRedirect: cross-registrable target reported (aws.com case)");
+  is(homepageRedirectInfo("https://www.aws.com/", "aws.com"), null, "homepageRedirect: www of the same domain is not a redirect away");
+  is(homepageRedirectInfo("https://docs.aws.com/x", "aws.com"), null, "homepageRedirect: own subdomain is not cross-domain");
+  is(homepageRedirectInfo("::::", "aws.com"), null, "homepageRedirect: unparseable final URL → null");
+  is(homepageRedirectInfo(null, "aws.com"), null, "homepageRedirect: no final URL → null");
   const orgArd = orgRecordsFromDoc("https://developers.example.com/.well-known/ard.json", JSON.stringify({ entries: [{ type: "application/json", url: "https://developers.example.com/a.json" }] }), "homepage-link");
   is(orgArd.length, 1, "org: an ARD catalog on a related host is normalized");
   is(orgArd[0].evidence, "same-domain-host", "org: ARD entries labelled same-domain-host");

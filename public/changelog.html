@@ -43,6 +43,11 @@ longer consume the probe budget. Probes now also include
 bounded probe list; a host is still reported only when it serves a validated machine-readable
 document. The homepage check UI now lists exactly which hosts were checked when nothing is found,
 and distinguishes rate limiting from a timeout.</li>
+<li>When the queried domain's own homepage redirects to a <em>different</em> registrable domain
+(<code>aws.com → aws.amazon.com</code>), the org response now reports it as
+<code>homepageRedirect</code> — an honest observation of the publisher's own configuration, never
+merged into resources — and the homepage UI offers a one-click "Check {target} →" follow-through.
+Shell domains stop reading as bare, unexplained empties.</li>
 </ul>
 
 <h3 id="mcp-introspection-2026-09-19">Opt-in read-only MCP introspection (<code>?mcp=1</code>)</h3>
