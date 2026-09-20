@@ -27,6 +27,7 @@ import {
   mcpRegistryRecords,
   verifyCandidateRecords,
   parseSameOrgHosts,
+  selectOrgHosts,
   orgRecordsFromDoc,
   docRecords,
   isCrossRegistrable,
@@ -285,6 +286,29 @@ console.log("--- Explore v2 Organization Discovery (opt-in, bounded, verified-on
   is(orgLlms[0].evidence, "same-domain-host", "org: labelled same-domain-host");
   is(JSON.stringify(orgLlms[0].provenance), JSON.stringify(["org:conventional", "https://developers.example.com/llms.txt"]), "org: provenance records how the host was found");
   is(orgRecordsFromDoc("https://docs.example.com/llms.txt", "<!doctype html><html>SPA shell</html>", "conventional").length, 0, "org: an SPA catch-all shell is NOT reported (wildcard-DNS guard)");
+  // selectOrgHosts: the bounded probe slots must go to plausible PUBLISHING
+  // hosts, not whatever same-domain URL happens to appear first in the HTML.
+  // Real-world failure this guards: microsoft.com's homepage yields
+  // cdn-dynmedia-1./web.vortex.data./wcpstatic./fpt. first, which consumed all
+  // 4 slots and starved docs./developers./the conventional shortlist.
+  const junkFirst = ["cdn-dynmedia-1.big.com", "web.vortex.data.big.com", "wcpstatic.big.com", "fpt.big.com", "docs.big.com"];
+  const selJunk = selectOrgHosts(junkFirst, "big.com");
+  is(selJunk.length, 4, "selectOrgHosts: capped at ORG_MAX_HOSTS");
+  is(selJunk[0].h, "docs.big.com", "selectOrgHosts: dev-facing homepage host outranks CDN junk");
+  is(selJunk[0].via, "homepage-link", "selectOrgHosts: homepage evidence label kept");
+  is(selJunk[1].h, "developers.big.com", "selectOrgHosts: conventional shortlist fills before junk");
+  is(selJunk.some((x) => x.h === "cdn-dynmedia-1.big.com"), false, "selectOrgHosts: CDN junk never wins a slot while better candidates exist");
+  // openai-shaped case: community.* (Discourse serves llms.txt) must stay eligible.
+  const oai = selectOrgHosts(["deploymentsafety.openai.com", "platform.openai.com", "developers.openai.com", "community.openai.com"], "openai.com");
+  is(oai.map((x) => x.h).includes("community.openai.com"), true, "selectOrgHosts: community.* homepage link keeps its slot (real llms publisher pattern)");
+  is(oai.map((x) => x.h).includes("deploymentsafety.openai.com"), false, "selectOrgHosts: non-dev-facing homepage host yields to conventional candidates");
+  // No homepage hosts → pure conventional shortlist, docs first.
+  const conv = selectOrgHosts([], "plain.com");
+  is(conv[0].h, "docs.plain.com", "selectOrgHosts: conventional fallback starts at docs.");
+  is(conv.every((x) => x.via === "conventional"), true, "selectOrgHosts: conventional entries labeled");
+  // Dedupe: homepage-linked docs. must not appear twice via the shortlist.
+  const dd = selectOrgHosts(["docs.dup.com"], "dup.com");
+  is(dd.filter((x) => x.h === "docs.dup.com").length, 1, "selectOrgHosts: homepage + conventional dedupe");
   const orgArd = orgRecordsFromDoc("https://developers.example.com/.well-known/ard.json", JSON.stringify({ entries: [{ type: "application/json", url: "https://developers.example.com/a.json" }] }), "homepage-link");
   is(orgArd.length, 1, "org: an ARD catalog on a related host is normalized");
   is(orgArd[0].evidence, "same-domain-host", "org: ARD entries labelled same-domain-host");

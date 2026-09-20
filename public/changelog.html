@@ -31,6 +31,20 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h2>2026</h2>
 
+<h3 id="org-hosts-2026-09-19">Related-host check: probe slots go to plausible publishing hosts</h3>
+<ul>
+<li><code>/explore/{domain}?org=1</code> probes a bounded set of same-domain hosts. Host selection is
+now prioritized: homepage-linked hosts with developer/documentation-facing labels
+(<code>docs.</code>, <code>developers.</code>, <code>api.</code>, <code>platform.</code>,
+<code>community.</code>, …) first, then the conventional shortlist, then remaining homepage-linked
+hosts — so CDN/telemetry/navigation subdomains that happen to appear first in the homepage HTML no
+longer consume the probe budget. Probes now also include
+<code>/.well-known/ai-catalog.json</code> (the ARD-canonical name). Prioritization only orders the
+bounded probe list; a host is still reported only when it serves a validated machine-readable
+document. The homepage check UI now lists exactly which hosts were checked when nothing is found,
+and distinguishes rate limiting from a timeout.</li>
+</ul>
+
 <h3 id="mcp-introspection-2026-09-19">Opt-in read-only MCP introspection (<code>?mcp=1</code>)</h3>
 <ul>
 <li>When a domain <em>declares</em> an MCP endpoint, <code>/discover/{domain}?mcp=1</code> (and the

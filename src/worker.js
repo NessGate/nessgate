@@ -1082,9 +1082,14 @@ const MAX_CANDIDATES = 10; // cap on opt-in caller-supplied candidate URLs to ve
 // DNS; the relationship is organizational, not independently verified). This is
 // not crawling: at most ORG_MAX_HOSTS hosts × ORG_PROBE_PATHS paths, sharing the
 // same request/host/byte budget, content-validated before being reported.
-const ORG_SUBDOMAIN_SHORTLIST = ["developers", "developer", "docs", "api", "ai", "open"];
+const ORG_SUBDOMAIN_SHORTLIST = ["docs", "developers", "api", "developer", "platform", "learn"];
 const ORG_MAX_HOSTS = 4;
-const ORG_PROBE_PATHS = ["/llms.txt", "/.well-known/ard.json"];
+const ORG_PROBE_PATHS = ["/llms.txt", "/.well-known/ard.json", "/.well-known/ai-catalog.json"];
+// Leftmost labels that mark a host as developer/documentation-facing. Used ONLY
+// to ORDER the bounded probe list (which hosts get the few slots) — never as an
+// authority signal. "community" earns its place empirically: Discourse-hosted
+// community.* sites auto-serve llms.txt (community.openai.com).
+const ORG_DEV_LABELS = new Set(["docs", "developers", "developer", "api", "platform", "learn", "community", "dev", "ai", "open"]);
 const ORG_NOTE =
   "Organization Discovery results (evidence \"same-domain-host\") are machine-readable resources " +
   "verified on hosts under the same registrable domain — subdomains the homepage links to, or a " +
@@ -1125,6 +1130,32 @@ function docRecords(url, text, evidence, prov) {
 // Pure: turn one fetched org-host document into same-domain-host records.
 function orgRecordsFromDoc(url, text, via) {
   return docRecords(url, text, "same-domain-host", ["org:" + via, url]);
+}
+
+// Pure: choose WHICH bounded set of same-organization hosts to probe. Homepage
+// HTML yields every same-domain absolute URL in DOM order — on large sites
+// that is CDN/telemetry/nav hosts first (cdn-dynmedia-1., wcpstatic., tv.),
+// which used to crowd the few probe slots out of the hosts that actually
+// publish (docs., developers.). Priority, deterministic:
+//   1. homepage-linked hosts whose leftmost label is developer/doc-facing
+//      (publisher evidence AND a plausible publishing host),
+//   2. the conventional shortlist (docs.{d}, developers.{d}, …),
+//   3. remaining homepage-linked hosts, original order.
+// Ordering only — a probed host still must serve a validated machine-readable
+// document to be reported at all.
+function selectOrgHosts(homepageHosts, domain) {
+  const seen = new Set();
+  const out = [];
+  const take = (h, via) => {
+    if (seen.has(h) || out.length >= ORG_MAX_HOSTS) return;
+    seen.add(h);
+    out.push({ h, via });
+  };
+  const devFacing = (h) => ORG_DEV_LABELS.has(String(h).split(".")[0]);
+  for (const h of homepageHosts) if (devFacing(h)) take(h, "homepage-link");
+  for (const p of ORG_SUBDOMAIN_SHORTLIST) take(`${p}.${domain}`, "conventional");
+  for (const h of homepageHosts) take(h, "homepage-link");
+  return out;
 }
 
 /* ----- Related Discovery (cross-registrable-domain; see docs/related-discovery-rules.md) ----- */
@@ -1584,10 +1615,7 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
   if (org) {
     let homepageHosts = [];
     if (homeDoc) homepageHosts = parseSameOrgHosts(homeDoc.text, domain);
-    const orgHosts = [
-      ...homepageHosts.map((h) => ({ h, via: "homepage-link" })),
-      ...ORG_SUBDOMAIN_SHORTLIST.map((p) => `${p}.${domain}`).filter((h) => !homepageHosts.includes(h)).map((h) => ({ h, via: "conventional" })),
-    ].slice(0, ORG_MAX_HOSTS);
+    const orgHosts = selectOrgHosts(homepageHosts, domain);
     orgChecked = [];
     for (const { h, via } of orgHosts) {
       if (budget.truncated) break;
@@ -2384,4 +2412,4 @@ function selfDomain() { return SELF_DOMAIN; }
 function apiCatalog() { return API_CATALOG; }
 function mcpTools() { return MCP_TOOLS; }
 function adapters() { return ADAPTERS; }
-export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, assertPublicDns, hostAllowedForDomain, isForbiddenHost, normalizeResources, classifyResource, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, orgRecordsFromDoc, docRecords, isCrossRegistrable, sameRegCanonicalHost, probeShapeOkObj, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters };
+export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, assertPublicDns, hostAllowedForDomain, isForbiddenHost, normalizeResources, classifyResource, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, selectOrgHosts, orgRecordsFromDoc, docRecords, isCrossRegistrable, sameRegCanonicalHost, probeShapeOkObj, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters };

@@ -85,18 +85,32 @@ if (resolveForm) {
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), 35000);
         let related = null; // null = the check itself failed/timed out
+        let checkedHosts = [];
+        let rateLimited = false;
         try {
           const orgRes = await fetch("/explore/" + encodeURIComponent(domain) + "?org=1", { signal: ctrl.signal });
-          const orgData = await orgRes.json();
-          if (!orgData.error) {
-            related = (Array.isArray(orgData.resources) ? orgData.resources : []).filter(
-              (r) => r && r.evidence === "same-domain-host" && typeof r.url === "string" && r.url.startsWith("https://")
-            );
+          if (orgRes.status === 429) {
+            rateLimited = true;
+          } else {
+            const orgData = await orgRes.json();
+            if (!orgData.error) {
+              related = (Array.isArray(orgData.resources) ? orgData.resources : []).filter(
+                (r) => r && r.evidence === "same-domain-host" && typeof r.url === "string" && r.url.startsWith("https://")
+              );
+              if (Array.isArray(orgData.orgChecked)) checkedHosts = orgData.orgChecked;
+            }
           }
         } catch {} finally {
           clearTimeout(timer);
         }
         orgBtn.remove();
+        if (rateLimited) {
+          const p = document.createElement("p");
+          p.className = "meta";
+          p.textContent = "Rate limit reached — please wait a minute and try again.";
+          box.append(p);
+          return;
+        }
         if (related === null) {
           const p = document.createElement("p");
           p.className = "meta";
@@ -114,8 +128,10 @@ if (resolveForm) {
           const p = document.createElement("p");
           p.className = "meta";
           p.textContent =
-            "Nothing could be confirmed on common related hosts either. Note: some sites' bot protection blocks " +
-            "checks from hosted infrastructure, so published files can be missed here.";
+            (checkedHosts.length
+              ? "Checked " + checkedHosts.join(", ") + " — nothing machine-readable was confirmed there. "
+              : "Nothing could be confirmed on common related hosts. ") +
+            "Note: some sites' bot protection blocks checks from hosted infrastructure, so published files can be missed here.";
           box.append(p);
         }
       });
