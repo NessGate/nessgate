@@ -1144,6 +1144,15 @@ function homepageRedirectInfo(finalUrl, domain) {
   return isCrossRegistrable(h, domain) ? { from: "https://" + domain + "/", to: finalUrl } : null;
 }
 
+// Pure: probes genuinely REACHED a host when one returned content (200) or a
+// clean not-found (404/410 — the host answered; nothing is published there).
+// Network-level failures and refusal statuses (401/403/405/429, 5xx) mean the
+// host would not let us look, so absence there is UNKNOWN — the org check
+// reports such hosts in orgBlocked instead of implying they publish nothing.
+function orgHostResponded(statuses) {
+  return statuses.some((s) => s === 200 || s === 404 || s === 410);
+}
+
 // Pure: choose WHICH bounded set of same-organization hosts to probe. Homepage
 // HTML yields every same-domain absolute URL in DOM order — on large sites
 // that is CDN/telemetry/nav hosts first (cdn-dynmedia-1., wcpstatic., tv.),
@@ -1492,7 +1501,7 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
   // (original → …redirects… → final), so provenance can preserve the whole path —
   // or null. Counts requests, and — via exploreBudgetAllows — every host touched
   // (including redirect hops) and the bytes fetched against the global budgets.
-  async function fetchDoc(url) {
+  async function fetchDoc(url, failMeta) {
     let host;
     try { host = new URL(url).hostname.toLowerCase().replace(/\.+$/, ""); } catch { return null; }
     if (budget.seen.has(url)) return null;
@@ -1513,7 +1522,14 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
       exploreBudgetAllows(budget, meta, EXPLORE_LIMITS); // counts redirect hosts + bytes
       budget.seen.add(meta.finalUrl); // the resolved URL is now accounted for
       return { text: meta.text, finalUrl: meta.finalUrl, chain: meta.redirectChain };
-    } catch {
+    } catch (e) {
+      // Optional failure classification for callers that must distinguish "the
+      // host answered with an HTTP status" from "nothing answered at all"
+      // (org mode's blocked-vs-absent honesty). 0 = network-level failure.
+      if (failMeta) {
+        const m = /returned HTTP (\d+)/.exec(String(e && e.message));
+        failMeta.status = m ? Number(m[1]) : 0;
+      }
       return null;
     }
   }
@@ -1624,6 +1640,7 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
   if (org || related) homeDoc = await fetchDoc(`https://${domain}/`);
 
   let orgChecked = null;
+  let orgBlocked = null;
   // Observation, org mode only: the domain's own homepage redirect to a
   // different registrable domain (fetchDoc already followed it; the target's
   // HTML never yields same-domain hosts, so the shell would otherwise read as
@@ -1635,14 +1652,24 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
     if (homeDoc) homepageHosts = parseSameOrgHosts(homeDoc.text, domain);
     const orgHosts = selectOrgHosts(homepageHosts, domain);
     orgChecked = [];
+    orgBlocked = [];
     for (const { h, via } of orgHosts) {
       if (budget.truncated) break;
       orgChecked.push(h);
+      const statuses = [];
       for (const p of ORG_PROBE_PATHS) {
-        const doc = await fetchDoc(`https://${h}${p}`);
-        if (!doc) continue;
-        for (const rec of orgRecordsFromDoc(doc.finalUrl, doc.text, via)) out.push(rec);
+        const failMeta = { status: -1 }; // -1 = probe skipped (budget), neither reached nor refused
+        const doc = await fetchDoc(`https://${h}${p}`, failMeta);
+        if (doc) {
+          statuses.push(200);
+          for (const rec of orgRecordsFromDoc(doc.finalUrl, doc.text, via)) out.push(rec);
+          continue;
+        }
+        statuses.push(failMeta.status);
       }
+      // Every probe refused or blackholed → the host blocked the look; absence
+      // there is unknown, never implied.
+      if (!orgHostResponded(statuses) && statuses.some((s) => s === 0 || s === 401 || s === 403 || s === 405 || s === 429 || s >= 500)) orgBlocked.push(h);
     }
   }
 
@@ -1779,6 +1806,7 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
     note: org ? EXPLORE_NOTE + " " + ORG_NOTE : EXPLORE_NOTE,
     checked: ADAPTERS.map((a) => a.id),
     ...(orgChecked ? { orgChecked } : {}),
+    ...(orgBlocked && orgBlocked.length ? { orgBlocked } : {}),
     ...(homepageRedirect ? { homepageRedirect } : {}),
     resources,
     ...(relatedOut
@@ -2431,4 +2459,4 @@ function selfDomain() { return SELF_DOMAIN; }
 function apiCatalog() { return API_CATALOG; }
 function mcpTools() { return MCP_TOOLS; }
 function adapters() { return ADAPTERS; }
-export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, assertPublicDns, hostAllowedForDomain, isForbiddenHost, normalizeResources, classifyResource, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, selectOrgHosts, homepageRedirectInfo, orgRecordsFromDoc, docRecords, isCrossRegistrable, sameRegCanonicalHost, probeShapeOkObj, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters };
+export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, assertPublicDns, hostAllowedForDomain, isForbiddenHost, normalizeResources, classifyResource, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, selectOrgHosts, orgHostResponded, homepageRedirectInfo, orgRecordsFromDoc, docRecords, isCrossRegistrable, sameRegCanonicalHost, probeShapeOkObj, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters };

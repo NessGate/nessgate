@@ -50,9 +50,10 @@ merged into resources — and the homepage UI offers a one-click "Check {target}
 Shell domains stop reading as bare, unexplained empties.</li>
 <li>Probe set widened: <code>cloud.</code> joined the conventional shortlist (cloud.google.com
 serves <code>llms.txt</code> while docs./developers.google.com do not) and the host cap rose from 4
-to 6, still inside the request budget. The UI now also distinguishes "every request was blocked"
-(zero bytes returned — the site rejects hosted checks; absence is <em>unknown</em>, and the
-embeddable library from your own machine may succeed) from "checked and nothing found".</li>
+to 6, still inside the request budget. Org responses also gain <code>orgBlocked</code>: hosts whose
+probes were all refused or blackholed (network failure, 401/403/405/429, 5xx) — a clean 404 still
+counts as "answered, publishes nothing". The UI reports blocked hosts as <em>absence unknown</em>
+(the embeddable library from your own machine may succeed) instead of implying "nothing found".</li>
 </ul>
 
 <h3 id="mcp-introspection-2026-09-19">Opt-in read-only MCP introspection (<code>?mcp=1</code>)</h3>
