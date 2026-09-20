@@ -294,7 +294,7 @@ console.log("--- Explore v2 Organization Discovery (opt-in, bounded, verified-on
   // 4 slots and starved docs./developers./the conventional shortlist.
   const junkFirst = ["cdn-dynmedia-1.big.com", "web.vortex.data.big.com", "wcpstatic.big.com", "fpt.big.com", "docs.big.com"];
   const selJunk = selectOrgHosts(junkFirst, "big.com");
-  is(selJunk.length, 4, "selectOrgHosts: capped at ORG_MAX_HOSTS");
+  is(selJunk.length, 6, "selectOrgHosts: capped at ORG_MAX_HOSTS");
   is(selJunk[0].h, "docs.big.com", "selectOrgHosts: dev-facing homepage host outranks CDN junk");
   is(selJunk[0].via, "homepage-link", "selectOrgHosts: homepage evidence label kept");
   is(selJunk[1].h, "developers.big.com", "selectOrgHosts: conventional shortlist fills before junk");
@@ -307,6 +307,9 @@ console.log("--- Explore v2 Organization Discovery (opt-in, bounded, verified-on
   const conv = selectOrgHosts([], "plain.com");
   is(conv[0].h, "docs.plain.com", "selectOrgHosts: conventional fallback starts at docs.");
   is(conv.every((x) => x.via === "conventional"), true, "selectOrgHosts: conventional entries labeled");
+  // google-shaped case: cloud.* must be probed even with no homepage evidence —
+  // cloud.google.com serves llms.txt while docs./developers.google.com do not.
+  is(conv.some((x) => x.h === "cloud.plain.com"), true, "selectOrgHosts: cloud. is in the conventional probe set");
   // Dedupe: homepage-linked docs. must not appear twice via the shortlist.
   const dd = selectOrgHosts(["docs.dup.com"], "dup.com");
   is(dd.filter((x) => x.h === "docs.dup.com").length, 1, "selectOrgHosts: homepage + conventional dedupe");

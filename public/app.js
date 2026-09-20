@@ -87,6 +87,7 @@ if (resolveForm) {
         let related = null; // null = the check itself failed/timed out
         let checkedHosts = [];
         let rateLimited = false;
+        let allBlocked = false; // every request failed (bytes 0) — the site blocks hosted checks; NOT the same as "nothing published"
         let redirectTarget = null; // the domain's own cross-domain homepage redirect (aws.com → aws.amazon.com)
         try {
           const orgRes = await fetch("/explore/" + encodeURIComponent(domain) + "?org=1", { signal: ctrl.signal });
@@ -99,6 +100,7 @@ if (resolveForm) {
                 (r) => r && r.evidence === "same-domain-host" && typeof r.url === "string" && r.url.startsWith("https://")
               );
               if (Array.isArray(orgData.orgChecked)) checkedHosts = orgData.orgChecked;
+              if (orgData.stats && orgData.stats.requests > 0 && orgData.stats.bytes === 0) allBlocked = true;
               if (orgData.homepageRedirect && typeof orgData.homepageRedirect.to === "string") {
                 try { redirectTarget = new URL(orgData.homepageRedirect.to).hostname.replace(/^www\./, ""); } catch {}
               }
@@ -128,6 +130,18 @@ if (resolveForm) {
           note.className = "meta";
           note.textContent = "Same registrable domain; the organizational relationship is not independently verified.";
           box.append(note);
+        } else if (allBlocked) {
+          // Honest distinction: zero bytes came back from ANY request — the site
+          // rejects checks from hosted infrastructure. We could not look, which
+          // is not the same as confirming absence.
+          const p = document.createElement("p");
+          p.className = "meta";
+          p.textContent =
+            domain + " and its related hosts did not respond to checks from our infrastructure (likely bot protection). " +
+            "We can't tell whether machine-readable files exist" +
+            (checkedHosts.length ? " — attempted: " + checkedHosts.join(", ") : "") +
+            ". Running the open-source resolver library from your own machine may succeed where hosted checks are blocked.";
+          box.append(p);
         } else {
           const p = document.createElement("p");
           p.className = "meta";

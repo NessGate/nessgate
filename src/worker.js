@@ -1082,14 +1082,15 @@ const MAX_CANDIDATES = 10; // cap on opt-in caller-supplied candidate URLs to ve
 // DNS; the relationship is organizational, not independently verified). This is
 // not crawling: at most ORG_MAX_HOSTS hosts × ORG_PROBE_PATHS paths, sharing the
 // same request/host/byte budget, content-validated before being reported.
-const ORG_SUBDOMAIN_SHORTLIST = ["docs", "developers", "api", "developer", "platform", "learn"];
-const ORG_MAX_HOSTS = 4;
+const ORG_SUBDOMAIN_SHORTLIST = ["docs", "developers", "cloud", "api", "developer", "platform", "learn"];
+const ORG_MAX_HOSTS = 6; // 6 hosts × 3 paths + homepage stays inside maxRequests (24); over-budget probes degrade gracefully (truncated:true)
 const ORG_PROBE_PATHS = ["/llms.txt", "/.well-known/ard.json", "/.well-known/ai-catalog.json"];
 // Leftmost labels that mark a host as developer/documentation-facing. Used ONLY
 // to ORDER the bounded probe list (which hosts get the few slots) — never as an
 // authority signal. "community" earns its place empirically: Discourse-hosted
-// community.* sites auto-serve llms.txt (community.openai.com).
-const ORG_DEV_LABELS = new Set(["docs", "developers", "developer", "api", "platform", "learn", "community", "dev", "ai", "open"]);
+// community.* sites auto-serve llms.txt (community.openai.com). "cloud" too:
+// cloud.google.com serves llms.txt while docs./developers.google.com do not.
+const ORG_DEV_LABELS = new Set(["docs", "developers", "developer", "api", "platform", "learn", "community", "cloud", "dev", "ai", "open"]);
 const ORG_NOTE =
   "Organization Discovery results (evidence \"same-domain-host\") are machine-readable resources " +
   "verified on hosts under the same registrable domain — subdomains the homepage links to, or a " +
