@@ -1118,7 +1118,13 @@ async function apiDiscover(raw, env, ctx, request) {
 // minutes. Once the deadline passes, no NEW fetch starts (an in-flight one still
 // honors its own 8s timeout, so worst case ≈ deadline + one fetch); the answer
 // returns with whatever was gathered and stats.truncated = true.
-const EXPLORE_LIMITS = { maxDepth: 2, maxHosts: 8, maxRequests: 24, maxTotalBytes: 6_000_000, deadlineMs: 20_000 };
+// maxDepth is a RUNAWAY BACKSTOP only, not the effective limit: an explicit
+// publisher-declared chain (company.com → agents.company.com catalog →
+// mcp.api.agents.company.com) is followed to arbitrary depth — the REAL
+// limiters are requests/bytes/hosts/deadline plus the seen-set (loop
+// detection) and per-hop validation. Raised from 2 (which cut legitimate
+// declaration chains) per the 2026-09-21 evidence-based-discovery review.
+const EXPLORE_LIMITS = { maxDepth: 8, maxHosts: 8, maxRequests: 24, maxTotalBytes: 6_000_000, deadlineMs: 20_000 };
 const MAX_CANDIDATES = 10; // cap on opt-in caller-supplied candidate URLs to verify (subrequest budget)
 
 // Organization Discovery (opt-in, ?org=1). Major organizations publish their
@@ -2518,4 +2524,5 @@ function selfDomain() { return SELF_DOMAIN; }
 function apiCatalog() { return API_CATALOG; }
 function mcpTools() { return MCP_TOOLS; }
 function adapters() { return ADAPTERS; }
-export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, assertPublicDns, hostAllowedForDomain, isForbiddenHost, normalizeResources, classifyResource, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, selectOrgHosts, orgHostResponded, homepageRedirectInfo, probeFailureKind, resolutionOutcome, orgRecordsFromDoc, docRecords, isCrossRegistrable, sameRegCanonicalHost, probeShapeOkObj, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters };
+function exploreLimits() { return EXPLORE_LIMITS; }
+export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, assertPublicDns, hostAllowedForDomain, isForbiddenHost, normalizeResources, classifyResource, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, selectOrgHosts, orgHostResponded, homepageRedirectInfo, probeFailureKind, resolutionOutcome, orgRecordsFromDoc, docRecords, isCrossRegistrable, sameRegCanonicalHost, probeShapeOkObj, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters, exploreLimits };

@@ -42,6 +42,7 @@ import {
   parseAssetLinksWeb,
   nsContained,
   adapters,
+  exploreLimits,
   extractOpenApiCapabilities,
   parseMcpMessages,
   mcpToolCapabilities,
@@ -579,6 +580,17 @@ console.log("--- MCP introspection: read-only, opt-in, verbatim server declarati
   is(authRes.introspection.ok, false, "auth-walled endpoint: introspection not ok");
   is(authRes.introspection.status, "auth-required", "auth wall labeled auth-required (no credentials, no retry)");
   is(authRes.capabilities, undefined, "auth-walled endpoint: no capabilities invented");
+}
+
+console.log("--- explore depth is a runaway backstop, not the effective limit");
+{
+  // The 2026-09-21 evidence-based-discovery review: an explicit publisher-
+  // declared chain (company.com → agents.company.com catalog → deeper) must be
+  // followable beyond 2 hops; requests/bytes/hosts/deadline + the seen-set are
+  // the REAL limiters. Guards against maxDepth quietly regressing to 2.
+  const L = exploreLimits();
+  is(L.maxDepth >= 8, true, "explore maxDepth is a backstop (>=8), budgets bind first");
+  is(L.maxRequests <= 32 && L.maxHosts <= 8 && L.deadlineMs <= 30000, true, "the real limiters (requests/hosts/deadline) stay tight");
 }
 
 console.log("--- outcome honesty: found / none-found / blocked, never hidden uncertainty");

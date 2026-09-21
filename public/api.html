@@ -145,7 +145,9 @@ does the same via <code>resolve(domain, {mcp: true})</code>.</p>
 <pre><code>GET /explore/{domain}</code></pre>
 <p>Everything <code>/discover</code> returns, plus <strong>bounded delegated discovery</strong>. It
 follows the explicit machine-readable pointers a domain declares — the links inside an
-<code>llms.txt</code> index, ARD and api-catalog entries — up to depth 2, crossing to another host
+<code>llms.txt</code> index, ARD and api-catalog entries — following an explicit declaration chain
+to arbitrary depth (bounded by the request/byte/host/time budgets, with loop detection and per-hop
+validation, plus a runaway backstop), crossing to another host
 <em>only</em> where the publisher itself named the target. It also federates the official
 <strong>MCP Registry</strong> for the domain's verified reverse-DNS namespace. Every resource gains
 an <code>evidence</code> class and a <code>provenance</code> chain:</p>
@@ -199,7 +201,9 @@ suggests, NessGate verifies</em>; NessGate never decides ownership. Up to 10 can
 these responses are never cached. The plain <code>GET</code> stays fully deterministic.</p>
 <p>Response adds <code>federated</code>, per-record <code>evidence</code>/<code>provenance</code>/<code>depth</code>,
 and <code>stats</code> (counts, requests, hosts, bytes, <code>truncated</code>). It is strictly
-bounded — depth&nbsp;≤2, ≤8 hosts, ≤24 requests, a global byte cap, and the same SSRF checks on
+bounded — ≤8 hosts, ≤24 requests, a global byte cap and deadline (declaration chains are followed
+to arbitrary depth within those budgets; a depth backstop only guards against runaways), and the
+same SSRF checks on
 every cross-host hop — and, like <code>/discover</code>, stores nothing, crawls nothing, guesses no
 subdomains, runs no AI, and makes no ownership claim. <code>/discover</code> is unchanged for
 existing integrations.</p>

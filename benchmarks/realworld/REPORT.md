@@ -1,6 +1,22 @@
 # NessGate real-world compatibility report
 
-**Date:** 2026-09-17 · **Corpus:** 86 real domains · **Result:** 100% recall (86/86), 0 false positives, 0 incorrect attribution, 0/36 negative-control triggers.
+**Date:** 2026-09-17, fully re-probed and re-run **2026-09-21** · **Corpus:** 86 real domains ·
+**2026-09-21 result (library 1.9.0 vs fresh independent ground truth):** 100% recall (87/87),
+0 false positives, 0 silent misattributions, 0/37 negative-control triggers, 41 cross-domain
+records from publisher rebrands (neon.tech→neon.com, railway.app→railway.com) all carrying the
+honest `verified-external-location`/external labels. Latency p50 2.2 s · requests p50 18.
+
+> **2026-09-21 re-run notes.** (1) Ground truth was independently re-probed corpus-wide —
+> ground-truth aging is real: prisma.io began publishing `/openapi.json` after the original
+> probe date, so the earlier run flagged a "false positive" that was actually a genuine find;
+> the refreshed ground truth confirms it. (2) The attribution check now distinguishes **silent**
+> misattribution (an off-domain `sourceUrl` with no honest label — a real defect, count: 0) from
+> **labeled external records** (the library ≥1.7.0 follows a publisher's own wholesale redirect,
+> records the final URL, and labels the result — correct behavior, counted separately). (3) One
+> stress-stratum domain was replaced with `excalidraw.com` (SPA catch-all serving 200+HTML shells
+> for every path — validators must reject all of it; they do). (4) Strata shifted slightly with
+> the fresh ground truth (multi 25 / single 17 / negative 37 / blocked 7) as sites changed what
+> they publish. The original 2026-09-17 report follows below.
 
 This benchmark measures NessGate's discovery accuracy against **independently established
 ground truth** on a diverse set of real domains — not against NessGate's own output.
