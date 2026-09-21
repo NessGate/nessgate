@@ -27,12 +27,12 @@
 // resolver at https://nessgate.com/discover/{domain} performs these checks.
 
 export const ADAPTERS = [
-  { id: "llms.txt", channel: "well-known", paths: ["/llms.txt"], kind: "text" },
+  { id: "llms.txt", channel: "well-known", paths: ["/llms.txt", "/llms-full.txt"], kind: "text" },
   { id: "ard-catalog", channel: "well-known", paths: ["/.well-known/ard.json", "/.well-known/ai-catalog.json"], kind: "json" },
   { id: "a2a-agent-card", channel: "well-known", paths: ["/.well-known/agent-card.json", "/.well-known/agent.json"], kind: "json" },
   { id: "api-catalog", channel: "well-known", paths: ["/.well-known/api-catalog"], kind: "json" },
   { id: "ai-info.json", channel: "well-known", paths: ["/ai-info.json"], kind: "json" },
-  { id: "openapi", channel: "well-known", paths: ["/openapi.json"], kind: "json" },
+  { id: "openapi", channel: "well-known", paths: ["/openapi.json", "/openapi.yaml", "/openapi.yml"], kind: "json" },
   { id: "ord", channel: "well-known", paths: ["/.well-known/open-resource-discovery"], kind: "json" },
   { id: "awp", channel: "well-known", paths: ["/.well-known/awp.json"], kind: "json" },
   { id: "host-meta", channel: "well-known", paths: ["/.well-known/host-meta.json"], kind: "json" },
@@ -629,6 +629,29 @@ function mcpIntrospectionCandidates(resources, domain) {
   return out;
 }
 
+// Bounded YAML OpenAPI detection — the document's own top-level
+// `openapi: <version>` marker on a non-HTML body; title read verbatim from the
+// info block when the simple line structure allows. No YAML parser (the
+// library stays dependency-free), so YAML specs are detected as pointer
+// records without capability enumeration — a documented limitation, never a
+// guess. Identical worker/library (parity-tested).
+export function detectOpenApiYaml(text) {
+  if (typeof text !== "string" || !text || /^\s*</.test(text)) return { ok: false };
+  const ver = /^openapi:\s*['"]?(\d[\d.]*)/m.exec(text);
+  if (!ver) return { ok: false };
+  const title = /^\s{1,8}title:\s*['"]?([^'"\n]{1,160})/m.exec(text);
+  return { ok: true, title: title ? title[1].trim() : undefined };
+}
+
+// Pure: drop duplicate records produced when ONE document is legitimately
+// reachable through several channels (well-known path + rel="ard" link +
+// robots Agentmap all naming the same catalog). Keeps the first occurrence
+// (channel order = priority). Identical worker/library (parity-tested).
+export function dedupeResources(resources) {
+  const seen = new Set();
+  return resources.filter((r) => { const k = r.source + "|" + r.url + "|" + r.sourceUrl; if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
 async function dohTxt(fetchImpl, name, timeoutMs) {
   try {
     const controller = new AbortController();
@@ -697,7 +720,14 @@ export function resolutionOutcome(resourceCount, probes) {
 async function runAdapter(a, domain, fetchImpl, timeoutMs, maxBytes, probes) {
   // probes (optional): shared failure tally for the outcome label — every
   // failed fetch is classified answered-vs-refused by probeFailureKind.
-  const miss = (e) => { if (probes) probes[probeFailureKind(e && e.message)]++; };
+  // NXDOMAIN is an ANSWER (the host does not exist → nothing is published
+  // there), distinguishable in Node via the error cause chain; runtimes
+  // without cause.code keep the older, overcautious classification. Deadline
+  // skips (see resolve) are our own budget, neither answered nor refused.
+  const miss = (e) => {
+    if (!probes || (e && e.deadlineSkip)) return;
+    probes[e && e.cause && e.cause.code === "ENOTFOUND" ? "answered" : probeFailureKind(e && e.message)]++;
+  };
   const get = (pathOrUrl) => {
     const url = /^https?:\/\//i.test(pathOrUrl) ? pathOrUrl : "https://" + domain + pathOrUrl;
     return fetchText(fetchImpl, url, timeoutMs, maxBytes);
@@ -711,6 +741,13 @@ async function runAdapter(a, domain, fetchImpl, timeoutMs, maxBytes, probes) {
         if (a.id === "openapi") {
           let r;
           try { r = await fetchBounded(fetchImpl, url, timeoutMs, OPENAPI_PREFIX_BYTES); } catch (e) { miss(e); continue; }
+          // YAML specs: detected by the document's own top-level marker;
+          // pointer record only (no capability enumeration without a parser).
+          if (/\.ya?ml$/.test(path)) {
+            const det = detectOpenApiYaml(r.text);
+            if (det.ok) return { discovered: [{ type: a.id, url: r.finalUrl }], resources: [{ source: "openapi", sourceUrl: r.finalUrl, type: "openapi", name: det.title, url: r.finalUrl }] };
+            continue;
+          }
           const det = detectOpenApi(r.text, r.truncated);
           if (det.ok) {
             // Declared capabilities need the COMPLETE document. If the prefix
@@ -849,13 +886,50 @@ async function queryGbzGateway(gbz, timeoutMs) {
 //   capabilities envelope and an `introspection` status; result is labeled
 //   top-level `introspected: ["mcp"]`. Same-registrable-domain HTTPS endpoints
 //   only, max 3 per resolution.
+// opts.org (optional, OFF by default): when the exact host publishes nothing,
+//   probe a bounded set of plausible same-registrable-domain hosts —
+//   homepage-linked subdomains with developer/doc-facing labels first, then a
+//   conventional shortlist (docs./developers./cloud./api.) — for llms.txt,
+//   ard.json and openapi.json. The library counterpart of the hosted
+//   /explore?org=1. ≤4 hosts × 3 paths; hosts attempted are reported in
+//   `orgChecked`; findings classify normally (same registrable domain,
+//   fetched + validated → verified-publisher-location).
+// opts.deadlineMs (default 20000): a GLOBAL wall-clock budget for the whole
+//   resolution (the hosted worker has always had one). Past the deadline no
+//   NEW fetch starts; deadline skips count as neither answered nor refused;
+//   an empty, cut-short result is labeled outcome "incomplete" with
+//   truncated: true — never a confident absence.
 export async function resolve(domain, opts = {}) {
-  const fetchImpl = opts.fetch || globalThis.fetch;
-  if (typeof fetchImpl !== "function") throw new Error("no fetch available; pass opts.fetch");
+  const rawFetch = opts.fetch || globalThis.fetch;
+  if (typeof rawFetch !== "function") throw new Error("no fetch available; pass opts.fetch");
   const timeoutMs = opts.timeoutMs || 8000;
   const maxBytes = opts.maxBytes || 1_000_000;
   const d = normalizeDomain(domain);
   if (!d) throw new Error("invalid domain");
+
+  // Global deadline + apex-DNS-flap guard, wrapped around every fetch:
+  // a transient local NXDOMAIN on the APEX must not read as a confident
+  // absence — its first ENOTFOUND is retried once; only a repeated apex
+  // NXDOMAIN propagates as genuine nonexistence.
+  const startedAt = Date.now();
+  const deadlineMs = opts.deadlineMs || 20000;
+  let deadlineHit = false;
+  let apexDnsRetried = false;
+  const fetchImpl = async (url, init) => {
+    if (Date.now() - startedAt > deadlineMs) { deadlineHit = true; const e = new Error("resolver deadline reached"); e.deadlineSkip = true; throw e; }
+    try {
+      return await rawFetch(url, init);
+    } catch (e) {
+      let host = "";
+      try { host = new URL(url).hostname.toLowerCase(); } catch {}
+      if (e && e.cause && e.cause.code === "ENOTFOUND" && (host === d || host === "www." + d) && !apexDnsRetried) {
+        apexDnsRetried = true;
+        await new Promise((r) => setTimeout(r, 300));
+        return rawFetch(url, init);
+      }
+      throw e;
+    }
+  };
 
   // Default = COMPLETE, ARD-conformant discovery (all channels incl. the required
   // rel="ard" link). opts.fast SKIPS the alternate ARD locators for speed — a
@@ -864,7 +938,7 @@ export async function resolve(domain, opts = {}) {
   // probes tallies every failed fetch (answered vs refused) for the outcome label.
   const probes = { answered: 0, refused: 0 };
   const results = await Promise.all(active.map((a) => runAdapter(a, d, fetchImpl, timeoutMs, maxBytes, probes)));
-  const discovered = results.flatMap((r) => r.discovered);
+  let discovered = results.flatMap((r) => r.discovered);
   let resources = results.flatMap((r) => r.resources);
   const checked = active.map((a) => a.id);
   // Canonical-host fallback (same registrable domain ONLY): when the exact host
@@ -883,10 +957,50 @@ export async function resolve(domain, opts = {}) {
               discovered.push({ type, url: p.finalUrl });
               resources.push(...normalizeResources(type, kind, p.text, p.finalUrl));
             }
-          } catch (e) { probes[probeFailureKind(e && e.message)]++; }
+          } catch (e) { if (!(e && e.deadlineSkip)) probes[e && e.cause && e.cause.code === "ENOTFOUND" ? "answered" : probeFailureKind(e && e.message)]++; }
         }
       }
     } catch {}
+  }
+  // Opt-in org discovery (see opts.org above): the library counterpart of the
+  // hosted /explore?org=1 — bounded related-host probing when the exact host
+  // publishes nothing.
+  let orgChecked = null;
+  if (opts.org && discovered.length === 0) {
+    orgChecked = [];
+    const DEV_LABELS = ["docs", "developers", "developer", "api", "platform", "learn", "community", "cloud", "dev"];
+    let homepageHosts = [];
+    try {
+      const home = await fetchImpl("https://" + d + "/", { redirect: "follow" });
+      const html = typeof home.text === "function" ? await home.text() : "";
+      const seenH = new Set();
+      for (const m of String(html).match(/https?:\/\/[a-z0-9.-]+/gi) || []) {
+        try {
+          const h = new URL(m).hostname.toLowerCase().replace(/\.+$/, "");
+          if (h !== d && h !== "www." + d && h.endsWith("." + d) && !seenH.has(h)) { seenH.add(h); homepageHosts.push(h); }
+        } catch {}
+      }
+    } catch {}
+    const hosts = [];
+    const take = (h) => { if (!hosts.includes(h) && hosts.length < 4) hosts.push(h); };
+    for (const h of homepageHosts) if (DEV_LABELS.includes(h.split(".")[0])) take(h);
+    for (const p of ["docs", "developers", "cloud", "api"]) take(p + "." + d);
+    for (const h of hosts) {
+      if (Date.now() - startedAt > deadlineMs) { deadlineHit = true; break; }
+      orgChecked.push(h);
+      for (const [path, type, kind] of [["/llms.txt", "llms.txt", "text"], ["/.well-known/ard.json", "ard-catalog", "json"], ["/openapi.json", "openapi", "json"]]) {
+        try {
+          const p = await fetchText(fetchImpl, "https://" + h + path, timeoutMs, maxBytes);
+          if (type === "openapi") {
+            const det = detectOpenApi(p.text, false);
+            if (det.ok) { discovered.push({ type, url: p.finalUrl }); resources.push({ source: "openapi", sourceUrl: p.finalUrl, type: "openapi", name: det.title, url: p.finalUrl }); }
+          } else if (validateProbeContent(kind, p.text) && probeShapeOk(type, kind, p.text)) {
+            discovered.push({ type, url: p.finalUrl });
+            resources.push(...normalizeResources(type, kind, p.text, p.finalUrl));
+          }
+        } catch (e) { if (!(e && e.deadlineSkip)) probes[e && e.cause && e.cause.code === "ENOTFOUND" ? "answered" : probeFailureKind(e && e.message)]++; }
+      }
+    }
   }
   // Optional GB/Z 185.5 discovery gateway — off unless the caller configures it.
   if (opts.gbz && opts.gbz.gatewayUrl) {
@@ -894,6 +1008,12 @@ export async function resolve(domain, opts = {}) {
     discovered.push(...g.discovered);
     resources.push(...g.resources);
     checked.push("gbz-185-5");
+  }
+  // One document reachable through several channels must not multiply records.
+  resources = dedupeResources(resources);
+  {
+    const seenD = new Set();
+    discovered = discovered.filter((x) => { const k = x.type + "|" + x.url; if (seenD.has(k)) return false; seenD.add(k); return true; });
   }
   resources = resources.slice(0, MAX_DISCOVER_RESOURCES).map((r) => ({ ...r, class: classifyResource(r, d) }));
   // Opt-in MCP introspection: ask each declared (same-registrable, HTTPS) MCP
@@ -909,6 +1029,11 @@ export async function resolve(domain, opts = {}) {
   // runtimes without DNS-failure detail (plain fetch), NXDOMAIN reads as a
   // network failure and counts toward refusals — overcautious by design.
   out.outcome = resolutionOutcome(resources.length, probes);
+  // An empty result cut short by the global deadline is "incomplete", never a
+  // confident absence (mirrors /explore); blocked stays blocked.
+  if (out.outcome === "none-found" && deadlineHit) out.outcome = "incomplete";
+  if (deadlineHit) out.truncated = true;
+  if (orgChecked) out.orgChecked = orgChecked;
   if (probes.refused) out.blockedProbes = probes.refused;
   if (opts.mcp) out.introspected = ["mcp"]; // labeled: read-only introspection ran
   if (opts.fast) out.mode = "fast"; // labeled: alternate ARD locators skipped, not fully conformant
@@ -949,4 +1074,4 @@ export function sameRegCanonicalHost(finalUrl, domain) {
   return h.endsWith("." + domain) ? h : null;
 }
 
-export default { resolve, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, extractOpenApiCapabilities, parseMcpMessages, mcpToolCapabilities, probeFailureKind, resolutionOutcome, fetchBounded, ADAPTERS };
+export default { resolve, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, detectOpenApiYaml, extractOpenApiCapabilities, dedupeResources, parseMcpMessages, mcpToolCapabilities, probeFailureKind, resolutionOutcome, fetchBounded, ADAPTERS };

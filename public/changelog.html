@@ -31,6 +31,25 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h2>2026</h2>
 
+<h3 id="component-eval-2026-09-22">Seven fixes from an adversarial component evaluation</h3>
+<ul>
+<li>An isolated evaluation (deterministic adversarial scenario suite + unseen live domains +
+free-tool comparisons) demonstrated seven concrete weaknesses; each fix ships with its
+demonstrating scenario as a regression test. <strong>Discovery:</strong> YAML OpenAPI specs
+(<code>/openapi.yaml</code>/<code>.yml</code>) are now detected via the document's own top-level
+marker (pointer records, verbatim title — no capability enumeration without a YAML parser, stated
+plainly); the <code>llms-full.txt</code> companion location is probed; one catalog declared through
+several channels (well-known + <code>rel="ard"</code> + robots Agentmap) now yields one record, not
+three (both hosted and library). <strong>Library robustness:</strong> a global
+<code>deadlineMs</code> budget (default 20 s — the hosted worker always had one; the library did
+not), with empty cut-short results labeled <code>incomplete</code>; a nonexistent probed host (DNS
+NXDOMAIN) now counts as an <em>answer</em> rather than a refusal; a transient apex DNS failure is
+retried once before it can read as nonexistence. <strong>New library capability:</strong>
+<code>resolve(domain, {org: true})</code> — bounded related-host discovery (docs./developers./…),
+the in-process counterpart of <code>/explore?org=1</code>, reporting <code>orgChecked</code>.
+Library 1.10.0; all changes additive.</li>
+</ul>
+
 <h3 id="outcome-2026-09-21">Unified outcome label: found / none-found / blocked / incomplete</h3>
 <ul>
 <li>Every <code>/discover</code> and <code>/explore</code> response (and the library's

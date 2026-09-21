@@ -1,0 +1,15 @@
+{
+  "id": "openapi/reject/detect-yaml-no-marker",
+  "protocol": "openapi",
+  "kind": "json",
+  "origin": "synthetic",
+  "detect": "openapi-yaml",
+  "input": {
+    "url": "https://x.com/openapi.yaml",
+    "body": "swagger: '2.0'\ninfo:\n  title: Old Style\n"
+  },
+  "expect": {
+    "ok": false
+  },
+  "notes": "YAML detection requires the top-level openapi: version marker; YAML Swagger-2 documents are not claimed (JSON Swagger-2 remains covered at /openapi.json)"
+}

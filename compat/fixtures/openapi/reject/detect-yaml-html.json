@@ -1,0 +1,15 @@
+{
+  "id": "openapi/reject/detect-yaml-html",
+  "protocol": "openapi",
+  "kind": "json",
+  "origin": "synthetic",
+  "detect": "openapi-yaml",
+  "input": {
+    "url": "https://x.com/openapi.yaml",
+    "body": "<!DOCTYPE html><html><head><title>App</title></head><body>openapi: 3.1.0 mentioned in prose</body></html>"
+  },
+  "expect": {
+    "ok": false
+  },
+  "notes": "SPA/HTML shell served at /openapi.yaml must be rejected even when the marker appears in prose"
+}

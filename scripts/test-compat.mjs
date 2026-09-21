@@ -5,7 +5,7 @@
 // Run with `npm run test:compat`. (Layer 1, official schemas/vectors, arrives in M2.)
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { validateProbeContent, probeShapeOk, normalizeResources, detectOpenApi } from "../packages/resolver/index.mjs";
+import { validateProbeContent, probeShapeOk, normalizeResources, detectOpenApi, detectOpenApiYaml } from "../packages/resolver/index.mjs";
 import { levelFor } from "../packages/resolver/v2.mjs";
 
 let failed = 0, ran = 0;
@@ -40,6 +40,13 @@ for (const file of files) {
       if (match && expect.truncated) match = d.truncated === true;
     }
     ok(match, `${id}: detectOpenApi → ${JSON.stringify({ ok: d.ok, title: d.title, truncated: d.truncated })} (${fx.notes || ""})`);
+    continue;
+  }
+  if (fx.detect === "openapi-yaml") {
+    const d = detectOpenApiYaml(input.body);
+    let match = !!d.ok === !!expect.ok;
+    if (match && expect.ok && "title" in expect) match = d.title === expect.title;
+    ok(match, `${id}: detectOpenApiYaml → ${JSON.stringify({ ok: d.ok, title: d.title })} (${fx.notes || ""})`);
     continue;
   }
 

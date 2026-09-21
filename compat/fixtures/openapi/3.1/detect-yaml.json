@@ -1,0 +1,17 @@
+{
+  "id": "openapi/3.1/detect-yaml",
+  "protocol": "openapi",
+  "version": "3.1",
+  "kind": "json",
+  "origin": "synthetic",
+  "detect": "openapi-yaml",
+  "input": {
+    "url": "https://x.com/openapi.yaml",
+    "body": "openapi: 3.1.0\ninfo:\n  title: Yaml API\n  version: '1.0'\npaths:\n  /v1/x:\n    get:\n      operationId: getX\n"
+  },
+  "expect": {
+    "ok": true,
+    "title": "Yaml API"
+  },
+  "notes": "YAML spec detected via the document's own top-level openapi: marker; verbatim title; pointer record only (no capability enumeration without a YAML parser)"
+}

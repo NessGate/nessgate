@@ -216,12 +216,12 @@ async function route(request, env, ctx) {
 //   robots     — parse an Agentmap directive in /robots.txt, then GET the target
 //   dns        — DoH query a well-known TXT node
 const ADAPTERS = [
-  { id: "llms.txt", channel: "well-known", paths: ["/llms.txt"], kind: "text" },
+  { id: "llms.txt", channel: "well-known", paths: ["/llms.txt", "/llms-full.txt"], kind: "text" },
   { id: "ard-catalog", channel: "well-known", paths: ["/.well-known/ard.json", "/.well-known/ai-catalog.json"], kind: "json" }, // Agentic Resource Discovery
   { id: "a2a-agent-card", channel: "well-known", paths: ["/.well-known/agent-card.json", "/.well-known/agent.json"], kind: "json" }, // A2A
   { id: "api-catalog", channel: "well-known", paths: ["/.well-known/api-catalog"], kind: "json" }, // RFC 9727
   { id: "ai-info.json", channel: "well-known", paths: ["/ai-info.json"], kind: "json" },
-  { id: "openapi", channel: "well-known", paths: ["/openapi.json"], kind: "json" },
+  { id: "openapi", channel: "well-known", paths: ["/openapi.json", "/openapi.yaml", "/openapi.yml"], kind: "json" },
   { id: "ord", channel: "well-known", paths: ["/.well-known/open-resource-discovery"], kind: "json" }, // Open Resource Discovery
   { id: "awp", channel: "well-known", paths: ["/.well-known/awp.json"], kind: "json" }, // AWP manifest (provisional)
   { id: "host-meta", channel: "well-known", paths: ["/.well-known/host-meta.json"], kind: "json" }, // RFC 6415
@@ -760,6 +760,29 @@ export function extractOpenApiCapabilities(text) {
   }
 }
 
+// Bounded YAML OpenAPI detection — the document's own top-level
+// `openapi: <version>` marker on a non-HTML body; title read verbatim from the
+// info block when the simple line structure allows. No YAML parser, so YAML
+// specs are detected as pointer records without capability enumeration — a
+// documented limitation, never a guess. Identical to the library
+// (parity-tested).
+export function detectOpenApiYaml(text) {
+  if (typeof text !== "string" || !text || /^\s*</.test(text)) return { ok: false };
+  const ver = /^openapi:\s*['"]?(\d[\d.]*)/m.exec(text);
+  if (!ver) return { ok: false };
+  const title = /^\s{1,8}title:\s*['"]?([^'"\n]{1,160})/m.exec(text);
+  return { ok: true, title: title ? title[1].trim() : undefined };
+}
+
+// Pure: drop duplicate records produced when ONE document is legitimately
+// reachable through several channels (well-known path + rel="ard" link +
+// robots Agentmap all naming the same catalog). Keeps the first occurrence
+// (channel order = priority). Identical to the library (parity-tested).
+export function dedupeResources(resources) {
+  const seen = new Set();
+  return resources.filter((r) => { const k = r.source + "|" + r.url + "|" + r.sourceUrl; if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
 // Fetch a bounded prefix of an on-domain document (for OpenAPI: read only the
 // head). Returns { text, truncated } — truncated true only when the body
 // exceeded the cap, so the caller can distinguish a cap-truncated document from
@@ -940,6 +963,13 @@ async function runAdapter(a, domain, env, ctx, probes) {
         if (a.id === "openapi") {
           let r;
           try { r = await getOnDomainPrefix(domain, path, env, ctx, OPENAPI_PREFIX_BYTES); } catch (e) { miss(e); continue; }
+          // YAML specs: detected by the document's own top-level marker;
+          // pointer record only (no capability enumeration without a parser).
+          if (/\.ya?ml$/.test(path)) {
+            const det = detectOpenApiYaml(r.text);
+            if (det.ok) return { discovered: [{ type: a.id, url }], resources: [{ source: "openapi", sourceUrl: url, type: "openapi", name: det.title, url }] };
+            continue;
+          }
           const det = detectOpenApi(r.text, r.truncated);
           if (det.ok) {
             // Declared capabilities need the COMPLETE document. If the prefix
@@ -1037,7 +1067,7 @@ async function discoverData(raw, env, ctx, request) {
   const probes = { answered: 0, refused: 0 };
   const settled = await Promise.allSettled(active.map((a) => runAdapter(a, domain, env, ctx, probes)));
   const results = settled.map((r) => (r.status === "fulfilled" && r.value ? r.value : { discovered: [], resources: [] }));
-  const discovered = results.flatMap((r) => r.discovered);
+  let discovered = results.flatMap((r) => r.discovered);
   let resources = results.flatMap((r) => r.resources);
 
   // Canonical-host fallback (general rule; same registrable domain ONLY). When
@@ -1063,6 +1093,13 @@ async function discoverData(raw, env, ctx, request) {
         }
       }
     } catch {}
+  }
+  // One document reachable through several channels (well-known + rel="ard" +
+  // robots Agentmap) must not multiply records.
+  resources = dedupeResources(resources);
+  {
+    const seenD = new Set();
+    discovered = discovered.filter((x) => { const k = x.type + "|" + x.url; if (seenD.has(k)) return false; seenD.add(k); return true; });
   }
   resources = resources.slice(0, MAX_DISCOVER_RESOURCES).map((r) => ({ ...r, class: classifyResource(r, domain) }));
   // Opt-in MCP introspection: ask each declared (same-registrable, HTTPS) MCP

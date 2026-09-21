@@ -44,6 +44,8 @@ import {
   adapters,
   exploreLimits,
   extractOpenApiCapabilities,
+  detectOpenApiYaml,
+  dedupeResources,
   parseMcpMessages,
   mcpToolCapabilities,
 } from "../src/worker.js";
@@ -591,6 +593,94 @@ console.log("--- explore depth is a runaway backstop, not the effective limit");
   const L = exploreLimits();
   is(L.maxDepth >= 8, true, "explore maxDepth is a backstop (>=8), budgets bind first");
   is(L.maxRequests <= 32 && L.maxHosts <= 8 && L.deadlineMs <= 30000, true, "the real limiters (requests/hosts/deadline) stay tight");
+}
+
+console.log("--- component-eval upstream fixes (each from a demonstrated failure)");
+{
+  const lib = await import("../public/resolver.mjs");
+  // F1 — YAML OpenAPI detection (pure + parity).
+  const yaml = "openapi: 3.1.0\ninfo:\n  title: Yaml API\npaths:\n  /v1/x:\n    get:\n      operationId: getX\n";
+  is(detectOpenApiYaml(yaml).ok, true, "yaml: top-level openapi: marker detected");
+  is(detectOpenApiYaml(yaml).title, "Yaml API", "yaml: title verbatim");
+  is(detectOpenApiYaml("<!DOCTYPE html><html>openapi: 3.1.0</html>").ok, false, "yaml: HTML shell rejected even with marker in prose");
+  is(detectOpenApiYaml("swagger: '2.0'\ninfo:\n  title: Old\n").ok, false, "yaml: swagger-2 YAML not claimed (marker required)");
+  is(JSON.stringify(lib.detectOpenApiYaml(yaml)), JSON.stringify(detectOpenApiYaml(yaml)), "detectOpenApiYaml worker/library parity");
+  // F5 — dedupe (pure + parity).
+  const dupIn = [
+    { source: "ard-catalog", url: "https://x.com/a.json", sourceUrl: "https://x.com/.well-known/ard.json" },
+    { source: "ard-catalog", url: "https://x.com/a.json", sourceUrl: "https://x.com/.well-known/ard.json" },
+    { source: "ard-catalog", url: "https://x.com/b.json", sourceUrl: "https://x.com/.well-known/ard.json" },
+  ];
+  is(dedupeResources(dupIn).length, 2, "dedupe: identical source|url|sourceUrl collapses");
+  is(JSON.stringify(lib.dedupeResources(dupIn)), JSON.stringify(dedupeResources(dupIn)), "dedupeResources worker/library parity");
+  // Library e2e — YAML-only publisher found via the yaml path (F1).
+  const yamlFetch = async (url) => {
+    const u = String(url);
+    if (u === "https://yamlco.com/openapi.yaml") return { ok: true, status: 200, url: u, headers: { get: () => "application/yaml" }, text: async () => yaml };
+    if (u.startsWith("https://cloudflare-dns.com/")) return { ok: true, status: 200, url: u, headers: { get: () => "application/dns-json" }, text: async () => JSON.stringify({ Answer: [] }) };
+    return { ok: false, status: 404, url: u, headers: { get: () => "" }, text: async () => "" };
+  };
+  const ry = await lib.resolve("yamlco.com", { fetch: yamlFetch });
+  const oaRes = ry.resources.find((x) => x.source === "openapi");
+  is(!!oaRes && oaRes.name === "Yaml API", true, "resolve(): YAML-only spec discovered (pointer record, verbatim title)");
+  is(oaRes.capabilities, undefined, "resolve(): YAML pointer record carries NO capabilities (no parser = no enumeration)");
+  // F2 — llms-full.txt-only publisher found.
+  const fullFetch = async (url) => {
+    const u = String(url);
+    if (u === "https://fullonly.com/llms-full.txt") return { ok: true, status: 200, url: u, headers: { get: () => "text/plain" }, text: async () => "# FullOnly\nComplete docs inline." };
+    if (u.startsWith("https://cloudflare-dns.com/")) return { ok: true, status: 200, url: u, headers: { get: () => "application/dns-json" }, text: async () => JSON.stringify({ Answer: [] }) };
+    return { ok: false, status: 404, url: u, headers: { get: () => "" }, text: async () => "" };
+  };
+  const rf = await lib.resolve("fullonly.com", { fetch: fullFetch });
+  is(rf.discovered.some((x) => x.type === "llms.txt" && /llms-full/.test(x.url)), true, "resolve(): llms-full.txt companion discovered");
+  // F4 — library org mode finds subdomain-scattered docs; F3 — NXDOMAIN on
+  // conventional hosts is an ANSWER (none of this reads as blocked).
+  const scatFetch = async (url) => {
+    const u = String(url);
+    const host = new URL(u).hostname;
+    if (host === "docs.scat.com") {
+      if (u.endsWith("/llms.txt")) return { ok: true, status: 200, url: u, headers: { get: () => "text/plain" }, text: async () => "# Scat Docs\n- [api](https://docs.scat.com/api.md)" };
+      return { ok: false, status: 404, url: u, headers: { get: () => "" }, text: async () => "" };
+    }
+    if (host === "scat.com" || host === "www.scat.com") {
+      if (u === "https://scat.com/") return { ok: true, status: 200, url: u, headers: { get: () => "text/html" }, text: async () => "<a href='https://docs.scat.com/'>Docs</a>" };
+      if (u.startsWith("https://cloudflare-dns.com/")) return { ok: true, status: 200, url: u, headers: { get: () => "application/dns-json" }, text: async () => JSON.stringify({ Answer: [] }) };
+      return { ok: false, status: 404, url: u, headers: { get: () => "" }, text: async () => "" };
+    }
+    if (u.startsWith("https://cloudflare-dns.com/")) return { ok: true, status: 200, url: u, headers: { get: () => "application/dns-json" }, text: async () => JSON.stringify({ Answer: [] }) };
+    const e = new TypeError("fetch failed"); e.cause = { code: "ENOTFOUND" }; throw e; // developers./cloud./api. don't exist
+  };
+  const rs = await lib.resolve("scat.com", { fetch: scatFetch, org: true });
+  is(rs.discovered.some((x) => /docs\.scat\.com\/llms\.txt/.test(x.url)), true, "org mode: subdomain-scattered llms.txt found");
+  is(Array.isArray(rs.orgChecked) && rs.orgChecked.includes("docs.scat.com"), true, "org mode: orgChecked reports hosts attempted");
+  const scatLlms = rs.resources.find((x) => x.source === "llms.txt");
+  is(scatLlms && scatLlms.class, "verified-publisher-location", "org mode: same-registrable fetched surface keeps the honest class");
+  is(rs.outcome, "found", "org mode: NXDOMAIN conventional hosts never flip outcome to blocked");
+  // Off by default: no org probing without opts.org.
+  const rsOff = await lib.resolve("scat.com", { fetch: scatFetch });
+  is(rsOff.orgChecked, undefined, "org mode: opt-in only");
+  // F6 — global deadline: an empty resolution cut short is incomplete, never
+  // a confident absence.
+  const slowFetch = async (url) => {
+    const u = String(url);
+    if (u.startsWith("https://cloudflare-dns.com/")) return { ok: true, status: 200, url: u, headers: { get: () => "application/dns-json" }, text: async () => JSON.stringify({ Answer: [] }) };
+    await new Promise((r) => setTimeout(r, 120));
+    return { ok: false, status: 404, url: u, headers: { get: () => "" }, text: async () => "" };
+  };
+  const rSlow = await lib.resolve("slowco.com", { fetch: slowFetch, deadlineMs: 150 });
+  is(rSlow.outcome, "incomplete", "deadline: empty + cut-short → incomplete (never none-found)");
+  is(rSlow.truncated, true, "deadline: truncation labeled");
+  // F7 — apex DNS flap: first apex ENOTFOUND retried once; resolution proceeds.
+  let flapped = false;
+  const flapFetch = async (url) => {
+    const u = String(url);
+    if (u.startsWith("https://cloudflare-dns.com/")) return { ok: true, status: 200, url: u, headers: { get: () => "application/dns-json" }, text: async () => JSON.stringify({ Answer: [] }) };
+    if (!flapped) { flapped = true; const e = new TypeError("fetch failed"); e.cause = { code: "ENOTFOUND" }; throw e; }
+    if (u === "https://flap.com/llms.txt") return { ok: true, status: 200, url: u, headers: { get: () => "text/plain" }, text: async () => "# Flap" };
+    return { ok: false, status: 404, url: u, headers: { get: () => "" }, text: async () => "" };
+  };
+  const rFlap = await lib.resolve("flap.com", { fetch: flapFetch });
+  is(rFlap.discovered.some((x) => x.type === "llms.txt"), true, "apex DNS flap: retried once, resolution proceeds normally");
 }
 
 console.log("--- outcome honesty: found / none-found / blocked, never hidden uncertainty");

@@ -87,8 +87,25 @@ unverified), and `unsupported` (no usable URL). The hosted resolver at nessgate.
 domain-locked and never follows cross-domain redirects, so `verified-external-location`
 appears only in library results.
 
-Options: `{ fetch, timeoutMs = 8000, maxBytes = 1_000_000 }`. Bring your own `fetch` if the
-runtime has none.
+Options: `{ fetch, timeoutMs = 8000, maxBytes = 1_000_000, deadlineMs = 20000, org, fast, mcp }`.
+Bring your own `fetch` if the runtime has none.
+
+- `deadlineMs` — a global wall-clock budget for the whole resolution. Past it no new
+  fetch starts; an empty, cut-short result is labeled `outcome: "incomplete"` with
+  `truncated: true` — never a confident absence. A transient DNS failure on the apex
+  is retried once before it can count as nonexistence.
+- `org: true` — when the exact host publishes nothing, probe a bounded set of
+  plausible same-registrable hosts (homepage-linked developer/doc subdomains first,
+  then `docs.`/`developers.`/`cloud.`/`api.`) for `llms.txt`, `ard.json` and
+  `openapi.json` — the library counterpart of the hosted `/explore?org=1` (≤4 hosts ×
+  3 paths). Hosts attempted are reported in `orgChecked`; findings classify normally.
+
+Probed OpenAPI locations include `/openapi.yaml` and `/openapi.yml`: YAML specs are
+detected via the document's own top-level `openapi:` marker and returned as pointer
+records (verbatim title, no capability enumeration — the library carries no YAML
+parser). The `llms-full.txt` companion location is probed after `llms.txt`. One
+document declared through several channels (well-known + `rel="ard"` + robots
+Agentmap) yields one record, not three.
 
 Optional GB/Z 185.5 discovery (Node only): pass
 `opts.gbz = { gatewayUrl, fetch, query, headers }` to query a gateway **you configure** with

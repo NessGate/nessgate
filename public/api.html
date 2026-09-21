@@ -174,7 +174,8 @@ homepage redirects to a <em>different</em> registrable domain (<code>aws.com →
 that is reported as <code>homepageRedirect</code> — an observation of the publisher's own
 configuration, never merged into resources. No brute-force scanning, no crawling; a host that
 serves nothing recognized is simply absent. For a related host's full resource graph, explore that
-host directly.</p>
+host directly. The embeddable library offers the same capability in-process via
+<code>resolve(domain, {org: true})</code>, reporting hosts attempted in <code>orgChecked</code>.</p>
 <p><strong>Related Discovery (opt-in).</strong> Add <code>?related=1</code> for a clearly separate
 cross-domain layer, returned in <code>related[]</code> (never mixed with <code>resources[]</code>).
 Classes: <code>publisher-declared-related</code> — the queried domain itself serves a purpose-built
