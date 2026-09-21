@@ -31,7 +31,16 @@ for (const r of resources) {
 }
 ```
 
-`resolve(domain, opts)` returns `{ domain, provenance, discovered, resources, checked }`.
+`resolve(domain, opts)` returns
+`{ domain, provenance, discovered, resources, checked, outcome, blockedProbes? }`.
+
+- `outcome` — the single honest label: `"found"` (validated resources exist),
+  `"none-found"` (the checks completed — clean 404s and nonexistent hosts count as
+  *answers* — and no supported declaration exists at the locations checked), or
+  `"blocked"` (refusals — auth walls, rate limits, timeouts, network failures — were
+  at least as common as clean answers: the checks were prevented, so absence is
+  *unknown*). `blockedProbes` discloses the refusal count whenever any probe was
+  refused, even under `none-found`.
 
 - `resources` — the normalized union of what the domain publishes. Each record has
   `source`, `sourceUrl`, `type` (the source's own label), `url`, a `class`

@@ -80,12 +80,15 @@ const PROBE_INFO = {
   },
 };
 
-function row(found, label, detail, url) {
+function row(found, label, detail, url, inconclusive) {
   const p = document.createElement("p");
   p.className = "res-line";
   const tag = document.createElement("span");
+  // Three honest states: found; missing (the domain ANSWERED our checks, so
+  // absence is confirmed); inconclusive (the domain blocked the checks — we
+  // could not look, which is not the same as missing).
   tag.className = "res-tag " + (found ? "found" : "miss");
-  tag.textContent = found ? "✓ found" : "— missing";
+  tag.textContent = found ? "✓ found" : inconclusive ? "? unknown" : "— missing";
   const name = document.createElement("strong");
   name.textContent = label + " ";
   p.append(tag, document.createTextNode(" "), name);
@@ -124,17 +127,21 @@ $("checkForm").addEventListener("submit", async (e) => {
     pCard.textContent = "";
     const foundTypes = new Map((disc.discovered || []).map((x) => [x.type, x.url]));
     let foundCount = 0;
+    // The server's outcome label distinguishes a confirmed absence from a
+    // refused look — a blocked site must never read as "missing everything".
+    const blocked = disc.outcome === "blocked";
     const checked = disc.checked && disc.checked.length ? disc.checked : Object.keys(PROBE_INFO);
     for (const key of checked) {
       const info = PROBE_INFO[key] || { label: key, what: "", ifMissing: "" };
       const url = foundTypes.get(key);
       if (url) foundCount++;
-      pCard.append(row(!!url, info.label, url ? info.what : info.ifMissing, url || null));
+      pCard.append(row(!!url, info.label, url ? info.what : blocked ? "Could not be checked — the site blocked our request." : info.ifMissing, url || null, blocked));
     }
     const summary = document.createElement("p");
     summary.className = "meta probe-summary";
-    summary.textContent =
-      foundCount === 0
+    summary.textContent = blocked
+      ? "This site did not let our hosted checks look (bot protection or blocking), so these results are inconclusive — we can't tell whether discovery files exist. Checking from your own machine (e.g. opening /llms.txt in your browser, or running the open-source resolver library) may succeed."
+      : foundCount === 0
         ? "No supported discovery files could be confirmed on this exact host. Related product hosts or external registries may still publish some."
         : `You support ${foundCount} of ${checked.length} supported discovery mechanisms.`;
     pCard.append(summary);
