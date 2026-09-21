@@ -47,6 +47,7 @@ import {
   detectOpenApiYaml,
   dedupeResources,
   reachabilityFromStatus,
+  classifyDenial,
   parseMcpMessages,
   mcpToolCapabilities,
 } from "../src/worker.js";
@@ -691,13 +692,32 @@ console.log("--- verify pass: outage vs auth vs missing, evidence-derived where 
   // never conflated.
   is(reachabilityFromStatus(200), "ok", "verify: 2xx → ok");
   is(reachabilityFromStatus(405), "ok", "verify: 405 → ok (alive; POST-only endpoints are normal)");
-  is(reachabilityFromStatus(401), "auth-required", "verify: 401 → auth-required");
-  is(reachabilityFromStatus(403), "auth-required", "verify: 403 → auth-required");
+  is(reachabilityFromStatus(401), "auth-required", "verify: 401 → auth-required (protocol evidence)");
+  is(reachabilityFromStatus(403), "unknown", "verify: bare 403 → unknown (auth OR bot-wall — never assumed either way)");
   is(reachabilityFromStatus(404), "not-found", "verify: 404 → not-found (declared, nothing there)");
   is(reachabilityFromStatus(503), "unreachable", "verify: 5xx → unreachable");
-  is(reachabilityFromStatus(429), "unreachable", "verify: 429 → unreachable (alive-and-usable NOT shown)");
+  is(reachabilityFromStatus(429), "rate-limited", "verify: 429 → rate-limited (alive; asked us to slow down)");
   is(reachabilityFromStatus(0), "unreachable", "verify: network failure → unreachable");
-  for (const s of [200, 301, 401, 404, 405, 429, 0]) is(lib.reachabilityFromStatus(s), reachabilityFromStatus(s), `reachabilityFromStatus parity for ${s}`);
+  for (const s of [200, 301, 401, 403, 404, 405, 429, 0]) is(lib.reachabilityFromStatus(s), reachabilityFromStatus(s), `reachabilityFromStatus parity for ${s}`);
+  // classifyDenial: the anti-bot honesty matrix. Reliable identification or
+  // "unknown" — never an assumption, never an arms race, never stored bodies.
+  const cd = (a) => classifyDenial(a);
+  is(cd({ status: 403, headers: { "cf-mitigated": "challenge" } }).reachability, "blocked", "denial: cf-mitigated challenge → blocked");
+  is(cd({ status: 403, headers: { "cf-mitigated": "challenge" } }).signal, "cf-challenge", "denial: signal named");
+  is(cd({ status: 403, headers: { "x-datadome-cid": "abc" } }).signal, "datadome", "denial: datadome header → blocked(datadome)");
+  is(cd({ status: 503, bodySnippet: "<html>…cf_chl_opt…</html>" }).reachability, "blocked", "denial: challenge body marker on 503 → blocked");
+  is(cd({ status: 403 }).reachability, "unknown", "denial: bare 403, no signals → unknown (rule 1 applied literally)");
+  is(cd({ status: 401, headers: { "www-authenticate": "Bearer" } }).signal, "www-authenticate", "denial: WWW-Authenticate → auth-required, evidence-backed");
+  is(cd({ status: 403, headers: { "www-authenticate": "Bearer realm=x" } }).reachability, "auth-required", "denial: 403 WITH WWW-Authenticate → auth-required (evidence beats status)");
+  is(cd({ status: 429, headers: { "retry-after": "120" } }).reachability, "rate-limited", "denial: 429 → rate-limited");
+  is(cd({ status: 429, headers: { "retry-after": "120" } }).retryAfterSeconds, 120, "denial: Retry-After captured as evidence (never acted on)");
+  is(cd({ status: 200, bodySnippet: "sign up with g-recaptcha widget www.google.com/recaptcha/api" }).reachability, "ok", "denial: a 200 page embedding a captcha widget is NOT a wall (signals only checked on denial statuses)");
+  is(cd({ status: 0 }).reachability, "unreachable", "denial: network failure → unreachable");
+  const cdOut = cd({ status: 403, bodySnippet: "<html>Just a moment...</html>" });
+  is(cdOut.reachability, "blocked", "denial: interstitial marker → blocked");
+  is(JSON.stringify(cdOut).includes("Just a moment"), false, "denial: evidence NEVER contains response content");
+  for (const c of [{ status: 403, headers: { "cf-mitigated": "challenge" } }, { status: 403 }, { status: 429, headers: { "retry-after": "9" } }, { status: 401 }])
+    is(JSON.stringify(lib.classifyDenial(c)), JSON.stringify(classifyDenial(c)), "classifyDenial parity: " + JSON.stringify(c.headers || c.status));
   // Library e2e: an ARD catalog declaring four pointers with distinct fates.
   // The catalog itself must be "ok" WITHOUT any extra request; each pointer
   // gets exactly one safe probe; states never conflate.

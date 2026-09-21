@@ -131,9 +131,16 @@ short. Whenever any probe was refused, <code>blockedProbes</code> discloses the 
 <p class="note"><strong>Reachability verification (opt-in: <code>?verify=1</code>).</strong> Finding an
 address does not mean an agent can use it. The verify pass adds a per-record
 <code>reachability</code> label — <code>ok</code> (the endpoint answered a <em>safe</em> request;
-never a claim that operations succeed or that you are authorized), <code>auth-required</code>,
-<code>not-found</code> (declared, but nothing is there), or <code>unreachable</code> — plus
-<code>checkedAt</code>. Surfaces NessGate fetched during the resolution are marked <code>ok</code>
+never a claim that operations succeed or that you are authorized), <code>auth-required</code>
+(401/407 or a <code>WWW-Authenticate</code> header — protocol evidence, never assumed),
+<code>rate-limited</code> (alive; the <code>Retry-After</code> hint is captured as evidence, never
+acted on), <code>blocked</code> (anti-bot protection <em>reliably</em> identified via a small,
+conservative signal list — NessGate identifies walls and reports them honestly; it never attempts
+CAPTCHA bypasses, proxy rotation, or any evasion), <code>not-found</code> (declared, but nothing is
+there), <code>unreachable</code>, or <code>unknown</code> (a denial whose cause cannot be
+established — a bare 403 is used by both auth systems and bot-walls, and NessGate never assumes
+either) — plus <code>checkedAt</code> and an <code>evidence</code> object ({status, signal name,
+retryAfterSeconds}; response content is never stored). Surfaces NessGate fetched during the resolution are marked <code>ok</code>
 with <strong>no extra request</strong> (the fetch is the evidence); MCP records reuse introspection
 results when present; declared pointers get one safe probe each (HEAD, then a bounded GET when HEAD
 is unsupported — never a POST, never an execution), capped at 8. Absent

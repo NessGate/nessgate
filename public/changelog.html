@@ -31,6 +31,22 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h2>2026</h2>
 
+<h3 id="antibot-2026-09-22">Anti-bot honesty in the verify pass: identify walls, never assume, never evade</h3>
+<ul>
+<li>The reachability states grew to distinguish what a denial actually <em>means</em>:
+<code>blocked</code> (anti-bot protection <em>reliably</em> identified via a small conservative
+signal list — challenge headers and high-precision markers; NessGate reports walls, and never
+attempts CAPTCHA bypasses, proxy rotation, or any evasion), <code>rate-limited</code> (429 — alive;
+<code>Retry-After</code> captured as evidence, never acted on), and <code>unknown</code> (a denial
+whose cause cannot be established). Two honesty corrections to yesterday's initial verify release:
+a <strong>bare 403 no longer reads as <code>auth-required</code></strong> — auth systems and
+bot-walls both use 403, so without protocol evidence (401/407 or <code>WWW-Authenticate</code>) it
+is <code>unknown</code>; and 429 no longer reads as <code>unreachable</code>. Every verified record
+now carries an <code>evidence</code> object ({status, signal name, retryAfterSeconds}) so the
+classification is auditable — response content is never stored. Library 1.12.0; additive except the
+disclosed 403/429 relabeling inside the day-old opt-in verify pass.</li>
+</ul>
+
 <h3 id="verify-2026-09-22">Opt-in reachability verification (<code>?verify=1</code>)</h3>
 <ul>
 <li>Finding an address does not mean an agent can use it. <code>?verify=1</code> (and the library's

@@ -774,20 +774,51 @@ export function detectOpenApiYaml(text) {
   return { ok: true, title: title ? title[1].trim() : undefined };
 }
 
-// Pure: map an HTTP status (0 = network-level failure) to the four honest
-// reachability states of the opt-in verify pass. Deliberately conservative:
-// ok = the endpoint answered a safe request (2xx/3xx; 405/406 count — alive,
-// only method/representation negotiation differs, normal for POST-only
-// protocol endpoints); auth-required = 401/403/407; not-found = 404/410
-// (declared, nothing there); unreachable = network/timeout/429/5xx. "ok"
-// never asserts operations succeed or the caller is authorized. Identical to
-// the library (parity-tested).
+// Pure: map an HTTP status (0 = network-level failure) to an honest
+// reachability state — STATUS-ONLY knowledge; classifyDenial upgrades it with
+// header/body evidence where available. ok = answered a safe request
+// (2xx/3xx/405/406); auth-required = 401/407 (protocol evidence only);
+// unknown = bare 403 (auth OR bot-wall — a status alone cannot tell, and we
+// never assume); rate-limited = 429; not-found = 404/410; unreachable =
+// network/timeout/5xx. Identical to the library (parity-tested).
 export function reachabilityFromStatus(status) {
   const s = Number(status) || 0;
   if ((s >= 200 && s < 400) || s === 405 || s === 406) return "ok";
-  if (s === 401 || s === 403 || s === 407) return "auth-required";
+  if (s === 401 || s === 407) return "auth-required";
+  if (s === 403) return "unknown";
+  if (s === 429) return "rate-limited";
   if (s === 404 || s === 410) return "not-found";
   return "unreachable";
+}
+
+// Pure: classify a probe response using status PLUS evidence — a small,
+// conservative signal list, never an arms race. Anti-bot identification must
+// be RELIABLE or it stays "unknown". Signals are names only (never response
+// content). Identical to the library (parity-tested).
+export function classifyDenial({ status, headers = {}, bodySnippet = "" } = {}) {
+  const s = Number(status) || 0;
+  const h = {};
+  for (const [k, v] of Object.entries(headers || {})) h[String(k).toLowerCase()] = String(v == null ? "" : v);
+  const ra = /^\d+$/.test(String(h["retry-after"] || "").trim()) ? Number(h["retry-after"]) : undefined;
+  const out = (reachability, signal) => ({ reachability, ...(signal ? { signal } : {}), ...(ra !== undefined ? { retryAfterSeconds: ra } : {}) });
+  if (h["www-authenticate"]) return out("auth-required", "www-authenticate");
+  if (s === 401 || s === 407) return out("auth-required");
+  if (s === 403 || s === 503 || s === 429) {
+    if ((h["cf-mitigated"] || "").includes("challenge")) return out("blocked", "cf-challenge");
+    for (const k of Object.keys(h)) {
+      if (k.startsWith("x-datadome")) return out("blocked", "datadome");
+      if (k.startsWith("x-px") || k === "x-perimeterx") return out("blocked", "perimeterx");
+    }
+    if (["challenge", "captcha"].includes(h["x-amzn-waf-action"] || "")) return out("blocked", "aws-waf");
+    const b = String(bodySnippet || "").slice(0, 2048);
+    if (/cf_chl_|challenge-platform|Just a moment\.\.\./.test(b)) return out("blocked", "cf-challenge");
+    if (/geo\.captcha-delivery\.com/.test(b)) return out("blocked", "datadome");
+    if (/_Incapsula_Resource|Incapsula incident/.test(b)) return out("blocked", "imperva");
+    if (/errors\.edgesuite\.net/.test(b)) return out("blocked", "akamai");
+    if (/hcaptcha\.com\/captcha|www\.google\.com\/recaptcha\/api/.test(b)) return out("blocked", "captcha");
+  }
+  if (s === 429) return out("rate-limited", ra !== undefined ? "retry-after" : undefined);
+  return out(reachabilityFromStatus(s));
 }
 
 // One SAFE reachability probe for ?verify=1: HEAD first; on 405/501 one GET
@@ -795,33 +826,55 @@ export function reachabilityFromStatus(status) {
 // Cross-registrable targets are probed ONLY because the publisher itself
 // declared them (the /explore precedent); forbidden-host and public-DNS
 // guards always apply; the SELF domain dispatches in-process.
+const VERIFY_HEADER_ALLOWLIST = ["www-authenticate", "retry-after", "cf-mitigated", "x-amzn-waf-action", "x-perimeterx"];
+const VERIFY_HEADER_PREFIXES = ["x-datadome", "x-px"];
+function pickVerifyHeaders(res) {
+  const out = {};
+  try {
+    for (const [k, v] of res.headers) {
+      const key = String(k).toLowerCase();
+      if (VERIFY_HEADER_ALLOWLIST.includes(key) || VERIFY_HEADER_PREFIXES.some((p) => key.startsWith(p))) out[key] = String(v);
+    }
+  } catch {}
+  return out;
+}
 async function probeReachabilityWorker(url, env, ctx, domain) {
   let u;
-  try { u = new URL(url); } catch { return 0; }
-  if (u.protocol !== "https:") return 0;
+  try { u = new URL(url); } catch { return { status: 0, headers: {}, snippet: "" }; }
+  if (u.protocol !== "https:") return { status: 0, headers: {}, snippet: "" };
   const host = u.hostname.toLowerCase().replace(/\.+$/, "");
   if (domain === SELF_DOMAIN && host === SELF_DOMAIN) {
-    try { const res = await route(new Request(url), env, ctx); return res.status || 0; } catch { return 0; }
+    try { const res = await route(new Request(url), env, ctx); return { status: res.status || 0, headers: {}, snippet: "" }; } catch { return { status: 0, headers: {}, snippet: "" }; }
   }
-  if (isForbiddenHost(host)) return 0; // opaque, like every other guard
-  try { await assertPublicDns(host); } catch { return 0; }
-  const attempt = async (method) => {
+  if (isForbiddenHost(host)) return { status: 0, headers: {}, snippet: "" }; // opaque, like every other guard
+  try { await assertPublicDns(host); } catch { return { status: 0, headers: {}, snippet: "" }; }
+  const attempt = async (method, wantSnippet) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
       const res = await fetch(url, { method, redirect: "follow", signal: controller.signal, headers: { "User-Agent": "NessGate-Verify/1.0 (+https://nessgate.com)", Accept: "*/*" }, cf: { cacheTtl: 0 } });
-      if (method === "GET" && res.body && typeof res.body.cancel === "function") { try { await res.body.cancel(); } catch {} }
-      return res.status || 0;
+      let snippet = "";
+      if (method === "GET") {
+        if (wantSnippet) { try { snippet = String(await res.text()).slice(0, 2048); } catch {} }
+        else if (res.body && typeof res.body.cancel === "function") { try { await res.body.cancel(); } catch {} }
+      }
+      return { status: res.status || 0, headers: pickVerifyHeaders(res), snippet };
     } catch {
-      return 0;
+      return { status: 0, headers: {}, snippet: "" };
     } finally {
       clearTimeout(timer);
     }
   };
-  const head = await attempt("HEAD");
-  if (head === 405 || head === 501 || head === 0) {
-    const get = await attempt("GET");
-    if (get !== 0 || head === 0) return get;
+  const head = await attempt("HEAD", false);
+  const unexplainedDenial = (r) => (r.status === 403 || r.status === 503) && !Object.keys(r.headers).some((k) => k !== "retry-after");
+  if (head.status === 405 || head.status === 501 || head.status === 0) {
+    const get = await attempt("GET", true);
+    if (get.status !== 0 || head.status === 0) return get;
+    return head;
+  }
+  if (unexplainedDenial(head)) {
+    const get = await attempt("GET", true);
+    if (get.status !== 0) return get;
   }
   return head;
 }
@@ -1177,20 +1230,27 @@ async function discoverData(raw, env, ctx, request) {
       if (r.class === "verified-publisher-location" || r.url === r.sourceUrl) {
         r.reachability = "ok";
         r.checkedAt = now;
+        r.evidence = { signal: "fetched-this-resolution" };
         continue;
       }
       if (r.introspection) {
         r.reachability = r.introspection.ok ? "ok" : r.introspection.status === "auth-required" ? "auth-required" : r.introspection.status === "legacy-transport" ? "ok" : "unreachable";
         r.checkedAt = now;
+        r.evidence = { signal: "mcp-introspection" };
         continue;
       }
       if (!probed.has(r.url)) {
         if (vBudget <= 0) continue; // stays not-checked
         vBudget--;
-        probed.set(r.url, await probeReachabilityWorker(r.url, env, ctx, domain));
+        const probe = await probeReachabilityWorker(r.url, env, ctx, domain);
+        const c = classifyDenial({ status: probe.status, headers: probe.headers, bodySnippet: probe.snippet });
+        probed.set(r.url, { ...c, status: probe.status });
       }
-      r.reachability = reachabilityFromStatus(probed.get(r.url));
+      const c = probed.get(r.url);
+      r.reachability = c.reachability;
       r.checkedAt = now;
+      // Evidence: status + signal NAME + retry hint only — never response content.
+      r.evidence = { status: c.status, ...(c.signal ? { signal: c.signal } : {}), ...(c.retryAfterSeconds !== undefined ? { retryAfterSeconds: c.retryAfterSeconds } : {}) };
     }
   }
   let note = fast ? DISCOVER_NOTE + " (fast mode: the optional alternate ARD locators — rel=\"ard\" link and robots Agentmap — were skipped for speed; a catalog advertised only via those may be missed. Omit ?fast for complete, ARD-conformant discovery.)" : DISCOVER_NOTE;

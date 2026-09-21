@@ -93,10 +93,16 @@ Bring your own `fetch` if the runtime has none.
 - `verify: true` — a labeled reachability pass: surfaces this resolution already
   fetched are `reachability: "ok"` with **no extra request**; MCP records reuse
   introspection results; declared pointers get one safe probe each (HEAD, then a
-  bounded GET when HEAD is unsupported — never a POST, never an execution), capped
-  at 8, mapped to `ok | auth-required | not-found | unreachable` with `checkedAt`.
-  Absent `reachability` = not checked. `ok` means the endpoint answered a safe
-  request — never that operations succeed or that you are authorized.
+  bounded GET when HEAD is unsupported or a denial is unexplained — never a POST,
+  never an execution), capped at 8. States:
+  `ok | auth-required | rate-limited | blocked | not-found | unreachable | unknown`,
+  plus `checkedAt` and `evidence` ({status, signal name, retryAfterSeconds} — response
+  content is never stored). `auth-required` needs protocol evidence (401/407 or
+  `WWW-Authenticate`); `blocked` means anti-bot protection was *reliably* identified
+  via a small conservative signal list (NessGate identifies walls, never evades
+  them); a bare 403 is `unknown` — auth systems and bot-walls both use it, and
+  NessGate never assumes either. `ok` means the endpoint answered a safe request —
+  never that operations succeed or that you are authorized.
 
 - `deadlineMs` — a global wall-clock budget for the whole resolution. Past it no new
   fetch starts; an empty, cut-short result is labeled `outcome: "incomplete"` with

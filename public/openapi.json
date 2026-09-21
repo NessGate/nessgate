@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "NessGate API",
-    "version": "1.12.0",
+    "version": "1.13.0",
     "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads whatever that domain already publishes across the standard machine-discovery locations (llms.txt, ARD / ai-catalog.json, A2A agent card, RFC 9727 API catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP manifest, RFC 6415 host-meta) and returns one normalized answer, each record carrying a sourceUrl back to the domain. NessGate stores nothing, never crawls or indexes, and makes no ownership or safety claim. Read endpoints are public, unauthenticated, and CORS-open. The response contract is stable and additive: new optional fields may appear; clients must ignore unknown fields.",
     "contact": { "email": "contact@nessgate.com", "url": "https://nessgate.com/contact" },
     "termsOfService": "https://nessgate.com/terms",
@@ -243,8 +243,9 @@
             "items": { "type": "object" }
           },
           "securityTruncated": { "type": "boolean", "description": "True when the spec declares more security schemes than the cap; the list is a labeled prefix, never a silent truncation." },
-          "reachability": { "type": "string", "enum": ["ok", "auth-required", "not-found", "unreachable"], "description": "Only with ?verify=1. ok = the endpoint answered a safe request (2xx/3xx/405/406 — never asserts operations succeed or authorization); auth-required = 401/403/407; not-found = 404/410 (declared, nothing there); unreachable = network failures/timeouts/429/5xx. Absent = not checked." },
+          "reachability": { "type": "string", "enum": ["ok", "auth-required", "rate-limited", "blocked", "not-found", "unreachable", "unknown"], "description": "Only with ?verify=1. ok = answered a safe request (never asserts operations succeed or authorization); auth-required = 401/407 or a WWW-Authenticate header (protocol evidence, never assumed); rate-limited = 429 (alive; Retry-After captured as evidence, never acted on); blocked = anti-bot protection RELIABLY identified via a conservative signal list (challenge headers/markers) — NessGate identifies walls, never bypasses them; not-found = 404/410 (declared, nothing there); unreachable = network failures/timeouts/5xx; unknown = a denial whose cause cannot be established (e.g. a bare 403 — auth and bot-walls both use it, and NessGate never assumes either). Absent = not checked." },
           "checkedAt": { "type": "string", "description": "Only with ?verify=1: when this record's reachability was determined (ISO timestamp)." },
+          "evidence": { "type": "object", "description": "Only with ?verify=1: why the reachability label was chosen — { status?, signal?, retryAfterSeconds? }. signal is a NAME only (e.g. cf-challenge, www-authenticate, fetched-this-resolution, mcp-introspection); response content is never stored or returned." },
           "raw": { "type": "object" }
         },
         "required": ["source", "sourceUrl", "type", "url", "class"]

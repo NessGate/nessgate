@@ -643,22 +643,69 @@ export function detectOpenApiYaml(text) {
   return { ok: true, title: title ? title[1].trim() : undefined };
 }
 
-// Pure: map an HTTP status (0 = network-level failure) to the four honest
-// reachability states of the opt-in verify pass. Deliberately conservative:
-//   ok            — the endpoint answered (2xx/3xx; 405/406 count — the
-//                   endpoint is alive, only method/representation negotiation
-//                   differs, which is normal for POST-only protocol endpoints)
-//   auth-required — 401/403/407: alive, but credentials are the caller's job
+// Pure: map an HTTP status (0 = network-level failure) to an honest
+// reachability state — STATUS-ONLY knowledge; classifyDenial upgrades it with
+// header/body evidence where available. Deliberately conservative:
+//   ok            — the endpoint answered (2xx/3xx; 405/406 count — alive,
+//                   only method/representation negotiation differs, normal
+//                   for POST-only protocol endpoints)
+//   auth-required — 401/407: the protocol says credentials are required
+//   unknown       — bare 403: could be authorization OR a bot-wall — a status
+//                   code alone cannot tell, and we never assume
+//   rate-limited  — 429: alive; the server asked us to slow down
 //   not-found     — 404/410: the publisher declared it, nothing is there
-//   unreachable   — network failures, timeouts, 429, 5xx: NOT shown usable
+//   unreachable   — network failures, timeouts, 5xx: NOT shown usable
 // "ok" asserts the endpoint responded to a safe request — never that every
 // operation succeeds. Identical worker/library (parity-tested).
 export function reachabilityFromStatus(status) {
   const s = Number(status) || 0;
   if ((s >= 200 && s < 400) || s === 405 || s === 406) return "ok";
-  if (s === 401 || s === 403 || s === 407) return "auth-required";
+  if (s === 401 || s === 407) return "auth-required";
+  if (s === 403) return "unknown";
+  if (s === 429) return "rate-limited";
   if (s === 404 || s === 410) return "not-found";
   return "unreachable";
+}
+
+// Pure: classify a probe response using status PLUS evidence — a small,
+// conservative signal list, never an arms race. Anti-bot identification must
+// be RELIABLE or it stays "unknown" (the user rule: never assume a denial is
+// bot protection, and never assume it is auth either).
+//   headers: plain object, lowercase keys (allowlisted by the probe)
+//   bodySnippet: ≤2 KB of the denial body (only fetched for unexplained
+//   403/503) — inspected here, NEVER stored or returned
+// Returns { reachability, signal?, retryAfterSeconds? }. Signals are names
+// only (e.g. "cf-challenge"), so evidence can be preserved without carrying
+// any response content. Identical worker/library (parity-tested).
+export function classifyDenial({ status, headers = {}, bodySnippet = "" } = {}) {
+  const s = Number(status) || 0;
+  const h = {};
+  for (const [k, v] of Object.entries(headers || {})) h[String(k).toLowerCase()] = String(v == null ? "" : v);
+  const ra = /^\d+$/.test(String(h["retry-after"] || "").trim()) ? Number(h["retry-after"]) : undefined;
+  const out = (reachability, signal) => ({ reachability, ...(signal ? { signal } : {}), ...(ra !== undefined ? { retryAfterSeconds: ra } : {}) });
+
+  // Authentication is only claimed on protocol evidence, never assumed.
+  if (h["www-authenticate"]) return out("auth-required", "www-authenticate");
+  if (s === 401 || s === 407) return out("auth-required");
+
+  // Challenge signals — checked ONLY on denial-ish statuses (a 200 page may
+  // legitimately embed a captcha widget; that is not a wall).
+  if (s === 403 || s === 503 || s === 429) {
+    if ((h["cf-mitigated"] || "").includes("challenge")) return out("blocked", "cf-challenge");
+    for (const k of Object.keys(h)) {
+      if (k.startsWith("x-datadome")) return out("blocked", "datadome");
+      if (k.startsWith("x-px") || k === "x-perimeterx") return out("blocked", "perimeterx");
+    }
+    if (["challenge", "captcha"].includes(h["x-amzn-waf-action"] || "")) return out("blocked", "aws-waf");
+    const b = String(bodySnippet || "").slice(0, 2048);
+    if (/cf_chl_|challenge-platform|Just a moment\.\.\./.test(b)) return out("blocked", "cf-challenge");
+    if (/geo\.captcha-delivery\.com/.test(b)) return out("blocked", "datadome");
+    if (/_Incapsula_Resource|Incapsula incident/.test(b)) return out("blocked", "imperva");
+    if (/errors\.edgesuite\.net/.test(b)) return out("blocked", "akamai");
+    if (/hcaptcha\.com\/captcha|www\.google\.com\/recaptcha\/api/.test(b)) return out("blocked", "captcha");
+  }
+  if (s === 429) return out("rate-limited", ra !== undefined ? "retry-after" : undefined);
+  return out(reachabilityFromStatus(s));
 }
 
 // Pure: drop duplicate records produced when ONE document is legitimately
@@ -884,31 +931,56 @@ async function queryGbzGateway(gbz, timeoutMs) {
   }
 }
 
-// One SAFE reachability probe for the verify pass: HEAD first; on 405/501
-// (HEAD unsupported) one bounded GET whose body is cancelled immediately.
-// Returns the final HTTP status (0 = network failure). Never POSTs, never
-// executes anything, never follows a redirect chain beyond fetch defaults.
+// One SAFE reachability probe for the verify pass: HEAD first; one bounded
+// GET fallback when HEAD is unsupported (405/501), failed at the network
+// level, or produced an UNEXPLAINED denial (403/503 with no signal headers —
+// the ≤2 KB body snippet is what makes reliable bot-wall identification
+// possible; it is classified, never stored). Never POSTs, never executes
+// anything. Returns { status, headers (allowlisted, lowercase), snippet }.
 const VERIFY_MAX_TARGETS = 8;
+const VERIFY_HEADER_ALLOWLIST = ["www-authenticate", "retry-after", "cf-mitigated", "x-amzn-waf-action", "x-perimeterx"];
+const VERIFY_HEADER_PREFIXES = ["x-datadome", "x-px"];
+function pickVerifyHeaders(res) {
+  // Real Headers are iterable in every supported runtime; a non-iterable
+  // stand-in simply yields no evidence (classification falls back to
+  // status-only, which is the honest floor).
+  const out = {};
+  try {
+    for (const [k, v] of res.headers) {
+      const key = String(k).toLowerCase();
+      if (VERIFY_HEADER_ALLOWLIST.includes(key) || VERIFY_HEADER_PREFIXES.some((p) => key.startsWith(p))) out[key] = String(v);
+    }
+  } catch {}
+  return out;
+}
 async function probeReachability(fetchImpl, url, timeoutMs) {
-  const attempt = async (method) => {
+  const attempt = async (method, wantSnippet) => {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const res = await fetchImpl(url, { method, signal: ctrl.signal, headers: { "User-Agent": "NessGate-Verify/1.0 (+https://nessgate.com)", Accept: "*/*" } });
-      if (method === "GET" && res.body && typeof res.body.cancel === "function") { try { await res.body.cancel(); } catch {} }
-      return res.status || 0;
+      let snippet = "";
+      if (method === "GET") {
+        if (wantSnippet && typeof res.text === "function") { try { snippet = String(await res.text()).slice(0, 2048); } catch {} }
+        else if (res.body && typeof res.body.cancel === "function") { try { await res.body.cancel(); } catch {} }
+      }
+      return { status: res.status || 0, headers: pickVerifyHeaders(res), snippet };
     } catch {
-      return 0;
+      return { status: 0, headers: {}, snippet: "" };
     } finally {
       clearTimeout(timer);
     }
   };
-  const head = await attempt("HEAD");
-  if (head === 405 || head === 501 || head === 0) {
-    const get = await attempt("GET");
-    // HEAD-blocked but GET-alive servers are common; prefer the GET evidence
-    // unless it too failed at the network level.
-    if (get !== 0 || head === 0) return get;
+  const head = await attempt("HEAD", false);
+  const unexplainedDenial = (r) => (r.status === 403 || r.status === 503) && !Object.keys(r.headers).some((k) => k !== "retry-after");
+  if (head.status === 405 || head.status === 501 || head.status === 0) {
+    const get = await attempt("GET", true);
+    if (get.status !== 0 || head.status === 0) return get;
+    return head;
+  }
+  if (unexplainedDenial(head)) {
+    const get = await attempt("GET", true);
+    if (get.status !== 0) return get;
   }
   return head;
 }
@@ -1084,27 +1156,34 @@ export async function resolve(domain, opts = {}) {
   // fetch already happened, one safe probe otherwise.
   if (opts.verify) {
     const now = new Date().toISOString();
-    const probed = new Map(); // url -> status (dedupe probes across records)
+    const probed = new Map(); // url -> classification (dedupe probes across records)
     let budget = VERIFY_MAX_TARGETS;
     for (const r of resources) {
       if (typeof r.url !== "string" || !r.url.startsWith("https://")) continue;
       if (r.class === "verified-publisher-location" || r.class === "verified-external-location" || r.url === r.sourceUrl) {
         r.reachability = "ok"; // this resolution fetched and validated it — no extra request
         r.checkedAt = now;
+        r.evidence = { signal: "fetched-this-resolution" };
         continue;
       }
       if (r.introspection) { // MCP introspection already answered this
         r.reachability = r.introspection.ok ? "ok" : r.introspection.status === "auth-required" ? "auth-required" : r.introspection.status === "legacy-transport" ? "ok" : "unreachable";
         r.checkedAt = now;
+        r.evidence = { signal: "mcp-introspection" };
         continue;
       }
       if (!probed.has(r.url)) {
         if (budget <= 0 || Date.now() - startedAt > deadlineMs) continue; // stays not-checked, honestly absent
         budget--;
-        probed.set(r.url, await probeReachability(fetchImpl, r.url, timeoutMs));
+        const probe = await probeReachability(fetchImpl, r.url, timeoutMs);
+        const c = classifyDenial({ status: probe.status, headers: probe.headers, bodySnippet: probe.snippet });
+        probed.set(r.url, { ...c, status: probe.status });
       }
-      r.reachability = reachabilityFromStatus(probed.get(r.url));
+      const c = probed.get(r.url);
+      r.reachability = c.reachability;
       r.checkedAt = now;
+      // Evidence: status + signal NAME + retry hint only — never response content.
+      r.evidence = { status: c.status, ...(c.signal ? { signal: c.signal } : {}), ...(c.retryAfterSeconds !== undefined ? { retryAfterSeconds: c.retryAfterSeconds } : {}) };
     }
   }
   const out = { domain: d, provenance: "self-published", discovered, resources, checked };
@@ -1159,4 +1238,4 @@ export function sameRegCanonicalHost(finalUrl, domain) {
   return h.endsWith("." + domain) ? h : null;
 }
 
-export default { resolve, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, detectOpenApiYaml, extractOpenApiCapabilities, dedupeResources, reachabilityFromStatus, parseMcpMessages, mcpToolCapabilities, probeFailureKind, resolutionOutcome, fetchBounded, ADAPTERS };
+export default { resolve, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, detectOpenApiYaml, extractOpenApiCapabilities, dedupeResources, reachabilityFromStatus, classifyDenial, parseMcpMessages, mcpToolCapabilities, probeFailureKind, resolutionOutcome, fetchBounded, ADAPTERS };
