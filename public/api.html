@@ -128,6 +128,17 @@ least as common as clean answers: the checks were prevented, so absence is <em>u
 <code>/explore</code> adds <code>incomplete</code> when its request/byte/time budgets cut the walk
 short. Whenever any probe was refused, <code>blockedProbes</code> discloses the count even under
 <code>none-found</code> — uncertainty is never hidden.</p>
+<p class="note"><strong>Reachability verification (opt-in: <code>?verify=1</code>).</strong> Finding an
+address does not mean an agent can use it. The verify pass adds a per-record
+<code>reachability</code> label — <code>ok</code> (the endpoint answered a <em>safe</em> request;
+never a claim that operations succeed or that you are authorized), <code>auth-required</code>,
+<code>not-found</code> (declared, but nothing is there), or <code>unreachable</code> — plus
+<code>checkedAt</code>. Surfaces NessGate fetched during the resolution are marked <code>ok</code>
+with <strong>no extra request</strong> (the fetch is the evidence); MCP records reuse introspection
+results when present; declared pointers get one safe probe each (HEAD, then a bounded GET when HEAD
+is unsupported — never a POST, never an execution), capped at 8. Absent
+<code>reachability</code> means <em>not checked</em>, stated honestly. The embeddable library does
+the same via <code>resolve(domain, {verify: true})</code>.</p>
 <p class="note"><strong>MCP introspection (opt-in: <code>?mcp=1</code>).</strong> When a domain <em>declares</em>
 an MCP endpoint (via AWP, an AID record, a catalog entry — never a guessed path), NessGate can ask
 that server what <em>it</em> declares, using the protocol's own read-only handshake:

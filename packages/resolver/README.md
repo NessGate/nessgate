@@ -87,8 +87,16 @@ unverified), and `unsupported` (no usable URL). The hosted resolver at nessgate.
 domain-locked and never follows cross-domain redirects, so `verified-external-location`
 appears only in library results.
 
-Options: `{ fetch, timeoutMs = 8000, maxBytes = 1_000_000, deadlineMs = 20000, org, fast, mcp }`.
+Options: `{ fetch, timeoutMs = 8000, maxBytes = 1_000_000, deadlineMs = 20000, org, fast, mcp, verify }`.
 Bring your own `fetch` if the runtime has none.
+
+- `verify: true` — a labeled reachability pass: surfaces this resolution already
+  fetched are `reachability: "ok"` with **no extra request**; MCP records reuse
+  introspection results; declared pointers get one safe probe each (HEAD, then a
+  bounded GET when HEAD is unsupported — never a POST, never an execution), capped
+  at 8, mapped to `ok | auth-required | not-found | unreachable` with `checkedAt`.
+  Absent `reachability` = not checked. `ok` means the endpoint answered a safe
+  request — never that operations succeed or that you are authorized.
 
 - `deadlineMs` — a global wall-clock budget for the whole resolution. Past it no new
   fetch starts; an empty, cut-short result is labeled `outcome: "incomplete"` with

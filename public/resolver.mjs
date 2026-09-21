@@ -643,6 +643,24 @@ export function detectOpenApiYaml(text) {
   return { ok: true, title: title ? title[1].trim() : undefined };
 }
 
+// Pure: map an HTTP status (0 = network-level failure) to the four honest
+// reachability states of the opt-in verify pass. Deliberately conservative:
+//   ok            — the endpoint answered (2xx/3xx; 405/406 count — the
+//                   endpoint is alive, only method/representation negotiation
+//                   differs, which is normal for POST-only protocol endpoints)
+//   auth-required — 401/403/407: alive, but credentials are the caller's job
+//   not-found     — 404/410: the publisher declared it, nothing is there
+//   unreachable   — network failures, timeouts, 429, 5xx: NOT shown usable
+// "ok" asserts the endpoint responded to a safe request — never that every
+// operation succeeds. Identical worker/library (parity-tested).
+export function reachabilityFromStatus(status) {
+  const s = Number(status) || 0;
+  if ((s >= 200 && s < 400) || s === 405 || s === 406) return "ok";
+  if (s === 401 || s === 403 || s === 407) return "auth-required";
+  if (s === 404 || s === 410) return "not-found";
+  return "unreachable";
+}
+
 // Pure: drop duplicate records produced when ONE document is legitimately
 // reachable through several channels (well-known path + rel="ard" link +
 // robots Agentmap all naming the same catalog). Keeps the first occurrence
@@ -866,6 +884,35 @@ async function queryGbzGateway(gbz, timeoutMs) {
   }
 }
 
+// One SAFE reachability probe for the verify pass: HEAD first; on 405/501
+// (HEAD unsupported) one bounded GET whose body is cancelled immediately.
+// Returns the final HTTP status (0 = network failure). Never POSTs, never
+// executes anything, never follows a redirect chain beyond fetch defaults.
+const VERIFY_MAX_TARGETS = 8;
+async function probeReachability(fetchImpl, url, timeoutMs) {
+  const attempt = async (method) => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetchImpl(url, { method, signal: ctrl.signal, headers: { "User-Agent": "NessGate-Verify/1.0 (+https://nessgate.com)", Accept: "*/*" } });
+      if (method === "GET" && res.body && typeof res.body.cancel === "function") { try { await res.body.cancel(); } catch {} }
+      return res.status || 0;
+    } catch {
+      return 0;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const head = await attempt("HEAD");
+  if (head === 405 || head === 501 || head === 0) {
+    const get = await attempt("GET");
+    // HEAD-blocked but GET-alive servers are common; prefer the GET evidence
+    // unless it too failed at the network level.
+    if (get !== 0 || head === 0) return get;
+  }
+  return head;
+}
+
 // resolve(domain, opts) -> { domain, provenance, discovered, resources, checked }
 // discovered = which mechanisms the domain publishes and where (the routing map)
 // resources  = the normalized union of what those documents contain
@@ -899,6 +946,16 @@ async function queryGbzGateway(gbz, timeoutMs) {
 //   NEW fetch starts; deadline skips count as neither answered nor refused;
 //   an empty, cut-short result is labeled outcome "incomplete" with
 //   truncated: true — never a confident absence.
+// opts.verify (optional, OFF by default): a labeled reachability pass over the
+//   result. Surfaces NessGate fetched this resolution are marked
+//   reachability "ok" WITHOUT any extra request (the fetch is the evidence);
+//   declared pointers get ONE safe probe each (HEAD, then a bounded GET when
+//   HEAD is unsupported — never a POST, never an execution), capped at 8,
+//   mapped by reachabilityFromStatus, each record stamped checkedAt. Absent
+//   reachability = not checked. "ok" means the endpoint answered a safe
+//   request — never that operations succeed or that the caller is authorized.
+//   Cross-registrable targets are probed only because the publisher itself
+//   declared them; in server-side runtimes the README's SSRF note applies.
 export async function resolve(domain, opts = {}) {
   const rawFetch = opts.fetch || globalThis.fetch;
   if (typeof rawFetch !== "function") throw new Error("no fetch available; pass opts.fetch");
@@ -1023,7 +1080,35 @@ export async function resolve(domain, opts = {}) {
     const cands = mcpIntrospectionCandidates(resources, d);
     await Promise.all(cands.map(async (r) => { Object.assign(r, await introspectMcpEndpoint(fetchImpl, r.url, timeoutMs)); }));
   }
+  // Opt-in verify pass (see opts.verify above): evidence-derived where the
+  // fetch already happened, one safe probe otherwise.
+  if (opts.verify) {
+    const now = new Date().toISOString();
+    const probed = new Map(); // url -> status (dedupe probes across records)
+    let budget = VERIFY_MAX_TARGETS;
+    for (const r of resources) {
+      if (typeof r.url !== "string" || !r.url.startsWith("https://")) continue;
+      if (r.class === "verified-publisher-location" || r.class === "verified-external-location" || r.url === r.sourceUrl) {
+        r.reachability = "ok"; // this resolution fetched and validated it — no extra request
+        r.checkedAt = now;
+        continue;
+      }
+      if (r.introspection) { // MCP introspection already answered this
+        r.reachability = r.introspection.ok ? "ok" : r.introspection.status === "auth-required" ? "auth-required" : r.introspection.status === "legacy-transport" ? "ok" : "unreachable";
+        r.checkedAt = now;
+        continue;
+      }
+      if (!probed.has(r.url)) {
+        if (budget <= 0 || Date.now() - startedAt > deadlineMs) continue; // stays not-checked, honestly absent
+        budget--;
+        probed.set(r.url, await probeReachability(fetchImpl, r.url, timeoutMs));
+      }
+      r.reachability = reachabilityFromStatus(probed.get(r.url));
+      r.checkedAt = now;
+    }
+  }
   const out = { domain: d, provenance: "self-published", discovered, resources, checked };
+  if (opts.verify) out.verified = ["reachability"]; // labeled: the verify pass ran
   // The single honest outcome label (found / none-found / blocked), plus the
   // refusal count so uncertainty is never hidden even under none-found. In
   // runtimes without DNS-failure detail (plain fetch), NXDOMAIN reads as a
@@ -1074,4 +1159,4 @@ export function sameRegCanonicalHost(finalUrl, domain) {
   return h.endsWith("." + domain) ? h : null;
 }
 
-export default { resolve, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, detectOpenApiYaml, extractOpenApiCapabilities, dedupeResources, parseMcpMessages, mcpToolCapabilities, probeFailureKind, resolutionOutcome, fetchBounded, ADAPTERS };
+export default { resolve, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, detectOpenApiYaml, extractOpenApiCapabilities, dedupeResources, reachabilityFromStatus, parseMcpMessages, mcpToolCapabilities, probeFailureKind, resolutionOutcome, fetchBounded, ADAPTERS };

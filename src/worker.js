@@ -774,6 +774,59 @@ export function detectOpenApiYaml(text) {
   return { ok: true, title: title ? title[1].trim() : undefined };
 }
 
+// Pure: map an HTTP status (0 = network-level failure) to the four honest
+// reachability states of the opt-in verify pass. Deliberately conservative:
+// ok = the endpoint answered a safe request (2xx/3xx; 405/406 count — alive,
+// only method/representation negotiation differs, normal for POST-only
+// protocol endpoints); auth-required = 401/403/407; not-found = 404/410
+// (declared, nothing there); unreachable = network/timeout/429/5xx. "ok"
+// never asserts operations succeed or the caller is authorized. Identical to
+// the library (parity-tested).
+export function reachabilityFromStatus(status) {
+  const s = Number(status) || 0;
+  if ((s >= 200 && s < 400) || s === 405 || s === 406) return "ok";
+  if (s === 401 || s === 403 || s === 407) return "auth-required";
+  if (s === 404 || s === 410) return "not-found";
+  return "unreachable";
+}
+
+// One SAFE reachability probe for ?verify=1: HEAD first; on 405/501 one GET
+// whose body is cancelled immediately. Never POSTs, never executes anything.
+// Cross-registrable targets are probed ONLY because the publisher itself
+// declared them (the /explore precedent); forbidden-host and public-DNS
+// guards always apply; the SELF domain dispatches in-process.
+async function probeReachabilityWorker(url, env, ctx, domain) {
+  let u;
+  try { u = new URL(url); } catch { return 0; }
+  if (u.protocol !== "https:") return 0;
+  const host = u.hostname.toLowerCase().replace(/\.+$/, "");
+  if (domain === SELF_DOMAIN && host === SELF_DOMAIN) {
+    try { const res = await route(new Request(url), env, ctx); return res.status || 0; } catch { return 0; }
+  }
+  if (isForbiddenHost(host)) return 0; // opaque, like every other guard
+  try { await assertPublicDns(host); } catch { return 0; }
+  const attempt = async (method) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, { method, redirect: "follow", signal: controller.signal, headers: { "User-Agent": "NessGate-Verify/1.0 (+https://nessgate.com)", Accept: "*/*" }, cf: { cacheTtl: 0 } });
+      if (method === "GET" && res.body && typeof res.body.cancel === "function") { try { await res.body.cancel(); } catch {} }
+      return res.status || 0;
+    } catch {
+      return 0;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const head = await attempt("HEAD");
+  if (head === 405 || head === 501 || head === 0) {
+    const get = await attempt("GET");
+    if (get !== 0 || head === 0) return get;
+  }
+  return head;
+}
+const VERIFY_MAX_TARGETS = 8;
+
 // Pure: drop duplicate records produced when ONE document is legitimately
 // reachable through several channels (well-known path + rel="ard" link +
 // robots Agentmap all naming the same catalog). Keeps the first occurrence
@@ -1042,10 +1095,12 @@ async function discoverData(raw, env, ctx, request) {
   // cached under a separate key and flagged mode:"fast" in the response.
   let fast = false;
   let mcp = false;
+  let verify = false;
   try {
     const q = new URL(request.url).searchParams;
     fast = q.get("fast") === "1";
     mcp = q.get("mcp") === "1"; // opt-in read-only MCP introspection (labeled)
+    verify = q.get("verify") === "1"; // opt-in reachability pass (labeled)
   } catch {}
   const active = fast ? ADAPTERS.filter((a) => !FAST_MODE_SKIP.has(a.channel)) : ADAPTERS;
   const cache = caches.default;
@@ -1055,7 +1110,7 @@ async function discoverData(raw, env, ctx, request) {
   // /cache-op/ prefix keeps that bookkeeping out of every /discover//explore
   // path-filtered metric, where misses read as phantom caller-facing 504s.
   // (.invalid host = RFC 2606, clearly synthetic; keys are never fetched.)
-  const key = new Request(`https://resolver-cache.nessgate.invalid/cache-op/discover/${fast ? "fast/" : ""}${mcp ? "mcp/" : ""}${domain}`);
+  const key = new Request(`https://resolver-cache.nessgate.invalid/cache-op/discover/${fast ? "fast/" : ""}${mcp ? "mcp/" : ""}${verify ? "verify/" : ""}${domain}`);
   const hit = await cache.match(key);
   if (hit) return { status: 200, body: await hit.json(), cached: true };
   if (!(await rateLimit(env, request, "disc", DISCOVER_RATE_LIMIT_PER_HOUR))) {
@@ -1109,6 +1164,35 @@ async function discoverData(raw, env, ctx, request) {
     const cands = mcpIntrospectionCandidates(resources, domain);
     await Promise.all(cands.map(async (r) => { Object.assign(r, await introspectMcpEndpoint(r.url, env, ctx, domain)); }));
   }
+  // Opt-in ?verify=1: labeled reachability pass. Surfaces this resolution
+  // fetched are "ok" with NO extra request (the fetch is the evidence); MCP
+  // records reuse introspection when present; declared pointers get one safe
+  // probe each, capped. Absent reachability = not checked, honestly.
+  if (verify) {
+    const now = new Date().toISOString();
+    const probed = new Map();
+    let vBudget = VERIFY_MAX_TARGETS;
+    for (const r of resources) {
+      if (typeof r.url !== "string" || !r.url.startsWith("https://")) continue;
+      if (r.class === "verified-publisher-location" || r.url === r.sourceUrl) {
+        r.reachability = "ok";
+        r.checkedAt = now;
+        continue;
+      }
+      if (r.introspection) {
+        r.reachability = r.introspection.ok ? "ok" : r.introspection.status === "auth-required" ? "auth-required" : r.introspection.status === "legacy-transport" ? "ok" : "unreachable";
+        r.checkedAt = now;
+        continue;
+      }
+      if (!probed.has(r.url)) {
+        if (vBudget <= 0) continue; // stays not-checked
+        vBudget--;
+        probed.set(r.url, await probeReachabilityWorker(r.url, env, ctx, domain));
+      }
+      r.reachability = reachabilityFromStatus(probed.get(r.url));
+      r.checkedAt = now;
+    }
+  }
   let note = fast ? DISCOVER_NOTE + " (fast mode: the optional alternate ARD locators — rel=\"ard\" link and robots Agentmap — were skipped for speed; a catalog advertised only via those may be missed. Omit ?fast for complete, ARD-conformant discovery.)" : DISCOVER_NOTE;
   if (mcp) note += " (mcp introspection: declared MCP endpoints on this domain were queried READ-ONLY — initialize and tools/list only, no tool execution, no credentials; results are the servers' own declarations.)";
   const body = {
@@ -1122,6 +1206,7 @@ async function discoverData(raw, env, ctx, request) {
     ...(probes.refused ? { blockedProbes: probes.refused } : {}),
     ...(fast ? { mode: "fast" } : {}),
     ...(mcp ? { introspected: ["mcp"] } : {}),
+    ...(verify ? { verified: ["reachability"] } : {}),
     discovered,
     resources,
     checked: active.map((a) => a.id),

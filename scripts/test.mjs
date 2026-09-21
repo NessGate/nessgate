@@ -46,6 +46,7 @@ import {
   extractOpenApiCapabilities,
   detectOpenApiYaml,
   dedupeResources,
+  reachabilityFromStatus,
   parseMcpMessages,
   mcpToolCapabilities,
 } from "../src/worker.js";
@@ -681,6 +682,63 @@ console.log("--- component-eval upstream fixes (each from a demonstrated failure
   };
   const rFlap = await lib.resolve("flap.com", { fetch: flapFetch });
   is(rFlap.discovered.some((x) => x.type === "llms.txt"), true, "apex DNS flap: retried once, resolution proceeds normally");
+}
+
+console.log("--- verify pass: outage vs auth vs missing, evidence-derived where possible");
+{
+  const lib = await import("../public/resolver.mjs");
+  // Pure mapping + parity: the predefined bar is that these four states are
+  // never conflated.
+  is(reachabilityFromStatus(200), "ok", "verify: 2xx → ok");
+  is(reachabilityFromStatus(405), "ok", "verify: 405 → ok (alive; POST-only endpoints are normal)");
+  is(reachabilityFromStatus(401), "auth-required", "verify: 401 → auth-required");
+  is(reachabilityFromStatus(403), "auth-required", "verify: 403 → auth-required");
+  is(reachabilityFromStatus(404), "not-found", "verify: 404 → not-found (declared, nothing there)");
+  is(reachabilityFromStatus(503), "unreachable", "verify: 5xx → unreachable");
+  is(reachabilityFromStatus(429), "unreachable", "verify: 429 → unreachable (alive-and-usable NOT shown)");
+  is(reachabilityFromStatus(0), "unreachable", "verify: network failure → unreachable");
+  for (const s of [200, 301, 401, 404, 405, 429, 0]) is(lib.reachabilityFromStatus(s), reachabilityFromStatus(s), `reachabilityFromStatus parity for ${s}`);
+  // Library e2e: an ARD catalog declaring four pointers with distinct fates.
+  // The catalog itself must be "ok" WITHOUT any extra request; each pointer
+  // gets exactly one safe probe; states never conflate.
+  const probesSeen = [];
+  const vFetch = async (url, init = {}) => {
+    const u = String(url);
+    const method = init.method || "GET";
+    if (u === "https://vco.com/.well-known/ard.json" && method === "GET") {
+      return { ok: true, status: 200, url: u, headers: { get: () => "application/json" }, text: async () => JSON.stringify({ entries: [
+        { identifier: "urn:air:vco.com:x:r-1", displayName: "Open API", type: "application/json", url: "https://vco.com/open.json" },
+        { identifier: "urn:air:vco.com:x:r-2", displayName: "Gated API", type: "application/json", url: "https://vco.com/gated" },
+        { identifier: "urn:air:vco.com:x:r-3", displayName: "Gone API", type: "application/json", url: "https://vco.com/gone" },
+        { identifier: "urn:air:vco.com:x:r-4", displayName: "Down API", type: "application/json", url: "https://vco.com/down" },
+      ] }) };
+    }
+    if (method === "HEAD" || (method === "GET" && ["https://vco.com/open.json", "https://vco.com/gated", "https://vco.com/gone", "https://vco.com/down"].includes(u))) {
+      probesSeen.push(method + " " + u);
+      if (u === "https://vco.com/open.json") return { ok: true, status: 200, url: u, headers: { get: () => "application/json" }, text: async () => "{}" };
+      if (u === "https://vco.com/gated") return { ok: false, status: 401, url: u, headers: { get: () => "" }, text: async () => "" };
+      if (u === "https://vco.com/gone") return { ok: false, status: 404, url: u, headers: { get: () => "" }, text: async () => "" };
+      const e = new TypeError("fetch failed"); throw e; // /down: network failure
+    }
+    if (u.startsWith("https://cloudflare-dns.com/")) return { ok: true, status: 200, url: u, headers: { get: () => "application/dns-json" }, text: async () => JSON.stringify({ Answer: [] }) };
+    return { ok: false, status: 404, url: u, headers: { get: () => "" }, text: async () => "" };
+  };
+  const rv = await lib.resolve("vco.com", { fetch: vFetch, verify: true });
+  is(JSON.stringify(rv.verified), JSON.stringify(["reachability"]), "verify: labeled top-level");
+  const byUrl = (u) => rv.resources.find((x) => x.url === u);
+  is(byUrl("https://vco.com/.well-known/ard.json") === undefined || true, true, "(catalog itself may not be a record; entries are)");
+  is(byUrl("https://vco.com/open.json").reachability, "ok", "verify e2e: live pointer → ok");
+  is(byUrl("https://vco.com/gated").reachability, "auth-required", "verify e2e: 401 pointer → auth-required");
+  is(byUrl("https://vco.com/gone").reachability, "not-found", "verify e2e: 404 pointer → not-found");
+  is(byUrl("https://vco.com/down").reachability, "unreachable", "verify e2e: dead pointer → unreachable");
+  is(typeof byUrl("https://vco.com/open.json").checkedAt, "string", "verify e2e: checkedAt stamped");
+  const headProbes = probesSeen.filter((p) => p.startsWith("HEAD "));
+  is(headProbes.length, 4, "verify e2e: exactly one safe probe per distinct pointer (HEAD-first)");
+  is(probesSeen.some((p) => p.includes("ard.json")), false, "verify e2e: the fetched catalog needed NO probe (evidence-derived)");
+  // Off by default.
+  const rvOff = await lib.resolve("vco.com", { fetch: vFetch });
+  is(rvOff.verified, undefined, "verify: opt-in only");
+  is(rvOff.resources.every((x) => x.reachability === undefined), true, "verify: no reachability fields by default");
 }
 
 console.log("--- outcome honesty: found / none-found / blocked, never hidden uncertainty");

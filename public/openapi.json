@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "NessGate API",
-    "version": "1.11.0",
+    "version": "1.12.0",
     "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads whatever that domain already publishes across the standard machine-discovery locations (llms.txt, ARD / ai-catalog.json, A2A agent card, RFC 9727 API catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP manifest, RFC 6415 host-meta) and returns one normalized answer, each record carrying a sourceUrl back to the domain. NessGate stores nothing, never crawls or indexes, and makes no ownership or safety claim. Read endpoints are public, unauthenticated, and CORS-open. The response contract is stable and additive: new optional fields may appear; clients must ignore unknown fields.",
     "contact": { "email": "contact@nessgate.com", "url": "https://nessgate.com/contact" },
     "termsOfService": "https://nessgate.com/terms",
@@ -36,6 +36,13 @@
             "required": false,
             "description": "Set to 1 to introspect DECLARED MCP endpoints read-only via the protocol's own handshake (initialize + tools/list only — never tools/call, no credentials, POSTs never follow redirects). HTTPS endpoints on the queried registrable domain only, max 3 per resolution, 256 KB response cap. Declared tools land verbatim in the resource's capabilities; the response is labeled introspected:[\"mcp\"]. Default (omit ?mcp) never introspects.",
             "schema": { "type": "string", "enum": ["1"], "example": "1" }
+          },
+          {
+            "name": "verify",
+            "in": "query",
+            "required": false,
+            "description": "Set to 1 for a labeled reachability pass: surfaces this resolution already fetched are marked reachability ok with NO extra request (the fetch is the evidence); MCP records reuse introspection results when present; declared pointers get ONE safe probe each (HEAD, then a bounded GET when HEAD is unsupported — never a POST, never an execution), capped at 8, mapped to ok | auth-required | not-found | unreachable with a per-record checkedAt. Absent reachability = not checked. ok means the endpoint answered a safe request — never that operations succeed or the caller is authorized. Cross-registrable targets are probed only because the publisher itself declared them. Default (omit ?verify) never probes.",
+            "schema": { "type": "string", "enum": ["1"], "example": "1" }
           }
         ],
         "responses": {
@@ -53,6 +60,7 @@
                     "blockedProbes": { "type": "integer", "description": "Present when any probe was refused: the count of refused probes, disclosed even when the outcome is none-found so uncertainty is never hidden." },
                     "mode": { "type": "string", "enum": ["fast"], "description": "Present only when ?fast=1 was used: signals the alternate ARD locators were skipped (not fully ARD-conformant). Absent for the default complete mode." },
                     "introspected": { "type": "array", "items": { "type": "string", "enum": ["mcp"] }, "description": "Present only when ?mcp=1 was used: read-only MCP introspection ran on declared endpoints. Absent by default." },
+                    "verified": { "type": "array", "items": { "type": "string", "enum": ["reachability"] }, "description": "Present only when ?verify=1 was used: the labeled reachability pass ran. Absent by default." },
                     "discovered": {
                       "type": "array",
                       "description": "The routing map: which standards the domain publishes, and where.",
@@ -235,6 +243,8 @@
             "items": { "type": "object" }
           },
           "securityTruncated": { "type": "boolean", "description": "True when the spec declares more security schemes than the cap; the list is a labeled prefix, never a silent truncation." },
+          "reachability": { "type": "string", "enum": ["ok", "auth-required", "not-found", "unreachable"], "description": "Only with ?verify=1. ok = the endpoint answered a safe request (2xx/3xx/405/406 — never asserts operations succeed or authorization); auth-required = 401/403/407; not-found = 404/410 (declared, nothing there); unreachable = network failures/timeouts/429/5xx. Absent = not checked." },
+          "checkedAt": { "type": "string", "description": "Only with ?verify=1: when this record's reachability was determined (ISO timestamp)." },
           "raw": { "type": "object" }
         },
         "required": ["source", "sourceUrl", "type", "url", "class"]

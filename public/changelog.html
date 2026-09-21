@@ -31,6 +31,19 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h2>2026</h2>
 
+<h3 id="verify-2026-09-22">Opt-in reachability verification (<code>?verify=1</code>)</h3>
+<ul>
+<li>Finding an address does not mean an agent can use it. <code>?verify=1</code> (and the library's
+<code>resolve(domain, {verify: true})</code>) adds per-record <code>reachability</code> —
+<code>ok</code> / <code>auth-required</code> / <code>not-found</code> / <code>unreachable</code> —
+with <code>checkedAt</code>, distinguishing outages from auth walls from dead declarations.
+Evidence-derived where possible: already-fetched surfaces are <code>ok</code> with no extra request,
+MCP records reuse introspection, and only declared pointers get one safe probe each (HEAD, then a
+bounded GET — never a POST, never an execution), capped at 8. <code>ok</code> asserts only that the
+endpoint answered a safe request; absent <code>reachability</code> means not checked. Off by
+default; additive; library 1.11.0.</li>
+</ul>
+
 <h3 id="component-eval-2026-09-22">Seven fixes from an adversarial component evaluation</h3>
 <ul>
 <li>An isolated evaluation (deterministic adversarial scenario suite + unseen live domains +
