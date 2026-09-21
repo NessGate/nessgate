@@ -34,7 +34,7 @@ const CANDIDATES = {
   "dev-docs": ["bun.sh", "deno.com", "astro.build", "svelte.dev", "prisma.io", "tailwindcss.com",
     "python.org", "npmjs.com", "gitlab.com", "apache.org", "kernel.org"],
   "standards": ["modelcontextprotocol.io", "agenticresourcediscovery.org", "ucpchecker.com"],
-  "stress": ["perplexity.ai", "gitbook.com", "wordpress.com", "medium.com", "notion.so", "fanar.qa"],
+  "stress": ["perplexity.ai", "gitbook.com", "wordpress.com", "medium.com", "notion.so", "excalidraw.com"],
   "negative-biz": ["walmart.com", "target.com", "homedepot.com", "bestbuy.com", "nike.com",
     "cocacola.com", "toyota.com", "airbnb.com", "booking.com"],
   "negative-news": ["nytimes.com", "bbc.com", "cnn.com", "spiegel.de", "lemonde.fr"],

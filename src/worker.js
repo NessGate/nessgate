@@ -388,6 +388,44 @@ function parseAidRecord(txt) {
   return { version, uri, proto: pick("p", "proto"), auth: pick("a", "auth"), desc: pick("s", "desc"), docs: pick("d", "docs"), raw: kv };
 }
 
+/* --- Probe-outcome honesty (pure, identical in the library; parity-tested) --- */
+
+// Classify one FAILED probe from its error message. "answered" = the domain
+// gave a definitive answer that nothing is at that location (clean 404/410, no
+// public DNS record, or a redirect pointing away) — absence is CONFIRMED there.
+// "refused" = the domain (or its protection layer) would not let the check
+// happen (auth/rate/5xx statuses, timeouts, network failures) — absence is
+// UNKNOWN there. Unknown failure shapes default to "refused": overcaution may
+// label a flaky site blocked, but can never claim absence that was not shown.
+function probeFailureKind(message) {
+  const msg = String(message || "");
+  const m = /HTTP (\d+)/.exec(msg);
+  if (m) {
+    const s = Number(m[1]);
+    return s === 404 || s === 410 ? "answered" : "refused";
+  }
+  if (/does not resolve/.test(msg)) return "answered"; // no public host — nothing is published there
+  if (/left the target domain|too many redirects|redirect without a target/.test(msg)) return "answered"; // the domain answered by pointing away
+  if (/response is too large/.test(msg)) return "answered"; // it answered; the content just exceeds our cap
+  return "refused";
+}
+
+// The single honest outcome label for a resolution:
+//   found      — validated resources exist.
+//   blocked    — nothing found AND refusals dominate (refused >= answered,
+//                refused > 0): the checks were prevented, absence is UNKNOWN.
+//   none-found — the checks completed; no supported declaration exists at the
+//                locations checked.
+// A lone flaky timeout among many clean 404s stays none-found (with the
+// refusal count still disclosed via blockedProbes) — blocked requires refusals
+// to be at least as common as clean answers.
+function resolutionOutcome(resourceCount, probes) {
+  if (resourceCount > 0) return "found";
+  const r = (probes && probes.refused) || 0;
+  const a = (probes && probes.answered) || 0;
+  return r > 0 && r >= a ? "blocked" : "none-found";
+}
+
 /* --- Worker fetch helpers (centralised SSRF via safeFetch / self-dispatch) --- */
 
 // Fetch a path (or an absolute on-domain URL) as text. safeFetch enforces
@@ -889,7 +927,10 @@ function mcpIntrospectionCandidates(resources, domain) {
   return out;
 }
 
-async function runAdapter(a, domain, env, ctx) {
+async function runAdapter(a, domain, env, ctx, probes) {
+  // probes (optional): shared failure tally for the outcome label — every
+  // failed fetch is classified answered-vs-refused by probeFailureKind.
+  const miss = (e) => { if (probes) probes[probeFailureKind(e && e.message)]++; };
   try {
     if (a.channel === "well-known") {
       for (const path of a.paths) {
@@ -898,7 +939,7 @@ async function runAdapter(a, domain, env, ctx) {
         // without downloading/parsing megabytes.
         if (a.id === "openapi") {
           let r;
-          try { r = await getOnDomainPrefix(domain, path, env, ctx, OPENAPI_PREFIX_BYTES); } catch { continue; }
+          try { r = await getOnDomainPrefix(domain, path, env, ctx, OPENAPI_PREFIX_BYTES); } catch (e) { miss(e); continue; }
           const det = detectOpenApi(r.text, r.truncated);
           if (det.ok) {
             // Declared capabilities need the COMPLETE document. If the prefix
@@ -917,7 +958,7 @@ async function runAdapter(a, domain, env, ctx) {
           continue;
         }
         let text;
-        try { text = await getOnDomain(domain, path, env, ctx); } catch { continue; }
+        try { text = await getOnDomain(domain, path, env, ctx); } catch (e) { miss(e); continue; }
         if (validateProbeContent(a.kind, text) && probeShapeOk(a.id, a.kind, text)) {
           return { discovered: [{ type: a.id, url }], resources: normalizeResources(a.id, a.kind, text, url) };
         }
@@ -927,14 +968,14 @@ async function runAdapter(a, domain, env, ctx) {
     if (a.channel === "link-rel" || a.channel === "robots") {
       const src = a.channel === "link-rel" ? "/" : "/robots.txt";
       let doc;
-      try { doc = await getOnDomain(domain, src, env, ctx); } catch { return { discovered: [], resources: [] }; }
+      try { doc = await getOnDomain(domain, src, env, ctx); } catch (e) { miss(e); return { discovered: [], resources: [] }; }
       const targets = a.channel === "link-rel" ? parseLinkRel(doc, a.rels) : parseAgentmap(doc, a.directive);
       const discovered = [], resources = [];
       for (const t of targets.slice(0, MAX_LINKED_CATALOGS)) {
         let abs;
         try { abs = new URL(t, `https://${domain}/`).toString(); } catch { continue; }
         let text;
-        try { text = await getOnDomain(domain, abs, env, ctx); } catch { continue; } // safeFetch keeps it on-domain
+        try { text = await getOnDomain(domain, abs, env, ctx); } catch (e) { miss(e); continue; } // safeFetch keeps it on-domain
         if (validateProbeContent("json", text) && probeShapeOk(a.normalizeAs, "json", text)) {
           discovered.push({ type: a.id, url: abs });
           resources.push(...normalizeResources(a.normalizeAs, "json", text, abs));
@@ -992,7 +1033,9 @@ async function discoverData(raw, env, ctx, request) {
   }
   // Run every adapter in parallel; merge the routing map (discovered) and the
   // normalized union (resources). Each adapter is self-contained per channel.
-  const settled = await Promise.allSettled(active.map((a) => runAdapter(a, domain, env, ctx)));
+  // probes tallies every failed fetch (answered vs refused) for the outcome label.
+  const probes = { answered: 0, refused: 0 };
+  const settled = await Promise.allSettled(active.map((a) => runAdapter(a, domain, env, ctx, probes)));
   const results = settled.map((r) => (r.status === "fulfilled" && r.value ? r.value : { discovered: [], resources: [] }));
   const discovered = results.flatMap((r) => r.discovered);
   let resources = results.flatMap((r) => r.resources);
@@ -1016,7 +1059,7 @@ async function discoverData(raw, env, ctx, request) {
               discovered.push({ type, url });
               resources.push(...normalizeResources(type, kind, text, url));
             }
-          } catch {}
+          } catch (e) { probes[probeFailureKind(e && e.message)]++; }
         }
       }
     } catch {}
@@ -1035,6 +1078,11 @@ async function discoverData(raw, env, ctx, request) {
     domain,
     provenance: "self-published",
     note,
+    // The single honest outcome label: found / none-found / blocked.
+    // blockedProbes discloses refusals even when the outcome is none-found
+    // (e.g. one flaky timeout among clean 404s), so uncertainty is never hidden.
+    outcome: resolutionOutcome(resources.length, probes),
+    ...(probes.refused ? { blockedProbes: probes.refused } : {}),
     ...(fast ? { mode: "fast" } : {}),
     ...(mcp ? { introspected: ["mcp"] } : {}),
     discovered,
@@ -1487,6 +1535,7 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
   }
 
   const budget = { requests: 0, bytes: 0, hosts: new Set(), seen: new Set(), truncated: false, start: Date.now() };
+  const probes = { answered: 0, refused: 0 }; // failed-fetch tally for the outcome label
   const out = [];
 
   // Attributed MCP Registry federation — ISSUED FIRST (so it grabs an early
@@ -1525,13 +1574,14 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
       budget.seen.add(meta.finalUrl); // the resolved URL is now accounted for
       return { text: meta.text, finalUrl: meta.finalUrl, chain: meta.redirectChain };
     } catch (e) {
+      const msg = String(e && e.message);
+      probes[probeFailureKind(msg)]++; // outcome-label tally (answered vs refused)
       // Optional failure classification for callers that must distinguish "the
       // host answered with an HTTP status" from "nothing answered at all"
       // (org mode's blocked-vs-absent honesty). 0 = network-level failure;
       // -2 = the host has no public DNS record (it does not publicly exist —
       // nothing is published there, which is an ANSWER, not a block).
       if (failMeta) {
-        const msg = String(e && e.message);
         const m = /returned HTTP (\d+)/.exec(msg);
         failMeta.status = m ? Number(m[1]) : /does not resolve/.test(msg) ? -2 : 0;
       }
@@ -1809,6 +1859,10 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
   const body = {
     domain,
     note: org ? EXPLORE_NOTE + " " + ORG_NOTE : EXPLORE_NOTE,
+    // Outcome label; /explore adds "incomplete" — budgets/deadline cut the walk
+    // before it finished, so an empty result may just be an unfinished one.
+    outcome: resources.length > 0 ? "found" : budget.truncated ? "incomplete" : resolutionOutcome(0, probes),
+    ...(probes.refused ? { blockedProbes: probes.refused } : {}),
     checked: ADAPTERS.map((a) => a.id),
     ...(orgChecked ? { orgChecked } : {}),
     ...(orgBlocked && orgBlocked.length ? { orgBlocked } : {}),
@@ -2464,4 +2518,4 @@ function selfDomain() { return SELF_DOMAIN; }
 function apiCatalog() { return API_CATALOG; }
 function mcpTools() { return MCP_TOOLS; }
 function adapters() { return ADAPTERS; }
-export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, assertPublicDns, hostAllowedForDomain, isForbiddenHost, normalizeResources, classifyResource, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, selectOrgHosts, orgHostResponded, homepageRedirectInfo, orgRecordsFromDoc, docRecords, isCrossRegistrable, sameRegCanonicalHost, probeShapeOkObj, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters };
+export { normalizeDomain, escapeHtml, validateProbeContent, probeShapeOk, parseLinkRel, parseAgentmap, parseAidRecord, isPrivateIp, assertPublicDns, hostAllowedForDomain, isForbiddenHost, normalizeResources, classifyResource, isAcs, parseLlmsLinks, looksMachineReadable, isLlmsPath, classifyJson, exploreBudgetAllows, domainToNamespace, mcpRegistryRecords, verifyCandidateRecords, parseSameOrgHosts, selectOrgHosts, orgHostResponded, homepageRedirectInfo, probeFailureKind, resolutionOutcome, orgRecordsFromDoc, docRecords, isCrossRegistrable, sameRegCanonicalHost, probeShapeOkObj, parseRwsDeclaration, rwsReciprocal, parseAssetLinksWeb, nsContained, selfDomain, apiCatalog, mcpTools, adapters };

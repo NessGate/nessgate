@@ -31,6 +31,19 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h2>2026</h2>
 
+<h3 id="outcome-2026-09-21">Unified outcome label: found / none-found / blocked / incomplete</h3>
+<ul>
+<li>Every <code>/discover</code> and <code>/explore</code> response (and the library's
+<code>resolve()</code>) now carries a single <code>outcome</code> label, derived from a
+classification of every failed probe: a clean 404/410, a nonexistent host, or a redirect pointing
+away is an <em>answer</em> (absence confirmed at that location); an auth wall, rate limit, timeout,
+or network failure is a <em>refusal</em> (absence unknown). Nothing found + refusals at least as
+common as answers → <code>blocked</code>, never a silent empty. <code>/explore</code> adds
+<code>incomplete</code> when budgets cut the walk short, and <code>blockedProbes</code> discloses
+refusal counts even under <code>none-found</code>. The homepage checker now says explicitly when a
+domain would not let hosted checks look. Additive; existing fields unchanged.</li>
+</ul>
+
 <h3 id="org-hosts-2026-09-19">Related-host check: probe slots go to plausible publishing hosts</h3>
 <ul>
 <li><code>/explore/{domain}?org=1</code> probes a bounded set of same-domain hosts. Host selection is

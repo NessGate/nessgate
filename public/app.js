@@ -68,11 +68,16 @@ if (resolveForm) {
         return;
       }
       // Exact host is empty: answer immediately and honestly, then OFFER the
-      // slower related-host check as a separate, explicit action.
+      // slower related-host check as a separate, explicit action. The server's
+      // outcome label distinguishes a confirmed absence from a refused look.
       const msg = document.createElement("p");
       msg.textContent =
-        "No supported resources could be confirmed on " + d + " itself. This is an exact-host check — " +
-        "related hosts (like a developers. subdomain) or external registries may still publish some.";
+        data.outcome === "blocked"
+          ? d + " would not let our hosted checks look (bot protection or blocking) — we can't tell whether it " +
+            "publishes machine-readable resources. Related hosts may still answer, and the open-source resolver " +
+            "library run from your own machine may succeed where hosted checks are blocked."
+          : "No supported resources could be confirmed on " + d + " itself. This is an exact-host check — " +
+            "related hosts (like a developers. subdomain) or external registries may still publish some.";
       box.append(msg);
       const orgBtn = document.createElement("button");
       orgBtn.type = "button";

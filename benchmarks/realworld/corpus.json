@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-17",
+  "generatedAt": "2026-09-21",
   "method": "Independent ground truth: each path fetched directly and validated by this script's own shape checks; NessGate's resolver was NOT consulted. Bounded (HTTPS, 12s timeout, 512KB cap), no bypass of 403/bot-walls, no credentials.",
   "totalDomains": 86,
   "domains": [
@@ -70,7 +70,7 @@
           "sourceUrl": "https://assemblyai.com/llms.txt",
           "host": "assemblyai.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "openapi",
@@ -78,7 +78,7 @@
           "sourceUrl": "https://assemblyai.com/openapi.json",
           "host": "assemblyai.com",
           "version": "3.1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -149,7 +149,7 @@
           "sourceUrl": "https://bun.sh/llms.txt",
           "host": "bun.sh",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -172,7 +172,7 @@
           "sourceUrl": "https://clerk.com/llms.txt",
           "host": "clerk.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "api-catalog",
@@ -180,7 +180,7 @@
           "sourceUrl": "https://clerk.com/.well-known/api-catalog",
           "host": "clerk.com",
           "version": "rfc9727",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "openapi",
@@ -188,7 +188,7 @@
           "sourceUrl": "https://clerk.com/openapi.json",
           "host": "clerk.com",
           "version": "3.0.3",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -211,7 +211,7 @@
           "sourceUrl": "https://cloudflare.com/llms.txt",
           "host": "cloudflare.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "a2a-agent-card",
@@ -219,7 +219,7 @@
           "sourceUrl": "https://cloudflare.com/.well-known/agent.json",
           "host": "cloudflare.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "openapi",
@@ -227,7 +227,7 @@
           "sourceUrl": "https://cloudflare.com/openapi.json",
           "host": "cloudflare.com",
           "version": "3.1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -278,7 +278,7 @@
           "sourceUrl": "https://cohere.com/llms.txt",
           "host": "cohere.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -299,7 +299,7 @@
           "sourceUrl": "https://cursor.com/llms.txt",
           "host": "cursor.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -320,7 +320,7 @@
           "sourceUrl": "https://deepgram.com/llms.txt",
           "host": "deepgram.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -352,7 +352,7 @@
           "sourceUrl": "https://elevenlabs.io/llms.txt",
           "host": "elevenlabs.io",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "api-catalog",
@@ -360,7 +360,7 @@
           "sourceUrl": "https://elevenlabs.io/.well-known/api-catalog",
           "host": "elevenlabs.io",
           "version": "rfc9727",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -376,7 +376,7 @@
       "notes": []
     },
     {
-      "domain": "fanar.qa",
+      "domain": "excalidraw.com",
       "category": "stress",
       "reachable": true,
       "blocked": false,
@@ -403,15 +403,15 @@
           "sourceUrl": "https://fly.io/llms.txt",
           "host": "fly.io",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "ard-catalog",
-          "path": "/.well-known/ai-catalog.json",
-          "sourceUrl": "https://fly.io/.well-known/ai-catalog.json",
+          "path": "/.well-known/ard.json",
+          "sourceUrl": "https://fly.io/.well-known/ard.json",
           "host": "fly.io",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "api-catalog",
@@ -419,7 +419,7 @@
           "sourceUrl": "https://fly.io/.well-known/api-catalog",
           "host": "fly.io",
           "version": "rfc9727",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -442,7 +442,7 @@
           "sourceUrl": "https://gitbook.com/llms.txt",
           "host": "gitbook.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "ard-catalog",
@@ -450,7 +450,7 @@
           "sourceUrl": "https://gitbook.com/.well-known/ai-catalog.json",
           "host": "gitbook.com",
           "version": "0.1",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "api-catalog",
@@ -458,7 +458,7 @@
           "sourceUrl": "https://gitbook.com/.well-known/api-catalog",
           "host": "gitbook.com",
           "version": "rfc9727",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -479,7 +479,7 @@
           "sourceUrl": "https://about.gitlab.com/llms.txt",
           "host": "about.gitlab.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -513,7 +513,7 @@
           "sourceUrl": "https://huggingface.co/.well-known/ai-catalog.json",
           "host": "huggingface.co",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "api-catalog",
@@ -521,7 +521,7 @@
           "sourceUrl": "https://huggingface.co/.well-known/api-catalog",
           "host": "huggingface.co",
           "version": "rfc9727",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -604,7 +604,7 @@
           "sourceUrl": "https://mintlify.com/llms.txt",
           "host": "mintlify.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -625,7 +625,7 @@
           "sourceUrl": "https://mistral.ai/llms.txt",
           "host": "mistral.ai",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -656,7 +656,7 @@
           "sourceUrl": "https://modal.com/llms.txt",
           "host": "modal.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -678,7 +678,7 @@
           "sourceUrl": "https://modelcontextprotocol.io/llms.txt",
           "host": "modelcontextprotocol.io",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "a2a-agent-card",
@@ -686,7 +686,7 @@
           "sourceUrl": "https://modelcontextprotocol.io/.well-known/agent-card.json",
           "host": "modelcontextprotocol.io",
           "version": "0.3",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -717,7 +717,7 @@
           "sourceUrl": "https://n8n.io/llms.txt",
           "host": "n8n.io",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -761,7 +761,7 @@
           "sourceUrl": "https://neon.tech/llms.txt",
           "host": "neon.tech",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "ard-catalog",
@@ -769,7 +769,7 @@
           "sourceUrl": "https://neon.tech/.well-known/ai-catalog.json",
           "host": "neon.tech",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "api-catalog",
@@ -777,7 +777,7 @@
           "sourceUrl": "https://neon.tech/.well-known/api-catalog",
           "host": "neon.tech",
           "version": "rfc9727",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "openapi",
@@ -785,7 +785,7 @@
           "sourceUrl": "https://neon.tech/openapi.json",
           "host": "neon.tech",
           "version": "3.0.3",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -816,7 +816,7 @@
           "sourceUrl": "https://notion.so/llms.txt",
           "host": "notion.so",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -849,8 +849,8 @@
       "domain": "openai.com",
       "category": "ai-dev",
       "reachable": true,
-      "blocked": true,
-      "stratum": "blocked",
+      "blocked": false,
+      "stratum": "negative",
       "groundTruthProtocols": [],
       "groundTruth": [],
       "notes": []
@@ -886,7 +886,7 @@
           "sourceUrl": "https://pinecone.io/llms.txt",
           "host": "pinecone.io",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "a2a-agent-card",
@@ -894,7 +894,7 @@
           "sourceUrl": "https://pinecone.io/.well-known/agent-card.json",
           "host": "pinecone.io",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "api-catalog",
@@ -902,7 +902,7 @@
           "sourceUrl": "https://pinecone.io/.well-known/api-catalog",
           "host": "pinecone.io",
           "version": "rfc9727",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "openapi",
@@ -910,7 +910,7 @@
           "sourceUrl": "https://pinecone.io/openapi.json",
           "host": "pinecone.io",
           "version": "3.0.3",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -932,7 +932,7 @@
           "sourceUrl": "https://planetscale.com/llms.txt",
           "host": "planetscale.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "api-catalog",
@@ -940,7 +940,7 @@
           "sourceUrl": "https://planetscale.com/.well-known/api-catalog",
           "host": "planetscale.com",
           "version": "rfc9727",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -972,7 +972,7 @@
           "sourceUrl": "https://posthog.com/llms.txt",
           "host": "posthog.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "openapi",
@@ -980,7 +980,7 @@
           "sourceUrl": "https://posthog.com/openapi.json",
           "host": "posthog.com",
           "version": "3.1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -990,9 +990,10 @@
       "category": "dev-docs",
       "reachable": true,
       "blocked": false,
-      "stratum": "single",
+      "stratum": "multi",
       "groundTruthProtocols": [
-        "llms.txt"
+        "llms.txt",
+        "openapi"
       ],
       "groundTruth": [
         {
@@ -1001,7 +1002,15 @@
           "sourceUrl": "https://prisma.io/llms.txt",
           "host": "prisma.io",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
+        },
+        {
+          "protocol": "openapi",
+          "path": "/openapi.json",
+          "sourceUrl": "https://prisma.io/openapi.json",
+          "host": "prisma.io",
+          "version": "3.1.0",
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1035,7 +1044,7 @@
           "sourceUrl": "https://railway.app/llms.txt",
           "host": "railway.app",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "ard-catalog",
@@ -1043,7 +1052,7 @@
           "sourceUrl": "https://railway.app/.well-known/ard.json",
           "host": "railway.app",
           "version": "0.91",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "api-catalog",
@@ -1051,7 +1060,7 @@
           "sourceUrl": "https://railway.app/.well-known/api-catalog",
           "host": "railway.app",
           "version": "rfc9727",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "openapi",
@@ -1059,7 +1068,7 @@
           "sourceUrl": "https://railway.app/openapi.json",
           "host": "railway.app",
           "version": "3.1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1101,7 +1110,7 @@
           "sourceUrl": "https://redocly.com/llms.txt",
           "host": "redocly.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "a2a-agent-card",
@@ -1109,7 +1118,7 @@
           "sourceUrl": "https://redocly.com/.well-known/agent-card.json",
           "host": "redocly.com",
           "version": "0.3.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1132,7 +1141,7 @@
           "sourceUrl": "https://render.com/llms.txt",
           "host": "render.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "api-catalog",
@@ -1140,7 +1149,7 @@
           "sourceUrl": "https://render.com/.well-known/api-catalog",
           "host": "render.com",
           "version": "rfc9727",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "openapi",
@@ -1148,7 +1157,7 @@
           "sourceUrl": "https://render.com/openapi.json",
           "host": "render.com",
           "version": "3.1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1169,7 +1178,7 @@
           "sourceUrl": "https://replit.com/llms.txt",
           "host": "replit.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1192,7 +1201,7 @@
           "sourceUrl": "https://resend.com/llms.txt",
           "host": "resend.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "api-catalog",
@@ -1200,7 +1209,7 @@
           "sourceUrl": "https://resend.com/.well-known/api-catalog",
           "host": "resend.com",
           "version": "rfc9727",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "openapi",
@@ -1208,7 +1217,7 @@
           "sourceUrl": "https://resend.com/openapi.json",
           "host": "resend.com",
           "version": "3.0.3",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1229,7 +1238,7 @@
           "sourceUrl": "https://retool.com/llms.txt",
           "host": "retool.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1270,7 +1279,7 @@
           "sourceUrl": "https://stripe.com/llms.txt",
           "host": "stripe.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1294,7 +1303,7 @@
           "sourceUrl": "https://supabase.com/llms.txt",
           "host": "supabase.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "ard-catalog",
@@ -1302,7 +1311,7 @@
           "sourceUrl": "https://supabase.com/.well-known/ard.json",
           "host": "supabase.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "api-catalog",
@@ -1310,7 +1319,7 @@
           "sourceUrl": "https://supabase.com/.well-known/api-catalog",
           "host": "supabase.com",
           "version": "rfc9727",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "openapi",
@@ -1318,7 +1327,7 @@
           "sourceUrl": "https://supabase.com/openapi.json",
           "host": "supabase.com",
           "version": "3.0.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1339,7 +1348,7 @@
           "sourceUrl": "https://svelte.dev/llms.txt",
           "host": "svelte.dev",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1370,7 +1379,7 @@
           "sourceUrl": "https://target.com/llms.txt",
           "host": "target.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1391,7 +1400,7 @@
           "sourceUrl": "https://together.ai/llms.txt",
           "host": "together.ai",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1423,7 +1432,7 @@
           "sourceUrl": "https://turso.tech/llms.txt",
           "host": "turso.tech",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "openapi",
@@ -1431,7 +1440,7 @@
           "sourceUrl": "https://turso.tech/openapi.json",
           "host": "turso.tech",
           "version": "3.0.1",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1454,7 +1463,7 @@
           "sourceUrl": "https://ucpchecker.com/llms.txt",
           "host": "ucpchecker.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "ard-catalog",
@@ -1462,14 +1471,14 @@
           "sourceUrl": "https://ucpchecker.com/.well-known/ard.json",
           "host": "ucpchecker.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "ard-agentmap",
           "path": "/robots.txt",
           "sourceUrl": "https://ucpchecker.com/robots.txt",
           "version": "0.91",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1491,7 +1500,7 @@
           "sourceUrl": "https://upstash.com/llms.txt",
           "host": "upstash.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "api-catalog",
@@ -1499,7 +1508,7 @@
           "sourceUrl": "https://upstash.com/.well-known/api-catalog",
           "host": "upstash.com",
           "version": "rfc9727",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1523,7 +1532,7 @@
           "sourceUrl": "https://vercel.com/llms.txt",
           "host": "vercel.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "ard-catalog",
@@ -1531,7 +1540,7 @@
           "sourceUrl": "https://vercel.com/.well-known/ai-catalog.json",
           "host": "vercel.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "api-catalog",
@@ -1539,7 +1548,7 @@
           "sourceUrl": "https://vercel.com/.well-known/api-catalog",
           "host": "vercel.com",
           "version": "rfc9727",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "openapi",
@@ -1547,7 +1556,7 @@
           "sourceUrl": "https://vercel.com/openapi.json",
           "host": "vercel.com",
           "version": "3.0.3",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1579,7 +1588,7 @@
           "sourceUrl": "https://weaviate.io/llms.txt",
           "host": "weaviate.io",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "ard-catalog",
@@ -1587,7 +1596,7 @@
           "sourceUrl": "https://weaviate.io/.well-known/ai-catalog.json",
           "host": "weaviate.io",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1628,7 +1637,7 @@
           "sourceUrl": "https://wordpress.com/llms.txt",
           "host": "wordpress.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1650,7 +1659,7 @@
           "sourceUrl": "https://workos.com/llms.txt",
           "host": "workos.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "openapi",
@@ -1658,7 +1667,7 @@
           "sourceUrl": "https://workos.com/openapi.json",
           "host": "workos.com",
           "version": "3.1.1",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []
@@ -1693,7 +1702,7 @@
           "sourceUrl": "https://zapier.com/llms.txt",
           "host": "zapier.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "ard-catalog",
@@ -1701,7 +1710,7 @@
           "sourceUrl": "https://zapier.com/.well-known/ai-catalog.json",
           "host": "zapier.com",
           "version": "1.0",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "api-catalog",
@@ -1709,21 +1718,21 @@
           "sourceUrl": "https://zapier.com/.well-known/api-catalog",
           "host": "zapier.com",
           "version": "rfc9727",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "ard-link",
           "path": "/",
           "sourceUrl": "https://zapier.com/",
           "version": "0.91",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         },
         {
           "protocol": "ard-agentmap",
           "path": "/robots.txt",
           "sourceUrl": "https://zapier.com/robots.txt",
           "version": "0.91",
-          "verifiedAt": "2026-09-17"
+          "verifiedAt": "2026-09-21"
         }
       ],
       "notes": []

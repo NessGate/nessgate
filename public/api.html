@@ -119,6 +119,15 @@ flagged <code>capabilitiesTruncated</code> when the publisher declares more. For
 larger than the 64&nbsp;KB detection prefix, NessGate performs one additional bounded read (1&nbsp;MB cap)
 to enumerate operations; a spec larger than that stays detected but not enumerated — never partially
 extracted.</p>
+<p class="note"><strong>Outcome honesty.</strong> Every response carries a single <code>outcome</code>
+label so a blank result is never ambiguous: <code>found</code> (validated resources exist),
+<code>none-found</code> (the checks completed — clean 404s and nonexistent hosts count as
+<em>answers</em> — and no supported declaration exists at the locations checked), or
+<code>blocked</code> (refusals — auth walls, rate limiting, timeouts, network failures — were at
+least as common as clean answers: the checks were prevented, so absence is <em>unknown</em>).
+<code>/explore</code> adds <code>incomplete</code> when its request/byte/time budgets cut the walk
+short. Whenever any probe was refused, <code>blockedProbes</code> discloses the count even under
+<code>none-found</code> — uncertainty is never hidden.</p>
 <p class="note"><strong>MCP introspection (opt-in: <code>?mcp=1</code>).</strong> When a domain <em>declares</em>
 an MCP endpoint (via AWP, an AID record, a catalog entry — never a guessed path), NessGate can ask
 that server what <em>it</em> declares, using the protocol's own read-only handshake:

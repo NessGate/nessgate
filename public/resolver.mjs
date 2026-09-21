@@ -655,8 +655,49 @@ async function dohTxt(fetchImpl, name, timeoutMs) {
   }
 }
 
+/* --- Probe-outcome honesty (pure, identical in src/worker.js; parity-tested) --- */
+
+// Classify one FAILED probe from its error message. "answered" = the domain
+// gave a definitive answer that nothing is at that location (clean 404/410, no
+// public DNS record, or a redirect pointing away) — absence is CONFIRMED there.
+// "refused" = the domain (or its protection layer) would not let the check
+// happen (auth/rate/5xx statuses, timeouts, network failures) — absence is
+// UNKNOWN there. Unknown failure shapes default to "refused": overcaution may
+// label a flaky site blocked, but can never claim absence that was not shown.
+export function probeFailureKind(message) {
+  const msg = String(message || "");
+  const m = /HTTP (\d+)/.exec(msg);
+  if (m) {
+    const s = Number(m[1]);
+    return s === 404 || s === 410 ? "answered" : "refused";
+  }
+  if (/does not resolve/.test(msg)) return "answered"; // no public host — nothing is published there
+  if (/left the target domain|too many redirects|redirect without a target/.test(msg)) return "answered"; // the domain answered by pointing away
+  if (/response is too large/.test(msg)) return "answered"; // it answered; the content just exceeds our cap
+  return "refused";
+}
+
+// The single honest outcome label for a resolution:
+//   found      — validated resources exist.
+//   blocked    — nothing found AND refusals dominate (refused >= answered,
+//                refused > 0): the checks were prevented, absence is UNKNOWN.
+//   none-found — the checks completed; no supported declaration exists at the
+//                locations checked.
+// A lone flaky timeout among many clean 404s stays none-found (with the
+// refusal count still disclosed via blockedProbes) — blocked requires refusals
+// to be at least as common as clean answers.
+export function resolutionOutcome(resourceCount, probes) {
+  if (resourceCount > 0) return "found";
+  const r = (probes && probes.refused) || 0;
+  const a = (probes && probes.answered) || 0;
+  return r > 0 && r >= a ? "blocked" : "none-found";
+}
+
 // Run one adapter over its channel. Failures collapse to empty.
-async function runAdapter(a, domain, fetchImpl, timeoutMs, maxBytes) {
+async function runAdapter(a, domain, fetchImpl, timeoutMs, maxBytes, probes) {
+  // probes (optional): shared failure tally for the outcome label — every
+  // failed fetch is classified answered-vs-refused by probeFailureKind.
+  const miss = (e) => { if (probes) probes[probeFailureKind(e && e.message)]++; };
   const get = (pathOrUrl) => {
     const url = /^https?:\/\//i.test(pathOrUrl) ? pathOrUrl : "https://" + domain + pathOrUrl;
     return fetchText(fetchImpl, url, timeoutMs, maxBytes);
@@ -669,7 +710,7 @@ async function runAdapter(a, domain, fetchImpl, timeoutMs, maxBytes) {
         // (multi-MB) are found without downloading/parsing the whole document.
         if (a.id === "openapi") {
           let r;
-          try { r = await fetchBounded(fetchImpl, url, timeoutMs, OPENAPI_PREFIX_BYTES); } catch { continue; }
+          try { r = await fetchBounded(fetchImpl, url, timeoutMs, OPENAPI_PREFIX_BYTES); } catch (e) { miss(e); continue; }
           const det = detectOpenApi(r.text, r.truncated);
           if (det.ok) {
             // Declared capabilities need the COMPLETE document. If the prefix
@@ -688,7 +729,7 @@ async function runAdapter(a, domain, fetchImpl, timeoutMs, maxBytes) {
           continue;
         }
         let r;
-        try { r = await get(path); } catch { continue; }
+        try { r = await get(path); } catch (e) { miss(e); continue; }
         if (validateProbeContent(a.kind, r.text) && probeShapeOk(a.id, a.kind, r.text)) {
           // Record the FINAL (post-redirect) URL: when fetchImpl followed a
           // redirect the bytes came from there, and classifyResource labels a
@@ -701,7 +742,7 @@ async function runAdapter(a, domain, fetchImpl, timeoutMs, maxBytes) {
     if (a.channel === "link-rel" || a.channel === "robots") {
       const src = a.channel === "link-rel" ? "/" : "/robots.txt";
       let doc;
-      try { doc = await get(src); } catch { return { discovered: [], resources: [] }; }
+      try { doc = await get(src); } catch (e) { miss(e); return { discovered: [], resources: [] }; }
       const targets = a.channel === "link-rel" ? parseLinkRel(doc.text, a.rels) : parseAgentmap(doc.text, a.directive);
       const discovered = [], resources = [];
       for (const t of targets.slice(0, MAX_LINKED_CATALOGS)) {
@@ -711,7 +752,7 @@ async function runAdapter(a, domain, fetchImpl, timeoutMs, maxBytes) {
         try { abs = new URL(t, doc.finalUrl || "https://" + domain + "/"); } catch { continue; }
         if (abs.protocol !== "https:" || !onDomain(abs.hostname, domain)) continue; // on-domain only
         let r;
-        try { r = await get(abs.toString()); } catch { continue; }
+        try { r = await get(abs.toString()); } catch (e) { miss(e); continue; }
         if (validateProbeContent("json", r.text) && probeShapeOk(a.normalizeAs, "json", r.text)) {
           discovered.push({ type: a.id, url: r.finalUrl });
           resources.push(...normalizeResources(a.normalizeAs, "json", r.text, r.finalUrl));
@@ -820,7 +861,9 @@ export async function resolve(domain, opts = {}) {
   // rel="ard" link). opts.fast SKIPS the alternate ARD locators for speed — a
   // labeled, non-conformant performance trade (see FAST_MODE_SKIP).
   const active = opts.fast ? ADAPTERS.filter((a) => !FAST_MODE_SKIP.has(a.channel)) : ADAPTERS;
-  const results = await Promise.all(active.map((a) => runAdapter(a, d, fetchImpl, timeoutMs, maxBytes)));
+  // probes tallies every failed fetch (answered vs refused) for the outcome label.
+  const probes = { answered: 0, refused: 0 };
+  const results = await Promise.all(active.map((a) => runAdapter(a, d, fetchImpl, timeoutMs, maxBytes, probes)));
   const discovered = results.flatMap((r) => r.discovered);
   let resources = results.flatMap((r) => r.resources);
   const checked = active.map((a) => a.id);
@@ -840,7 +883,7 @@ export async function resolve(domain, opts = {}) {
               discovered.push({ type, url: p.finalUrl });
               resources.push(...normalizeResources(type, kind, p.text, p.finalUrl));
             }
-          } catch {}
+          } catch (e) { probes[probeFailureKind(e && e.message)]++; }
         }
       }
     } catch {}
@@ -861,6 +904,12 @@ export async function resolve(domain, opts = {}) {
     await Promise.all(cands.map(async (r) => { Object.assign(r, await introspectMcpEndpoint(fetchImpl, r.url, timeoutMs)); }));
   }
   const out = { domain: d, provenance: "self-published", discovered, resources, checked };
+  // The single honest outcome label (found / none-found / blocked), plus the
+  // refusal count so uncertainty is never hidden even under none-found. In
+  // runtimes without DNS-failure detail (plain fetch), NXDOMAIN reads as a
+  // network failure and counts toward refusals — overcautious by design.
+  out.outcome = resolutionOutcome(resources.length, probes);
+  if (probes.refused) out.blockedProbes = probes.refused;
   if (opts.mcp) out.introspected = ["mcp"]; // labeled: read-only introspection ran
   if (opts.fast) out.mode = "fast"; // labeled: alternate ARD locators skipped, not fully conformant
   return out;
@@ -900,4 +949,4 @@ export function sameRegCanonicalHost(finalUrl, domain) {
   return h.endsWith("." + domain) ? h : null;
 }
 
-export default { resolve, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, extractOpenApiCapabilities, parseMcpMessages, mcpToolCapabilities, fetchBounded, ADAPTERS };
+export default { resolve, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, extractOpenApiCapabilities, parseMcpMessages, mcpToolCapabilities, probeFailureKind, resolutionOutcome, fetchBounded, ADAPTERS };

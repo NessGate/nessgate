@@ -126,7 +126,9 @@ is(hostsFromLocs(["https://api.a.test/1", "https://a.test/2", "https://10.0.0.1/
 /* ------------------------------- tier: fast ------------------------------- */
 console.log("--- tier: fast (exact-host only) mirrors v1 exactly");
 const v1 = await resolveV1(SEED, opts);
-is(Object.keys(v1).sort(), ["checked", "discovered", "domain", "provenance", "resources"], "v1 output shape unchanged");
+// outcome (and conditionally blockedProbes) are deliberate ADDITIVE fields
+// (2026-09-21 outcome-honesty work); the pre-existing fields stay unchanged.
+is(Object.keys(v1).sort().filter((k) => k !== "outcome" && k !== "blockedProbes"), ["checked", "discovered", "domain", "provenance", "resources"], "v1 output shape unchanged (plus additive outcome fields)");
 const fast = await resolveV2(SEED, { ...opts, tier: "fast" });
 is(fast.checked, ["exact-host"], "fast runs only exact-host");
 is(fast.level2.length, 0, "fast yields no Level 2");

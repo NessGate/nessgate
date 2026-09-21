@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "NessGate API",
-    "version": "1.9.0",
+    "version": "1.10.0",
     "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads whatever that domain already publishes across the standard machine-discovery locations (llms.txt, ARD / ai-catalog.json, A2A agent card, RFC 9727 API catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP manifest, RFC 6415 host-meta) and returns one normalized answer, each record carrying a sourceUrl back to the domain. NessGate stores nothing, never crawls or indexes, and makes no ownership or safety claim. Read endpoints are public, unauthenticated, and CORS-open. The response contract is stable and additive: new optional fields may appear; clients must ignore unknown fields.",
     "contact": { "email": "contact@nessgate.com", "url": "https://nessgate.com/contact" },
     "termsOfService": "https://nessgate.com/terms",
@@ -49,6 +49,8 @@
                     "domain": { "type": "string", "example": "example.com" },
                     "provenance": { "type": "string", "enum": ["self-published"], "example": "self-published" },
                     "note": { "type": "string" },
+                    "outcome": { "type": "string", "enum": ["found", "none-found", "blocked"], "description": "The single honest outcome label. found = validated resources exist. none-found = the checks completed and confirmed no supported declaration at the locations checked (clean 404s count as answers). blocked = nothing found AND refusals (auth/rate/5xx, timeouts, network failures) were at least as common as clean answers - the checks were prevented, so absence is UNKNOWN." },
+                    "blockedProbes": { "type": "integer", "description": "Present when any probe was refused: the count of refused probes, disclosed even when the outcome is none-found so uncertainty is never hidden." },
                     "mode": { "type": "string", "enum": ["fast"], "description": "Present only when ?fast=1 was used: signals the alternate ARD locators were skipped (not fully ARD-conformant). Absent for the default complete mode." },
                     "introspected": { "type": "array", "items": { "type": "string", "enum": ["mcp"] }, "description": "Present only when ?mcp=1 was used: read-only MCP introspection ran on declared endpoints. Absent by default." },
                     "discovered": {
@@ -122,6 +124,8 @@
                   "properties": {
                     "domain": { "type": "string", "example": "example.com" },
                     "note": { "type": "string" },
+                    "outcome": { "type": "string", "enum": ["found", "none-found", "blocked", "incomplete"], "description": "The single honest outcome label; /explore adds incomplete = budgets or the deadline cut the walk before it finished, so an empty result may just be unfinished." },
+                    "blockedProbes": { "type": "integer", "description": "Present when any probe was refused: count of refused probes (uncertainty is never hidden)." },
                     "checked": { "type": "array", "items": { "type": "string" } },
                     "federated": { "type": "array", "items": { "type": "string" }, "example": ["mcp-registry"] },
                     "related": { "type": "array", "description": "Only with ?related=1: cross-registrable-domain entries, each { host, class: publisher-declared-related | registry-verified-related | infrastructure-correlated-candidate, declaration?, attribution?, signals[], resources[] }. Separate from resources[]; signals are corroborating only.", "items": { "type": "object" } },

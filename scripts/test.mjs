@@ -30,6 +30,8 @@ import {
   selectOrgHosts,
   orgHostResponded,
   homepageRedirectInfo,
+  probeFailureKind,
+  resolutionOutcome,
   orgRecordsFromDoc,
   docRecords,
   isCrossRegistrable,
@@ -577,6 +579,60 @@ console.log("--- MCP introspection: read-only, opt-in, verbatim server declarati
   is(authRes.introspection.ok, false, "auth-walled endpoint: introspection not ok");
   is(authRes.introspection.status, "auth-required", "auth wall labeled auth-required (no credentials, no retry)");
   is(authRes.capabilities, undefined, "auth-walled endpoint: no capabilities invented");
+}
+
+console.log("--- outcome honesty: found / none-found / blocked, never hidden uncertainty");
+{
+  const lib = await import("../public/resolver.mjs");
+  // probeFailureKind: what a failure MEANS, from its error message.
+  is(probeFailureKind("the URL returned HTTP 404"), "answered", "outcome: clean 404 = the domain answered (absence confirmed)");
+  is(probeFailureKind("HTTP 410"), "answered", "outcome: 410 = answered (library message shape)");
+  is(probeFailureKind("the URL returned HTTP 403"), "refused", "outcome: 403 = refused (absence unknown)");
+  is(probeFailureKind("HTTP 503"), "refused", "outcome: 5xx = refused");
+  is(probeFailureKind("the URL could not be fetched (timeout or network error)"), "refused", "outcome: network failure = refused");
+  is(probeFailureKind("the domain does not resolve to a public address"), "answered", "outcome: NXDOMAIN = answered (nothing exists there)");
+  is(probeFailureKind("request left the target domain"), "answered", "outcome: redirect away = the domain answered by pointing elsewhere");
+  is(probeFailureKind("some novel failure"), "refused", "outcome: unknown failures default to refused (overcaution, never false absence)");
+  is(probeFailureKind(""), "refused", "outcome: empty message defaults to refused");
+  // resolutionOutcome: the label.
+  is(resolutionOutcome(3, { answered: 0, refused: 14 }), "found", "outcome: resources always win");
+  is(resolutionOutcome(0, { answered: 0, refused: 14 }), "blocked", "outcome: all probes refused → blocked (google-shaped)");
+  is(resolutionOutcome(0, { answered: 13, refused: 1 }), "none-found", "outcome: one flaky timeout among clean 404s stays none-found");
+  is(resolutionOutcome(0, { answered: 5, refused: 5 }), "blocked", "outcome: refusals as common as answers → blocked (can't assert absence)");
+  is(resolutionOutcome(0, { answered: 14, refused: 0 }), "none-found", "outcome: clean sweep of 404s → none-found");
+  is(resolutionOutcome(0, null), "none-found", "outcome: no probe data → none-found");
+  // Worker/library parity on both functions.
+  for (const m of ["the URL returned HTTP 404", "HTTP 403", "x", "the domain does not resolve to a public address"])
+    is(lib.probeFailureKind(m), probeFailureKind(m), `probeFailureKind parity for "${m}"`);
+  for (const c of [[0, { answered: 0, refused: 3 }], [0, { answered: 3, refused: 1 }], [2, { answered: 0, refused: 9 }]])
+    is(lib.resolutionOutcome(c[0], c[1]), resolutionOutcome(c[0], c[1]), "resolutionOutcome parity");
+  // Library e2e: a domain that refuses everything → outcome blocked.
+  const refuseAll = async (url) => {
+    const u = String(url);
+    if (u.startsWith("https://cloudflare-dns.com/")) return { ok: true, status: 200, url: u, headers: { get: () => "application/dns-json" }, text: async () => JSON.stringify({ Answer: [] }) };
+    return { ok: false, status: 403, url: u, headers: { get: () => "" }, text: async () => "" };
+  };
+  const rB = await lib.resolve("walled.com", { fetch: refuseAll });
+  is(rB.outcome, "blocked", "resolve(): all-403 domain → outcome blocked");
+  is(rB.blockedProbes > 0, true, "resolve(): refusal count disclosed");
+  // Clean 404s everywhere → none-found, no blockedProbes field.
+  const notFoundAll = async (url) => {
+    const u = String(url);
+    if (u.startsWith("https://cloudflare-dns.com/")) return { ok: true, status: 200, url: u, headers: { get: () => "application/dns-json" }, text: async () => JSON.stringify({ Answer: [] }) };
+    return { ok: false, status: 404, url: u, headers: { get: () => "" }, text: async () => "" };
+  };
+  const rN = await lib.resolve("emptyclean.com", { fetch: notFoundAll });
+  is(rN.outcome, "none-found", "resolve(): clean 404s → none-found");
+  is(rN.blockedProbes, undefined, "resolve(): no refusals → no blockedProbes field");
+  // Publisher present → found.
+  const withLlms = async (url) => {
+    const u = String(url);
+    if (u === "https://haslms.com/llms.txt") return { ok: true, status: 200, url: u, headers: { get: () => "text/plain" }, text: async () => "# HasLlms" };
+    if (u.startsWith("https://cloudflare-dns.com/")) return { ok: true, status: 200, url: u, headers: { get: () => "application/dns-json" }, text: async () => JSON.stringify({ Answer: [] }) };
+    return { ok: false, status: 404, url: u, headers: { get: () => "" }, text: async () => "" };
+  };
+  const rF = await lib.resolve("haslms.com", { fetch: withLlms });
+  is(rF.outcome, "found", "resolve(): publisher present → found");
 }
 
 console.log("--- Related Discovery (cross-domain; strict evidence model)");
