@@ -852,11 +852,33 @@ async function probeReachabilityWorker(url, env, ctx, domain) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const res = await fetch(url, { method, redirect: "follow", signal: controller.signal, headers: { "User-Agent": "NessGate-Verify/1.0 (+https://nessgate.com)", Accept: "*/*" }, cf: { cacheTtl: 0 } });
+      // redirect:"manual" (audit fix): a denial page's redirect is never
+      // blind-followed — per-hop validation is the rule everywhere else; a
+      // 3xx IS an answer (alive) and maps to "ok".
+      const res = await fetch(url, { method, redirect: "manual", signal: controller.signal, headers: { "User-Agent": "NessGate-Verify/1.0 (+https://nessgate.com)", Accept: "*/*" }, cf: { cacheTtl: 0 } });
       let snippet = "";
       if (method === "GET") {
-        if (wantSnippet) { try { snippet = String(await res.text()).slice(0, 2048); } catch {} }
-        else if (res.body && typeof res.body.cancel === "function") { try { await res.body.cancel(); } catch {} }
+        if (wantSnippet && res.body && typeof res.body.getReader === "function") {
+          // LITERAL-cap read (audit fix): retain at most ~2 KB, then cancel.
+          try {
+            const reader = res.body.getReader();
+            const chunks = [];
+            let size = 0;
+            while (size < 2048) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const room = 2048 - size;
+              chunks.push(value.length > room ? value.subarray(0, room) : value);
+              size += Math.min(value.length, room);
+              if (value.length > room) break;
+            }
+            try { await reader.cancel(); } catch {}
+            const buf = new Uint8Array(size);
+            let off = 0;
+            for (const c of chunks) { buf.set(c, off); off += c.length; }
+            snippet = new TextDecoder().decode(buf);
+          } catch {}
+        } else if (res.body && typeof res.body.cancel === "function") { try { await res.body.cancel(); } catch {} }
       }
       return { status: res.status || 0, headers: pickVerifyHeaders(res), snippet };
     } catch {
@@ -1225,7 +1247,9 @@ async function discoverData(raw, env, ctx, request) {
     const now = new Date().toISOString();
     const probed = new Map();
     let vBudget = VERIFY_MAX_TARGETS;
+    const vStart = Date.now(); // audit fix: time cap alongside the request cap
     for (const r of resources) {
+      if (Date.now() - vStart > 12000) break; // remaining records stay not-checked, honestly
       if (typeof r.url !== "string" || !r.url.startsWith("https://")) continue;
       if (r.class === "verified-publisher-location" || r.url === r.sourceUrl) {
         r.reachability = "ok";

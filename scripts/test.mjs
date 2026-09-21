@@ -759,6 +759,49 @@ console.log("--- verify pass: outage vs auth vs missing, evidence-derived where 
   const rvOff = await lib.resolve("vco.com", { fetch: vFetch });
   is(rvOff.verified, undefined, "verify: opt-in only");
   is(rvOff.resources.every((x) => x.reachability === undefined), true, "verify: no reachability fields by default");
+  // AUDIT: a redirecting pointer is an ANSWER (alive) — never blind-followed.
+  const redirFetch = async (url, init = {}) => {
+    const u = String(url);
+    if (u === "https://rco.com/.well-known/ard.json" && (init.method || "GET") === "GET" && !init.redirect) {
+      return { ok: true, status: 200, url: u, headers: { get: () => "application/json" }, text: async () => JSON.stringify({ entries: [{ identifier: "urn:air:rco.com:x:r-1", displayName: "Moved API", type: "application/json", url: "https://rco.com/moved" }] }) };
+    }
+    if (u === "https://rco.com/moved") return { ok: false, status: 301, url: u, headers: { get: () => "" }, text: async () => "" };
+    if (u.startsWith("https://cloudflare-dns.com/")) return { ok: true, status: 200, url: u, headers: { get: () => "application/dns-json" }, text: async () => JSON.stringify({ Answer: [] }) };
+    return { ok: false, status: 404, url: u, headers: { get: () => "" }, text: async () => "" };
+  };
+  const rr = await lib.resolve("rco.com", { fetch: redirFetch, verify: true });
+  const moved = rr.resources.find((x) => x.url === "https://rco.com/moved");
+  is(moved.reachability, "ok", "verify audit: 3xx pointer → ok (an answer; redirects never blind-followed)");
+  // AUDIT: a multi-megabyte wall page must be classified from a LITERAL-cap
+  // snippet, never buffered — streaming mock proves both (marker in the head,
+  // huge filler behind it; the run completing quickly proves the cancel).
+  const bigWall = (() => {
+    const head = new TextEncoder().encode("<html>Just a moment...</html>");
+    let sent = 0;
+    return {
+      ok: false, status: 403, url: "https://wco.com/walled",
+      headers: { get: () => "" },
+      body: { getReader() { return { async read() { if (sent === 0) { sent = 1; return { done: false, value: head }; } if (sent < 200) { sent++; return { done: false, value: new Uint8Array(65536).fill(120) }; } return { done: true }; }, async cancel() { sent = 999; } }; }, cancel: async () => {} },
+      text: async () => { throw new Error("must not full-read"); },
+    };
+  })();
+  const wallFetch = async (url, init = {}) => {
+    const u = String(url);
+    if (u === "https://wco.com/.well-known/ard.json" && !init.redirect) {
+      return { ok: true, status: 200, url: u, headers: { get: () => "application/json" }, text: async () => JSON.stringify({ entries: [{ identifier: "urn:air:wco.com:x:r-1", displayName: "Walled API", type: "application/json", url: "https://wco.com/walled" }] }) };
+    }
+    if (u === "https://wco.com/walled") {
+      if ((init.method || "GET") === "HEAD") return { ok: false, status: 403, url: u, headers: { get: () => "" }, text: async () => "" };
+      return bigWall;
+    }
+    if (u.startsWith("https://cloudflare-dns.com/")) return { ok: true, status: 200, url: u, headers: { get: () => "application/dns-json" }, text: async () => JSON.stringify({ Answer: [] }) };
+    return { ok: false, status: 404, url: u, headers: { get: () => "" }, text: async () => "" };
+  };
+  const rw = await lib.resolve("wco.com", { fetch: wallFetch, verify: true });
+  const walled = rw.resources.find((x) => x.url === "https://wco.com/walled");
+  is(walled.reachability, "blocked", "verify audit: wall page classified from bounded snippet → blocked");
+  is(walled.evidence.signal, "cf-challenge", "verify audit: signal named from the snippet head");
+  is(JSON.stringify(walled).includes("Just a moment"), false, "verify audit: no response content in output");
 }
 
 console.log("--- outcome honesty: found / none-found / blocked, never hidden uncertainty");

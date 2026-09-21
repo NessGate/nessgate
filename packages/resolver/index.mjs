@@ -563,8 +563,27 @@ async function mcpPost(fetchImpl, url, frame, extraHeaders, timeoutMs) {
       },
       body: JSON.stringify(frame),
     });
-    const text = await res.text();
-    if (text.length > MCP_INTROSPECT_MAX_BYTES) throw new Error("response too large");
+    // LITERAL cap (audit fix): never buffer beyond the limit before checking.
+    let text = "";
+    if (res.body && typeof res.body.getReader === "function") {
+      const reader = res.body.getReader();
+      const chunks = [];
+      let size = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.length;
+        if (size > MCP_INTROSPECT_MAX_BYTES) { try { await reader.cancel(); } catch {} throw new Error("response too large"); }
+        chunks.push(value);
+      }
+      const buf = new Uint8Array(size);
+      let off = 0;
+      for (const c of chunks) { buf.set(c, off); off += c.length; }
+      text = new TextDecoder().decode(buf);
+    } else {
+      text = await res.text();
+      if (text.length > MCP_INTROSPECT_MAX_BYTES) throw new Error("response too large");
+    }
     return { status: res.status, contentType: (res.headers && typeof res.headers.get === "function" && res.headers.get("content-type")) || "", text, headers: res.headers };
   } finally {
     clearTimeout(timer);
@@ -953,15 +972,47 @@ function pickVerifyHeaders(res) {
   } catch {}
   return out;
 }
+// LITERAL-cap snippet read: at most ~2 KB is ever retained; the stream is
+// cancelled immediately after (a hostile multi-megabyte denial page must not
+// be buffered). Falls back to text() only for body-less test doubles.
+async function boundedSnippet(res, cap = 2048) {
+  try {
+    if (res.body && typeof res.body.getReader === "function") {
+      const reader = res.body.getReader();
+      const chunks = [];
+      let size = 0;
+      while (size < cap) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const room = cap - size;
+        chunks.push(value.length > room ? value.subarray(0, room) : value);
+        size += Math.min(value.length, room);
+        if (value.length > room) break;
+      }
+      try { await reader.cancel(); } catch {}
+      const buf = new Uint8Array(size);
+      let off = 0;
+      for (const c of chunks) { buf.set(c, off); off += c.length; }
+      return new TextDecoder().decode(buf);
+    }
+    if (typeof res.text === "function") return String(await res.text()).slice(0, cap);
+  } catch {}
+  return "";
+}
 async function probeReachability(fetchImpl, url, timeoutMs) {
   const attempt = async (method, wantSnippet) => {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const res = await fetchImpl(url, { method, signal: ctrl.signal, headers: { "User-Agent": "NessGate-Verify/1.0 (+https://nessgate.com)", Accept: "*/*" } });
+      // redirect:"manual": a denial page's redirect is never blind-followed
+      // (per-hop validation is the rule everywhere else); a 3xx IS an answer —
+      // the endpoint is alive — and maps to "ok". Runtimes that cannot do
+      // manual redirects surface the followed response instead, which only
+      // makes the classification more generous, never less safe server-side.
+      const res = await fetchImpl(url, { method, redirect: "manual", signal: ctrl.signal, headers: { "User-Agent": "NessGate-Verify/1.0 (+https://nessgate.com)", Accept: "*/*" } });
       let snippet = "";
       if (method === "GET") {
-        if (wantSnippet && typeof res.text === "function") { try { snippet = String(await res.text()).slice(0, 2048); } catch {} }
+        if (wantSnippet) snippet = await boundedSnippet(res);
         else if (res.body && typeof res.body.cancel === "function") { try { await res.body.cancel(); } catch {} }
       }
       return { status: res.status || 0, headers: pickVerifyHeaders(res), snippet };
