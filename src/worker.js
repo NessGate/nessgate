@@ -2094,6 +2094,11 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
   if (readiness) {
     const pool = resources.concat(relatedOut ? relatedOut.flatMap((g) => (g && Array.isArray(g.resources) ? g.resources : [])) : []);
     try { await attachReadiness(pool); } catch { /* readiness must never break discovery */ }
+    // Anonymous aggregate usage signal: ONE categorical label (the best readiness
+    // outcome across connectable resources), no domain / payload / IP — emitted via
+    // the single metrics site (recordDiscovery), preserving the privacy invariant.
+    const ro = pool.map((r) => r.readiness && r.readiness.outcome);
+    recordDiscovery(env, "readiness:" + (ro.includes("ready") ? "ready" : ro.includes("credentials-required") ? "credentials-required" : ro.includes("incomplete") ? "incomplete" : "none-connectable"));
   }
 
   const body = {
@@ -2178,10 +2183,16 @@ export function readinessProtocol(r) {
   // OAuth/OpenID metadata documents are NOT connectable endpoints — the MCP
   // readiness resolver fetches them itself; never handshake one as an endpoint.
   if (/\/\.well-known\/(oauth-protected-resource|oauth-authorization-server|openid-configuration)/.test(path)) return null;
+  // A documentation/marketing page (…/mcp.md, …/openapi-guide.html) is never an
+  // endpoint even when its URL contains a protocol word. Explicit adapter/type
+  // labels are still trusted; only the fuzzy path/host heuristics are gated by this,
+  // and each requires the word as a bounded path SEGMENT — so /mcp and /openapi.json
+  // match, but /mcp-guide and /openapi-tips do not.
+  const isDoc = /\.(md|mdx|html?|txt|pdf|rst)($|\?)/.test(path);
   if (src === "aid" && r.raw && typeof r.raw === "object" && typeof r.raw.proto === "string") { const p = r.raw.proto.toLowerCase(); return p === "mcp" ? "mcp" : p || null; }
-  if (src === "openapi" || type.includes("openapi") || /(^|\/)(openapi|swagger)/.test(path)) return "openapi";
-  if (src === "mcp" || type === "mcp" || type === "mcp-server" || type === "application/mcp-server-card+json" || /(^|\/)mcp(\b|\/|$)/.test(path) || host.startsWith("mcp.")) return "mcp";
-  if (src === "a2a-agent-card" || type.includes("agent-card") || /\/agent(-card)?\.json$/.test(path)) return "a2a-agent-card";
+  if (src === "openapi" || type.includes("openapi") || (!isDoc && /\/(openapi|swagger)(\.(json|ya?ml))?(\/|\?|$)/.test(path))) return "openapi";
+  if (src === "mcp" || type === "mcp" || type === "mcp-server" || type === "application/mcp-server-card+json" || (!isDoc && (host.startsWith("mcp.") || /\/mcp(\/|\?|$)/.test(path)))) return "mcp";
+  if (src === "a2a-agent-card" || type.includes("agent-card") || (!isDoc && /\/agent(-card)?\.json(\?|$)/.test(path))) return "a2a-agent-card";
   return null;
 }
 
@@ -2431,9 +2442,9 @@ async function apiExplore(raw, env, ctx, request, candidates = [], org = false, 
 // the caller and never touch NessGate. Client-specific → never cached.
 async function connectData(raw, env, ctx, request, clientCaps) {
   const domain = normalizeDomain(raw, true);
-  if (!domain) return { status: 400, body: { error: "Invalid domain" } };
+  if (!domain) { recordDiscovery(env, "connect:invalid"); return { status: 400, body: { error: "Invalid domain" } }; }
   const disc = await exploreData(raw, env, ctx, request, [], false, false, false);
-  if (disc.status !== 200) return disc; // 429 / 400 bubble up unchanged
+  if (disc.status !== 200) { recordDiscovery(env, "connect:" + (disc.status === 429 ? "rate-limited" : "error")); return disc; } // 429 / 400 bubble up unchanged
   const resources = [
     ...(disc.body.resources || []),
     ...((disc.body.related || []).flatMap((g) => (g && Array.isArray(g.resources) ? g.resources : []))),
@@ -2475,6 +2486,10 @@ async function connectData(raw, env, ctx, request, clientCaps) {
   const seenRej = new Set();
   const serviceOffered = rejected.filter((x) => { const k = x.protocol + "|" + x.reason; if (seenRej.has(k)) return false; seenRej.add(k); return true; });
 
+  // Anonymous aggregate usage signal: ONE categorical outcome label, no domain /
+  // client payload / IP — emitted via the single metrics site (recordDiscovery).
+  recordDiscovery(env, "connect:" + outcome);
+
   return {
     status: 200,
     body: {
@@ -2502,7 +2517,7 @@ async function apiConnect(raw, env, ctx, request, clientCaps) {
 // (the tool dispatches to the same handler).
 
 const MCP_SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26"];
-const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.6.0" };
+const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.15.0" };
 const MCP_INSTRUCTIONS =
   "Use discover_domain to resolve a domain to the machine-readable resources it publishes " +
   "across the supported discovery locations (ARD, A2A, llms.txt, API catalogs, OpenAPI, and " +

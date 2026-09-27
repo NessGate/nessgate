@@ -1,18 +1,9 @@
 # @nessgate/resolver
 
-The open, neutral resolver for the agentic web. Give it a domain and it reads whatever that
-domain already publishes at the standard machine-discovery locations — ARD / `ai-catalog.json`
-(well-known path, `rel="ard"` link, and robots `Agentmap:` directive), A2A agent card,
-`llms.txt`, RFC 9727 api-catalog, `ai-info.json`, OpenAPI, Open Resource Discovery, AWP,
-RFC 6415 host-meta, Agent Network Protocol, Universal Commerce Protocol, the AID TXT record,
-and GB/Z 185.4 agent descriptions — and returns **one normalized list**, each record carrying
-its `source` and the native `sourceUrl` so you can verify against the domain directly.
-
-- **Dependency-free.** Runs anywhere with `fetch`: Node ≥18, Deno, Bun, Workers, and agent
-  runtimes.
-- **Decentralized.** Fetches the target domain directly — no runtime dependency on nessgate.com.
-- **Neutral.** Reads the existing standards; reuses each source's own type labels; invents no
-  taxonomy of its own. A new standard is just a new adapter, never a competitor.
+**Give it a domain and your client's capabilities, and it tells you how that client can connect —
+and what's still missing.** Dependency-free, decentralized (fetches the target domain directly, no
+runtime dependency on nessgate.com), and neutral (reads the standards a domain already publishes;
+invents no taxonomy). Runs anywhere with `fetch`: Node ≥18, Deno, Bun, Workers, agent runtimes.
 
 ## Install
 
@@ -20,7 +11,28 @@ its `source` and the native `sourceUrl` so you can verify against the domain dir
 npm install @nessgate/resolver
 ```
 
-## Use
+## Connect (the headline)
+
+```js
+import { plan } from "@nessgate/resolver";
+
+const p = await plan("supabase.com", { supports: [{ protocol: "mcp", auth: ["oauth2", "none"] }] });
+
+p.outcome;      // "ready" | "credentials-required" | "incomplete" | "no-compatible-method"
+p.connection;   // { protocol, endpoint, transport, version, auth:{ type, tokenEndpoint, scopes, … } }
+                // → everything needed to connect; you supply your own credentials (never sent to anyone).
+p.unmatched;    // what the service offered that your client can't use, and vice-versa
+```
+
+Four honest outcomes, never a guess. `plan()` discovers the domain, matches it against your client's
+declared capabilities (deterministic intersection — no scores), and resolves each protocol's real
+connection details from the service's own published metadata (OpenAPI `servers`+`securitySchemes`,
+A2A cards, the MCP OAuth chain RFC 9728 → RFC 8414). Read-only; credentials stay with you.
+
+Want just one resource's readiness? `assessReadiness(resource, { fetch })`. Want the raw list of
+everything a domain publishes? `resolve(domain)` — the original resolver, below.
+
+## Discover (the raw list)
 
 ```js
 import { resolve } from "@nessgate/resolver";
@@ -30,6 +42,11 @@ for (const r of resources) {
   console.log(r.source, r.type, r.url); // e.g. "ard-catalog" "application/json" "https://example.com/ai-info.json"
 }
 ```
+
+It reads ARD / `ai-catalog.json` (well-known path, `rel="ard"` link, robots `Agentmap:`), A2A agent
+card, `llms.txt`, RFC 9727 api-catalog, `ai-info.json`, OpenAPI, ORD, AWP, RFC 6415 host-meta, ANP,
+UCP, the AID TXT record, and GB/Z 185.4 — one normalized list, each record carrying its `source` and
+native `sourceUrl` so you can verify against the domain directly.
 
 `resolve(domain, opts)` returns
 `{ domain, provenance, discovered, resources, checked, outcome, blockedProbes? }`.

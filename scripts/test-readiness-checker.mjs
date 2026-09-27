@@ -29,6 +29,11 @@ const parityCases = [
   ["readinessProtocol", [{ source: "aid", type: "mcp", url: "https://x/mcp", raw: { proto: "mcp" } }]],
   ["readinessProtocol", [{ source: "llms.txt", type: "llms.txt", url: "https://x/llms.txt" }]],
   ["readinessProtocol", [{ source: "ard-catalog", type: "application/json", url: "https://api.x/.well-known/oauth-protected-resource/mcp" }]],
+  ["readinessProtocol", [{ source: "llms.txt", type: "llms.txt", url: "https://x.com/docs/mcp.md" }]],
+  ["readinessProtocol", [{ source: "x", type: "text/html", url: "https://x.com/blog/openapi-tips" }]],
+  ["readinessProtocol", [{ source: "x", type: "text/html", url: "https://x.com/mcp-guide" }]],
+  ["readinessProtocol", [{ source: "x", type: "x", url: "https://x.com/v1/mcp" }]],
+  ["readinessProtocol", [{ source: "x", type: "x", url: "https://x.com/openapi.yaml" }]],
   ["assessOpenApiReadiness", [{ openapi: "3.1.0", servers: [{ url: "https://a" }], components: { securitySchemes: { k: { type: "http", scheme: "bearer" } } } }]],
   ["assessOpenApiReadiness", [{ openapi: "3.0.0", servers: [{ url: "https://a" }] }]],
   ["assessOpenApiReadiness", [null]],
@@ -49,6 +54,21 @@ for (const [fn, args] of parityCases) {
 
 /* metadata docs are not endpoints (the MCP resolver fetches them itself) */
 eq("oauth-protected-resource is not a connectable endpoint", lib.readinessProtocol({ source: "ard-catalog", type: "application/json", url: "https://api.x/.well-known/oauth-protected-resource/mcp" }), null);
+
+/* detection tightening (audit #2): reject look-alikes, keep real endpoints */
+const rp = (u, extra = {}) => lib.readinessProtocol({ source: "x", type: "x", url: u, ...extra });
+eq("noise: /docs/mcp.md (doc) → null", rp("https://x.com/docs/mcp.md"), null);
+eq("noise: /blog/openapi-tips (substring, not segment) → null", rp("https://x.com/blog/openapi-tips"), null);
+eq("noise: /mcp-guide (not a bounded segment) → null", rp("https://x.com/mcp-guide"), null);
+eq("noise: /openapi-guide.html → null", rp("https://x.com/openapi-guide.html"), null);
+eq("noise: mcp. host but .html doc → null", rp("https://mcp.x.com/blog.html"), null);
+eq("keep: /mcp → mcp", rp("https://x.com/mcp"), "mcp");
+eq("keep: /v1/mcp → mcp", rp("https://x.com/v1/mcp"), "mcp");
+eq("keep: mcp. host root → mcp", rp("https://mcp.x.com/"), "mcp");
+eq("keep: /openapi.json → openapi", rp("https://x.com/openapi.json"), "openapi");
+eq("keep: /openapi.yaml → openapi", rp("https://x.com/openapi.yaml"), "openapi");
+eq("keep: /.well-known/agent.json → a2a", rp("https://x.com/.well-known/agent.json"), "a2a-agent-card");
+eq("keep: explicit type=openapi even on odd url → openapi", lib.readinessProtocol({ source: "openapi", type: "openapi", url: "https://x.com/spec" }), "openapi");
 
 /* (2) outcome correctness (via the library) ------------------------------ */
 eq("openapi complete → credentials-required", lib.assessOpenApiReadiness({ openapi: "3.1.0", servers: [{ url: "https://a" }], components: { securitySchemes: { o: { type: "oauth2", flows: { authorizationCode: { authorizationUrl: "https://a/az", tokenUrl: "https://a/tok", scopes: { r: "x" } } } } } } }).outcome, "credentials-required");

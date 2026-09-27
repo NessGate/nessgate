@@ -1,26 +1,55 @@
 # NessGate
 
-**The open, neutral compatibility resolver for the agentic web.** Give NessGate a domain and it
-reads whatever that domain already publishes — across ARD (all three surfaces), A2A, `llms.txt`,
-RFC 9727 api-catalog, Open Resource Discovery, RFC 6415 host-meta, OpenAPI, Agent Network Protocol
-(ANP), Universal Commerce Protocol (UCP), AID, GB/Z 185.4 and more — and returns **one normalized answer**,
-with a link back to each source so an agent can always verify against the domain itself.
+**Give NessGate a domain and your client's capabilities, and it tells you how that client can
+connect — and what's still missing.** One call turns "here's a domain" into a concrete,
+sourced connection plan: which protocol to use, at which endpoint, over which transport, and
+exactly what authentication the service published — or, if it can't be done yet, the precise
+field the service is missing.
 
+```bash
+curl -sX POST https://nessgate.com/connect/supabase.com \
+  -H 'content-type: application/json' \
+  -d '{"client":{"supports":[{"protocol":"mcp","auth":["oauth2","none"]}]}}'
 ```
-company.com  →  { resources: [
-                   { source: "ard-catalog", type: "application/json",
-                     url:       "https://company.com/ai-info.json",
-                     sourceUrl: "https://company.com/.well-known/ard.json" },
-                   ... ] }
+```jsonc
+{
+  "domain": "supabase.com",
+  "outcome": "credentials-required",          // ready | credentials-required | incomplete | no-compatible-method
+  "connection": {
+    "protocol": "mcp",  "transport": "streamable-http",
+    "endpoint": "https://mcp.supabase.com/mcp",
+    "auth": { "type": "oauth2",
+              "authorizationEndpoint": "https://api.supabase.com/v1/oauth/authorize",
+              "tokenEndpoint":         "https://api.supabase.com/v1/oauth/token",
+              "scopes": ["projects:read", "database:write", "…"] }
+  }
+}
+// → everything needed to connect is known; you just supply your own credentials
+//   (which never touch NessGate). No scores; each field links back to its source.
 ```
 
-One call instead of ten. NessGate **reads** these standards; it does not define or replace
-them — a new standard is just a new adapter, never a competitor. It reuses each source's own
-type labels and invents no taxonomy of its own. The **domain is always the authority**;
-NessGate only normalizes what the domain already publishes, reads it on demand, and stores nothing.
+Four honest outcomes, never a guess: **ready** (connect now, no credentials), **credentials-required**
+(everything's known — bring your own secret), **incomplete** (the service under-published — NessGate
+names the exact missing field), **no-compatible-method** (nothing your client speaks). Prefer the
+per-resource view? Add `?readiness=1` to `/explore`. Prefer the raw list of what a domain publishes?
+That's the original resolver, `GET /discover/{domain}` — unchanged and still here.
+
+### Why not just build this yourself?
+
+You can — it's not impossible, just *permanent*. To turn a domain into a working connection you'd have
+to read and track every discovery standard (ARD, A2A, `llms.txt`, api-catalog, OpenAPI, ORD, host-meta,
+ANP, UCP, AID, MCP, GB/Z 185.4…), follow each one's auth story (OpenAPI security schemes, the MCP OAuth
+metadata chain RFC 9728 → RFC 8414, A2A card schemes), handle server quirks, timeouts, redirects, and
+SSRF safety on every hop, normalize it all into one shape, and keep doing that as the protocols change.
+NessGate does exactly that, reads on demand, stores nothing, and stays neutral — so you write your
+agent, not a compatibility layer. It's free, open (Apache-2.0), and independently implementable; if
+nessgate.com vanished, every domain's files would still stand on the domain itself.
 
 Live at **https://nessgate.com** · [Specification](https://nessgate.com/spec) ·
 [Charter](https://nessgate.com/charter) · [API](https://nessgate.com/api)
+
+<sub>NessGate **reads** the standards a domain already publishes; it defines none of them and stores
+nothing. The domain is always the authority.</sub>
 
 ## Use it
 

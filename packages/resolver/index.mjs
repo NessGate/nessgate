@@ -1346,10 +1346,16 @@ export function readinessProtocol(r) {
   // OAuth/OpenID metadata documents are NOT connectable endpoints — the MCP
   // readiness resolver fetches them itself; never handshake one as an endpoint.
   if (/\/\.well-known\/(oauth-protected-resource|oauth-authorization-server|openid-configuration)/.test(path)) return null;
+  // A documentation/marketing page (…/mcp.md, …/openapi-guide.html) is never an
+  // endpoint even when its URL contains a protocol word. Explicit adapter/type
+  // labels are still trusted; only the fuzzy path/host heuristics are gated by this,
+  // and each requires the word as a bounded path SEGMENT — so /mcp and /openapi.json
+  // match, but /mcp-guide and /openapi-tips do not.
+  const isDoc = /\.(md|mdx|html?|txt|pdf|rst)($|\?)/.test(path);
   if (src === "aid" && r.raw && typeof r.raw === "object" && typeof r.raw.proto === "string") { const p = r.raw.proto.toLowerCase(); return p === "mcp" ? "mcp" : p || null; }
-  if (src === "openapi" || type.includes("openapi") || /(^|\/)(openapi|swagger)/.test(path)) return "openapi";
-  if (src === "mcp" || type === "mcp" || type === "mcp-server" || type === "application/mcp-server-card+json" || /(^|\/)mcp(\b|\/|$)/.test(path) || host.startsWith("mcp.")) return "mcp";
-  if (src === "a2a-agent-card" || type.includes("agent-card") || /\/agent(-card)?\.json$/.test(path)) return "a2a-agent-card";
+  if (src === "openapi" || type.includes("openapi") || (!isDoc && /\/(openapi|swagger)(\.(json|ya?ml))?(\/|\?|$)/.test(path))) return "openapi";
+  if (src === "mcp" || type === "mcp" || type === "mcp-server" || type === "application/mcp-server-card+json" || (!isDoc && (host.startsWith("mcp.") || /\/mcp(\/|\?|$)/.test(path)))) return "mcp";
+  if (src === "a2a-agent-card" || type.includes("agent-card") || (!isDoc && /\/agent(-card)?\.json(\?|$)/.test(path))) return "a2a-agent-card";
   return null;
 }
 

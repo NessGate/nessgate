@@ -50,6 +50,46 @@ await check("discover returns the normalized answer shape, labeled self-publishe
   if (!Array.isArray(d.discovered)) throw new Error("discovered not an array");
 });
 
+// --- Connection readiness + connection plan (real end-to-end, dogfooded on our
+// own domain so the gate never depends on a third party's live auth config). ---
+const CONNECT_OUTCOMES = ["ready", "credentials-required", "incomplete", "no-compatible-method"];
+
+await check("explore?readiness=1 is additive and attaches well-formed readiness blocks", async () => {
+  const r = await get("/explore/nessgate.com?readiness=1");
+  if (r.status !== 200) throw new Error(`status ${r.status}`);
+  const d = await r.json();
+  if (typeof d.readinessNote !== "string") throw new Error("missing readinessNote (flag path did not run)");
+  for (const x of (d.resources || []).filter((y) => y.readiness)) {
+    if (!["ready", "credentials-required", "incomplete"].includes(x.readiness.outcome)) throw new Error(`bad readiness outcome ${x.readiness.outcome}`);
+    if (!Array.isArray(x.readiness.missing)) throw new Error("readiness.missing is not an array");
+  }
+});
+
+await check("plain /explore is UNCHANGED by the readiness feature (no leak without the flag)", async () => {
+  const d = await (await get("/explore/nessgate.com")).json();
+  if (d.readinessNote) throw new Error("plain /explore leaked readinessNote");
+  if ((d.resources || []).some((x) => x.readiness)) throw new Error("plain /explore leaked a readiness field");
+});
+
+await check("POST /connect returns a valid connection outcome for the queried domain (real e2e)", async () => {
+  const r = await fetch(BASE + "/connect/nessgate.com", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ client: { supports: [{ protocol: "mcp" }, { protocol: "openapi" }] } }),
+  });
+  if (r.status !== 200) throw new Error(`status ${r.status}`);
+  const d = await r.json();
+  if (d.domain !== "nessgate.com") throw new Error(`domain echo wrong: ${d.domain}`);
+  if (!CONNECT_OUTCOMES.includes(d.outcome)) throw new Error(`outcome not in the honest enum: ${d.outcome}`);
+  if ((d.outcome === "ready" || d.outcome === "credentials-required") && !(d.connection && d.connection.endpoint))
+    throw new Error(`${d.outcome} without a connection endpoint`);
+  if (typeof d.compatibility !== "object") throw new Error("missing compatibility summary");
+});
+
+await check("GET /connect (no body) is a helpful 405, never a 500", async () => {
+  const r = await get("/connect/nessgate.com");
+  if (r.status !== 405) throw new Error(`status ${r.status}`);
+});
+
 await check("?fast=1 is a LABELED reduced mode (skips optional alternate ARD locators)", async () => {
   const d = await (await get("/discover/nessgate.com?fast=1")).json();
   if (d.mode !== "fast") throw new Error(`fast mode must be labeled mode:"fast", got ${d.mode}`);
