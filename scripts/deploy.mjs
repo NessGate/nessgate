@@ -15,6 +15,7 @@ if (execSync("git status --porcelain").toString().trim()) {
 for (const [label, args] of [
   ["regression", ["test"]],
   ["v2 alpha", ["run", "test:v2"]],
+  ["readiness checker", ["run", "test:readiness"]],
   ["compatibility corpus", ["run", "test:compat"]],
   ["openapi size handling", ["run", "test:openapi"]],
   ["official conformance", ["run", "test:conformance"]],

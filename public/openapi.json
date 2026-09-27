@@ -120,6 +120,13 @@
             "required": false,
             "description": "Set to 1 for Related Discovery: a separate cross-registrable-domain layer returned in related[] (never mixed with resources[]). Classes: publisher-declared-related (the queried domain serves a purpose-built declaration such as a legacy Related Website Set file; hyperlinks never qualify), registry-verified-related (a domain-verifying registry names the specific host, attributed), infrastructure-correlated-candidate (caller candidates with a cited technical signal). Technical signals are corroborating only and never mean official or same organization. Bounded, max 5 related hosts.",
             "schema": { "type": "string", "enum": ["1"] }
+          },
+          {
+            "name": "readiness",
+            "in": "query",
+            "required": false,
+            "description": "Set to 1 for connection-readiness: attach a readiness block to each connectable resource, assessed from the service's own published metadata (OpenAPI servers+securitySchemes, A2A card, MCP OAuth chain RFC 9728 -> RFC 8414). Outcomes: ready | credentials-required | incomplete (with missing[] naming the under-published field). Read-only, no scores, credentials never touch NessGate. Bounded + SSRF-guarded. Default /explore (no flag) is unchanged.",
+            "schema": { "type": "string", "enum": ["1"] }
           }
         ],
         "responses": {
@@ -150,7 +157,8 @@
                               "evidence": { "type": "string", "enum": ["publisher-hosted", "publisher-declared", "namespace-verified", "candidate", "same-domain-host", "publisher-redirect-candidate"], "description": "candidate = a caller-suggested URL (via POST {\"candidates\":[...]}) that NessGate fetched and confirmed is machine-readable; relationship to the domain is unverified." },
                               "provenance": { "type": "array", "items": { "type": "string" }, "description": "The chain of URLs/registry hops by which this record was reached." },
                               "depth": { "type": "integer", "example": 0 },
-                              "attribution": { "type": "string", "description": "For namespace-verified records: who verified the namespace (attributed to the registry, not NessGate)." }
+                              "attribution": { "type": "string", "description": "For namespace-verified records: who verified the namespace (attributed to the registry, not NessGate)." },
+                              "readiness": { "type": "object", "description": "Only with ?readiness=1: how ready this resource is to connect to, from its own published metadata. { outcome: ready | credentials-required | incomplete, protocol, transport?, version?, endpoint?, auth?, missing[] }. No scores; credentials stay with the caller." }
                             }
                           }
                         ]
@@ -177,6 +185,63 @@
           },
           "400": { "description": "Input is not a valid domain.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "429": { "description": "Rate limited (60 requests/hour per IP).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/connect/{domain}": {
+      "post": {
+        "operationId": "connectDomain",
+        "summary": "Connection plan: how a specific client can connect to this domain",
+        "description": "Discovers the domain (via the /explore path — delegation + MCP-Registry federation), matches each connectable resource against the CLIENT's declared capabilities (deterministic set intersection, no scores), assesses readiness of the matches from the service's own published metadata, and returns ONE outcome with a connection plan. Read-only; the client's capabilities are input only (nothing is stored); credentials stay with the caller and never touch NessGate; the client connects directly. Shares the /explore rate limit (60/hour/IP); responses are not cached (client-specific).",
+        "parameters": [
+          { "name": "domain", "in": "path", "required": true, "description": "Domain name, e.g. example.com.", "schema": { "type": "string", "example": "example.com" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "client": {
+                    "type": "object",
+                    "description": "The calling client's capabilities.",
+                    "properties": {
+                      "supports": { "type": "array", "description": "Protocols the client speaks, each optionally narrowing versions/transports/auth (omitting a dimension = accepts any).", "items": { "type": "object", "properties": { "protocol": { "type": "string", "example": "mcp" }, "versions": { "type": "array", "items": { "type": "string" } }, "transports": { "type": "array", "items": { "type": "string" } }, "auth": { "type": "array", "items": { "type": "string" } } }, "required": ["protocol"] } },
+                      "prefer": { "type": "array", "description": "Optional cross-protocol tie-break order; the only place client preference lives.", "items": { "type": "string" } }
+                    }
+                  }
+                }
+              },
+              "example": { "client": { "supports": [{ "protocol": "mcp", "auth": ["oauth2", "none"] }], "prefer": ["mcp"] } }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One connection outcome plus the plan and diagnostics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "domain": { "type": "string", "example": "example.com" },
+                    "outcome": { "type": "string", "enum": ["ready", "credentials-required", "incomplete", "no-compatible-method"] },
+                    "note": { "type": "string" },
+                    "connection": { "type": "object", "nullable": true, "description": "The recommended connection (or best incomplete): { protocol, endpoint, transport, version, auth, matchedOn, missing[], provenance }. null when nothing connectable matched." },
+                    "alternatives": { "type": "array", "items": { "type": "object" } },
+                    "selectedByClientPreference": { "type": "object", "nullable": true },
+                    "compatibility": { "type": "object", "properties": { "clientMethods": { "type": "integer" }, "serviceMethods": { "type": "integer" }, "compatibleMethods": { "type": "integer" } } },
+                    "unmatched": { "type": "object", "properties": { "serviceOffered": { "type": "array", "items": { "type": "object" } }, "clientOnly": { "type": "array", "items": { "type": "object" } } } }
+                  },
+                  "required": ["domain", "outcome"]
+                }
+              }
+            }
+          },
+          "400": { "description": "Input is not a valid domain.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "405": { "description": "Use POST with a JSON body.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "429": { "description": "Rate limited (shares the /explore 60/hour/IP budget).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }
     },
