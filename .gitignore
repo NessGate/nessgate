@@ -34,3 +34,8 @@ benchmarks/realworld/*.log
 # Python bytecode from running the examples
 __pycache__/
 *.pyc
+
+# connection-plan lab: transient run outputs (the code, README, and PROPOSAL are committed)
+lab/connection-plan/*.log
+lab/connection-plan/last-run*.json
+lab/connection-plan/market-*.json

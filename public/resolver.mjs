@@ -1237,8 +1237,23 @@ export async function resolve(domain, opts = {}) {
       r.evidence = { status: c.status, ...(c.signal ? { signal: c.signal } : {}), ...(c.retryAfterSeconds !== undefined ? { retryAfterSeconds: c.retryAfterSeconds } : {}) };
     }
   }
+  // Opt-in connection-readiness: for each CONNECTABLE resource, assess how ready
+  // it is to connect to (from the service's own published metadata) and attach a
+  // `readiness` field. Read-only, bounded, and gated on opts.readiness — the
+  // default resolve() output is byte-unchanged. See the checker below.
+  if (opts.readiness) {
+    let budget = 6; // cap the extra metadata hops per resolution
+    for (const r of resources) {
+      if (budget <= 0 || Date.now() - startedAt > deadlineMs) break;
+      if (!readinessProtocol(r)) continue;
+      budget--;
+      try { r.readiness = await assessReadiness(r, { fetch: fetchImpl, timeoutMs }); }
+      catch { r.readiness = { protocol: readinessProtocol(r), outcome: "incomplete", missing: ["readiness check failed"] }; }
+    }
+  }
   const out = { domain: d, provenance: "self-published", discovered, resources, checked };
   if (opts.verify) out.verified = ["reachability"]; // labeled: the verify pass ran
+  if (opts.readiness) out.readinessChecked = ["connection"]; // labeled: readiness ran
   // The single honest outcome label (found / none-found / blocked), plus the
   // refusal count so uncertainty is never hidden even under none-found. In
   // runtimes without DNS-failure detail (plain fetch), NXDOMAIN reads as a
@@ -1289,4 +1304,302 @@ export function sameRegCanonicalHost(finalUrl, domain) {
   return h.endsWith("." + domain) ? h : null;
 }
 
-export default { resolve, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, detectOpenApiYaml, extractOpenApiCapabilities, dedupeResources, reachabilityFromStatus, classifyDenial, parseMcpMessages, mcpToolCapabilities, probeFailureKind, resolutionOutcome, fetchBounded, ADAPTERS };
+/* ============ Connection-readiness checker (opt-in, additive) ============
+   Assess how ready a discovered resource is to be CONNECTED to, read purely from
+   the service's OWN published metadata. Additive: runs only under
+   resolve(domain, { readiness: true }) or the exported assessReadiness(); the
+   default resolve() output is byte-unchanged. Three honest outcomes, no scores:
+     ready                — connectable with NO credentials (a safe handshake
+                            confirmed it, or a fully-declared open surface).
+     credentials-required — endpoint + transport + auth METHOD and its metadata
+                            (token/authorize URLs, scopes) are all known and
+                            reachable; only the secret is missing — and the secret
+                            STAYS WITH THE CALLER (NessGate never sees or stores it).
+     incomplete           — a connection element the protocol ITSELF defines is not
+                            machine-published; `missing[]` names each gap (this is
+                            the protocol-readiness feedback for publishers).
+   Nothing is guessed (undeclared stays undeclared). The pure assessors below are
+   kept byte-identical to src/worker.js (parity-tested). "ready" for an
+   authenticated service is impossible without credentials, so authed services top
+   out at credentials-required; readiness is vantage-relative (from this caller). */
+
+// Pure: the negotiated MCP protocolVersion from an initialize response, whether it
+// came back as plain JSON or one/more SSE `data:` frames (Streamable HTTP).
+export function extractProtocolVersion(text) {
+  const tryParse = (s) => { try { return JSON.parse(s); } catch { return null; } };
+  const pv = (j) => (j && j.result && typeof j.result.protocolVersion === "string" ? j.result.protocolVersion : null);
+  let v = pv(tryParse(text));
+  if (v) return v;
+  for (const m of String(text || "").matchAll(/^data:\s*(.+)$/gm)) { v = pv(tryParse(m[1])); if (v) return v; }
+  return null;
+}
+
+// Pure: which connectable protocol a discovered resource represents, or null for a
+// pointer/catalog surface (llms.txt, api-catalog, host-meta, …). Reuses each
+// source's OWN labels — invents no taxonomy.
+export function readinessProtocol(r) {
+  if (!r || typeof r !== "object") return null;
+  const src = String(r.source || "").toLowerCase();
+  const type = String(r.type || "").toLowerCase();
+  let path = "", host = "";
+  try { const u = new URL(r.url); path = u.pathname.toLowerCase(); host = u.hostname.toLowerCase(); } catch {}
+  // OAuth/OpenID metadata documents are NOT connectable endpoints — the MCP
+  // readiness resolver fetches them itself; never handshake one as an endpoint.
+  if (/\/\.well-known\/(oauth-protected-resource|oauth-authorization-server|openid-configuration)/.test(path)) return null;
+  if (src === "aid" && r.raw && typeof r.raw === "object" && typeof r.raw.proto === "string") { const p = r.raw.proto.toLowerCase(); return p === "mcp" ? "mcp" : p || null; }
+  if (src === "openapi" || type.includes("openapi") || /(^|\/)(openapi|swagger)/.test(path)) return "openapi";
+  if (src === "mcp" || type === "mcp" || type === "mcp-server" || type === "application/mcp-server-card+json" || /(^|\/)mcp(\b|\/|$)/.test(path) || host.startsWith("mcp.")) return "mcp";
+  if (src === "a2a-agent-card" || type.includes("agent-card") || /\/agent(-card)?\.json$/.test(path)) return "a2a-agent-card";
+  return null;
+}
+
+// Pure: OpenAPI readiness from a parsed spec (servers[] + securitySchemes).
+export function assessOpenApiReadiness(spec) {
+  const out = { protocol: "openapi", transport: "https", version: null, missing: [] };
+  if (!spec || typeof spec !== "object") return { ...out, outcome: "incomplete", missing: ["a parseable OpenAPI document"] };
+  out.version = typeof spec.openapi === "string" ? spec.openapi : typeof spec.swagger === "string" ? spec.swagger : null;
+  const servers = Array.isArray(spec.servers) ? spec.servers.map((s) => s && s.url).filter(Boolean) : [];
+  const schemes = (spec.components && typeof spec.components === "object" && spec.components.securitySchemes) || spec.securityDefinitions || null;
+  const missing = [];
+  if (!servers.length) missing.push("servers[] (no base URL is declared)");
+  if (!schemes || !Object.keys(schemes).length) missing.push("securitySchemes (no auth method is declared)");
+  if (!out.version) missing.push("openapi/swagger version string");
+  if (servers[0]) out.endpoint = servers[0];
+  if (missing.length) return { ...out, outcome: "incomplete", missing };
+  const first = Object.values(schemes)[0] || {};
+  const auth = { required: true, type: first.type };
+  if (first.type === "http" && first.scheme) auth.type = "http:" + String(first.scheme).toLowerCase();
+  if (first.type === "oauth2" && first.flows && typeof first.flows === "object") {
+    const f = first.flows.authorizationCode || first.flows.clientCredentials || first.flows.password || first.flows.implicit || {};
+    if (f.authorizationUrl) auth.authorizationEndpoint = f.authorizationUrl;
+    if (f.tokenUrl) auth.tokenEndpoint = f.tokenUrl;
+    if (f.scopes && typeof f.scopes === "object") auth.scopes = Object.keys(f.scopes);
+  }
+  return { ...out, outcome: "credentials-required", auth };
+}
+
+// Pure: A2A readiness from a parsed agent card (modern + legacy schema).
+export function assessA2aReadiness(card) {
+  const out = { protocol: "a2a-agent-card", missing: [] };
+  if (!card || typeof card !== "object") return { ...out, outcome: "incomplete", missing: ["a parseable A2A agent card"] };
+  const ifaces = [
+    ...(Array.isArray(card.additionalInterfaces) ? card.additionalInterfaces : []),
+    ...(Array.isArray(card.supportedInterfaces) ? card.supportedInterfaces : []),
+  ].filter((i) => i && typeof i === "object");
+  let transport = null, endpoint = typeof card.url === "string" ? card.url : undefined;
+  if (typeof card.preferredTransport === "string") transport = card.preferredTransport.toLowerCase();
+  else if (ifaces.length && ifaces[0].transport) { transport = String(ifaces[0].transport).toLowerCase(); endpoint = ifaces[0].url || endpoint; }
+  else if (typeof card.url === "string" && !/\.json(\?|$)/i.test(card.url)) transport = "jsonrpc";
+  out.transport = transport; if (endpoint) out.endpoint = endpoint;
+  out.version = typeof card.protocolVersion === "string" ? card.protocolVersion : typeof card.version === "string" ? card.version : null;
+  const schemes = card.securitySchemes && typeof card.securitySchemes === "object" ? card.securitySchemes : null;
+  const requiredList = Array.isArray(card.security) && card.security.length ? card.security : null;
+  const missing = [];
+  if (!out.transport) missing.push("a transport (no preferredTransport, interfaces, or usable url)");
+  if (!out.version) missing.push("protocolVersion (no version is declared)");
+  if (missing.length) return { ...out, outcome: "incomplete", missing };
+  if (!schemes && !requiredList) return { ...out, outcome: "ready", auth: { required: false } };
+  const first = schemes ? Object.values(schemes)[0] || {} : {};
+  return { ...out, outcome: "credentials-required", auth: { required: true, type: first.type || "declared" } };
+}
+
+// Pure: MCP readiness from an initialize result plus an OPTIONAL OAuth metadata
+// chain (RFC 9728 protected-resource metadata → RFC 8414 authorization-server
+// metadata). A bare 403 is undetermined (auth OR bot/WAF), never a false OAuth wall.
+export function assessMcpReadiness({ init, prm, as }) {
+  const transport = init && init.status === 405 ? "sse-legacy" : "streamable-http";
+  const version = (init && init.protocolVersion) || null;
+  const base = { protocol: "mcp", transport, version };
+  if (init && init.ok) return { ...base, outcome: "ready", auth: { required: false }, verified: "ok", missing: [] };
+  const authWall = init && (init.status === 401 || (init.status === 403 && init.wwwAuthenticate));
+  if (authWall) {
+    if (as && as.authorization_endpoint && as.token_endpoint) {
+      const auth = { required: true, type: "oauth2", authorizationEndpoint: as.authorization_endpoint, tokenEndpoint: as.token_endpoint };
+      if (Array.isArray(as.scopes_supported)) auth.scopes = as.scopes_supported;
+      if (Array.isArray(as.grant_types_supported)) auth.grantTypes = as.grant_types_supported;
+      if (as.registration_endpoint) { auth.dynamicClientRegistration = true; auth.registrationEndpoint = as.registration_endpoint; }
+      return { ...base, outcome: "credentials-required", auth, verified: "auth-required", missing: [] };
+    }
+    const missing = !prm
+      ? ["OAuth 2.0 Protected Resource Metadata (RFC 9728) at /.well-known/oauth-protected-resource"]
+      : ["Authorization Server Metadata (RFC 8414) — the protected-resource doc names no reachable authorization server"];
+    return { ...base, outcome: "incomplete", auth: { required: true, type: "oauth2" }, verified: "auth-required", missing };
+  }
+  if (init && init.status === 403) return { ...base, outcome: "incomplete", verified: "denied:403", missing: ["undetermined: endpoint returned 403 with no auth challenge (authorization OR bot/WAF protection — a safe probe cannot distinguish them)"] };
+  return { ...base, outcome: "incomplete", verified: init && init.status ? "error:" + init.status : "unreachable", missing: ["a reachable MCP endpoint (initialize handshake did not succeed)"] };
+}
+
+// Reject obviously-unsafe hosts before any readiness fetch. The library's SSRF
+// contract still stands (a caller passing UNTRUSTED domains must validate them);
+// this is defense-in-depth for the metadata hops, some of which follow URLs from
+// attacker-influenceable documents (an OAuth authorization-server pointer).
+function readinessBadHost(h) {
+  h = String(h || "").toLowerCase().replace(/\.+$/, "");
+  if (!h || h === "localhost" || h.endsWith(".local") || h.endsWith(".internal") || h.endsWith(".localhost")) return true;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h) || h.includes(":")) return true;
+  if (/^(10|127)\./.test(h) || /^192\.168\./.test(h) || /^169\.254\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
+  return false;
+}
+async function readinessGetJson(fetchImpl, url, timeoutMs, maxBytes) {
+  let u; try { u = new URL(url); } catch { return null; }
+  if (u.protocol !== "https:" || readinessBadHost(u.hostname)) return null;
+  try { const r = await fetchBounded(fetchImpl, url, timeoutMs, maxBytes); return JSON.parse(r.text); } catch { return null; }
+}
+// Read-only MCP initialize (no tools/call, no credentials): status + the RFC 9728
+// WWW-Authenticate pointer + the negotiated protocol version.
+async function readinessMcpInitialize(fetchImpl, url, timeoutMs) {
+  let u; try { u = new URL(url); } catch { return { ok: false, status: 0 }; }
+  if (u.protocol !== "https:" || readinessBadHost(u.hostname)) return { ok: false, status: 0 };
+  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "NessGate-Readiness", version: "1.0" } } });
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const res = await fetchImpl(url, { method: "POST", redirect: "follow", signal: ac.signal, headers: { "content-type": "application/json", accept: "application/json, text/event-stream" }, body });
+    const buf = await res.arrayBuffer();
+    const text = new TextDecoder().decode(buf.byteLength > 65536 ? buf.slice(0, 65536) : buf);
+    return { ok: res.status === 200, status: res.status, wwwAuthenticate: res.headers.get("www-authenticate") || null, protocolVersion: extractProtocolVersion(text) };
+  } catch (e) { return { ok: false, status: 0, error: String(e && e.message || e) }; }
+  finally { clearTimeout(t); }
+}
+async function readinessFillMcp(fetchImpl, endpoint, timeoutMs) {
+  // If the declared URL is a server CARD (a JSON doc), read the endpoint it names.
+  if (/\.json(\?|$)/i.test(endpoint) || /server-card|agent-card/i.test(endpoint)) {
+    const card = await readinessGetJson(fetchImpl, endpoint, timeoutMs, 262144);
+    const inner = card && (card.url || card.endpoint || card.serverUrl || card.mcpUrl || (card.server && card.server.url));
+    if (typeof inner === "string" && /^https:\/\//i.test(inner)) endpoint = inner;
+  }
+  const init = await readinessMcpInitialize(fetchImpl, endpoint, timeoutMs);
+  let prm = null, as = null;
+  if (init.status === 401 || init.status === 403) {
+    let prmUrl = null;
+    const m = init.wwwAuthenticate && init.wwwAuthenticate.match(/resource_metadata="?([^",\s]+)"?/i);
+    if (m) prmUrl = m[1];
+    else { try { prmUrl = new URL("/.well-known/oauth-protected-resource", endpoint).toString(); } catch {} }
+    if (prmUrl) prm = await readinessGetJson(fetchImpl, prmUrl, timeoutMs, 262144);
+    const asBase = prm && Array.isArray(prm.authorization_servers) && prm.authorization_servers[0];
+    if (asBase) {
+      for (const path of ["/.well-known/oauth-authorization-server", "/.well-known/openid-configuration"]) {
+        let asUrl; try { asUrl = new URL(path, asBase).toString(); } catch { continue; }
+        const doc = await readinessGetJson(fetchImpl, asUrl, timeoutMs, 262144);
+        if (doc && doc.token_endpoint) { as = doc; break; }
+      }
+    }
+  }
+  return { ...assessMcpReadiness({ init, prm, as }), endpoint };
+}
+
+// IO: assess ONE discovered resource. Read-only, bring-your-own fetch, no
+// credentials ever sent. Returns a readiness record (or an incomplete note for a
+// pointer surface). Exported for integrators who want per-resource readiness.
+export async function assessReadiness(resource, opts = {}) {
+  const fetchImpl = opts.fetch || globalThis.fetch;
+  if (typeof fetchImpl !== "function") throw new Error("no fetch available; pass opts.fetch");
+  const timeoutMs = opts.timeoutMs || 8000;
+  const stamp = (a) => ({ ...a, endpoint: a.endpoint || (resource && resource.url), sourceUrl: resource && resource.sourceUrl, evidence: resource && (resource.evidence || resource.class) });
+  const proto = readinessProtocol(resource);
+  if (!proto) return stamp({ protocol: resource && resource.type, outcome: "incomplete", missing: ["a connectable endpoint — this is a pointer/catalog surface; follow it (delegation) to reach one"] });
+  if (proto === "openapi") return stamp(assessOpenApiReadiness(await readinessGetJson(fetchImpl, resource.url, timeoutMs, 1_000_000)));
+  if (proto === "a2a-agent-card") return stamp(assessA2aReadiness(await readinessGetJson(fetchImpl, resource.sourceUrl || resource.url, timeoutMs, 262144)));
+  if (proto === "mcp") return stamp(await readinessFillMcp(fetchImpl, resource.url, timeoutMs));
+  return stamp({ protocol: proto, outcome: "incomplete", missing: [`no readiness resolver implemented for "${proto}" yet`] });
+}
+
+/* =============== Connection PLAN (client-matched, opt-in) ================
+   plan(domain, clientCaps) answers the STRONGER question: "how can THIS client
+   connect to this domain?" It discovers the domain, matches each connectable
+   resource against the client's declared capabilities (deterministic set
+   intersection — a fact, never a score), assesses readiness of the matches, and
+   returns ONE outcome + a connection plan. Credentials stay with the caller.
+   Kept byte-identical to src/worker.js for matchClient (parity-tested). */
+
+const CLIENT_PROTOCOL_ALIASES = { a2a: "a2a-agent-card", "agent-card": "a2a-agent-card", rest: "openapi", "gbz-185.4": "gbz-185-4" };
+export function canonClientProtocol(p) { p = String(p || "").toLowerCase(); return CLIENT_PROTOCOL_ALIASES[p] || p; }
+
+// Pure: can a client entry { protocol, versions?, transports?, auth? } use a
+// resolved connection (a readiness record)? Tri-state per dimension — true (both
+// declared & intersect), "any" (client unconstrained), "unknown" (service did not
+// declare it), false (both declared & CONFLICT → the only hard incompatibility).
+export function matchClient(readiness, entry) {
+  const dim = (clientList, serviceVal) => {
+    if (!Array.isArray(clientList) || !clientList.length) return "any";
+    if (serviceVal == null) return "unknown";
+    return clientList.map((x) => String(x).toLowerCase()).includes(String(serviceVal).toLowerCase()) ? true : false;
+  };
+  const version = dim(entry.versions, readiness.version);
+  const transport = dim(entry.transports, readiness.transport);
+  let auth;
+  const a = readiness.auth;
+  if (!Array.isArray(entry.auth) || !entry.auth.length) auth = "any";
+  else if (!a) auth = "unknown";
+  else if (a.required === false) auth = true;
+  else {
+    const client = entry.auth.map((x) => String(x).toLowerCase());
+    const types = [];
+    if (typeof a.type === "string") types.push(a.type.toLowerCase());
+    if (Array.isArray(a.methods)) for (const m of a.methods) if (m && m.label) types.push(String(m.label).toLowerCase());
+    auth = !types.length ? "unknown" : types.some((t) => client.includes(t)) ? true : false;
+  }
+  const hardFail = version === false ? "version" : transport === false ? "transport" : auth === false ? "auth" : null;
+  return { compatible: !hardFail, reason: hardFail ? `client and service both declare ${hardFail} and they do not intersect` : undefined, matchedOn: { protocol: true, version, transport, auth } };
+}
+
+// IO: resolve a domain, match each connectable resource against the client, assess
+// readiness of the matches, and return one connection outcome. Read-only; no
+// credentials sent or stored. clientCaps: { supports:[{protocol,versions?,transports?,auth?}], prefer?:[] }.
+export async function plan(domain, clientCaps, opts = {}) {
+  const fetchImpl = opts.fetch || globalThis.fetch;
+  const caps = clientCaps && typeof clientCaps === "object" ? clientCaps.client || clientCaps : {};
+  const supportsList = Array.isArray(caps.supports) ? caps.supports : [];
+  const supports = new Map();
+  for (const s of supportsList) if (s && s.protocol) supports.set(canonClientProtocol(s.protocol), s);
+  const prefer = (Array.isArray(caps.prefer) ? caps.prefer : []).map(canonClientProtocol);
+  const discovery = await resolve(domain, { ...opts, readiness: false });
+
+  const seen = new Set(), plans = [], rejected = [], serviceProtocols = new Set();
+  let budget = opts.maxAssess || 6;
+  for (const r of discovery.resources || []) {
+    const proto = readinessProtocol(r);
+    if (!proto) continue;
+    serviceProtocols.add(proto);
+    if (seen.has(r.url)) continue;
+    seen.add(r.url);
+    const entry = supports.get(canonClientProtocol(proto));
+    if (!entry) { rejected.push({ protocol: proto, endpoint: r.url, reason: "client does not support protocol" }); continue; }
+    if (budget <= 0) continue;
+    budget--;
+    let readiness;
+    try { readiness = await assessReadiness(r, { fetch: fetchImpl, timeoutMs: opts.timeoutMs }); } catch { continue; }
+    const m = matchClient(readiness, entry);
+    if (!m.compatible) { rejected.push({ protocol: proto, endpoint: r.url, reason: m.reason }); continue; }
+    plans.push({ ...readiness, matchedOn: m.matchedOn });
+  }
+
+  const RANK = { ready: 0, "credentials-required": 1, incomplete: 2 };
+  const pidx = (p) => { const i = prefer.indexOf(canonClientProtocol(p)); return i < 0 ? prefer.length : i; };
+  plans.sort((a, b) => pidx(a.protocol) - pidx(b.protocol) || (RANK[a.outcome] ?? 3) - (RANK[b.outcome] ?? 3) || String(a.protocol).localeCompare(String(b.protocol)));
+  const has = (o) => plans.some((p) => p.outcome === o);
+  let outcome;
+  if (has("ready")) outcome = "ready";
+  else if (has("credentials-required")) outcome = "credentials-required";
+  else if (plans.length) outcome = "incomplete";
+  else if (serviceProtocols.size) outcome = "no-compatible-method"; // connectable methods exist, none the client can use
+  else outcome = "incomplete";
+
+  const clientOnly = [];
+  for (const s of supportsList) { const p = canonClientProtocol(s.protocol); if (p && !serviceProtocols.has(p)) clientOnly.push({ protocol: p, reason: `service publishes no ${p} surface` }); }
+  const seenRej = new Set();
+  const serviceOffered = rejected.filter((x) => { const k = x.protocol + "|" + x.reason; if (seenRej.has(k)) return false; seenRej.add(k); return true; });
+
+  return {
+    domain: discovery.domain,
+    outcome,
+    connection: plans[0] || null,
+    alternatives: plans.slice(1),
+    selectedByClientPreference: prefer.length && plans.length ? { protocol: plans[0].protocol, endpoint: plans[0].endpoint, reason: "client preference order" } : null,
+    compatibility: { clientMethods: supports.size, serviceMethods: serviceProtocols.size, compatibleMethods: plans.length },
+    unmatched: { serviceOffered, clientOnly },
+    discovery,
+  };
+}
+
+export default { resolve, plan, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, detectOpenApiYaml, extractOpenApiCapabilities, dedupeResources, reachabilityFromStatus, classifyDenial, parseMcpMessages, mcpToolCapabilities, probeFailureKind, resolutionOutcome, fetchBounded, assessReadiness, readinessProtocol, extractProtocolVersion, assessOpenApiReadiness, assessA2aReadiness, assessMcpReadiness, matchClient, canonClientProtocol, ADAPTERS };
