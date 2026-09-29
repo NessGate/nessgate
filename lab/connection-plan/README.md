@@ -177,4 +177,35 @@ because servers gate `initialize` behind auth (unknowable without credentials �
 `/explore` path loses the inline A2A card body (must re-fetch, occasionally blocked by the target's own bot
 protection). These are honest ceilings, not defects; the fixes are unit-proven (40 readiness tests).
 
+## Findings — verdict stability (the certification question)
+
+Can a readiness verdict be a *standing* claim ("NessGate Ready")? `run-stability.mjs` measured it:
+3 full local runs × 12 domains + a production-vantage `/connect` pass, then a controlled follow-up
+(3× assessment on ONE frozen discovery snapshot — pure assessment-layer variance).
+
+**Raw outcome stability was 25% — but decomposition shows the verdict rules are sound and the
+observations are the problem, with separable causes:**
+
+| Cause | Evidence | Implication |
+|---|---|---|
+| Experiment vantage (local machine) | 6 `fetch failed` errors — including to nessgate.com itself | vantage quality dominates; a laptop is not a certification vantage |
+| Self-inflicted rate limiting | prod `/connect` 429s late in the run (`outcome=null` rows) | budget the observation plan |
+| Per-vantage deterministic walls | elevenlabs/vercel OpenAPI fetch fails **3/3 consistently** locally, differs at the edge | verdicts are vantage-relative; a badge must name its vantage |
+| One dropped hop in an AND-chain | sentry run2: a single failed OAuth-metadata fetch flipped `credentials-required` → `incomplete` | per-hop retries required |
+| **Genuine service flakiness** | zapier, frozen discovery: `ready(ok)` 2/3, MCP handshake rejected 1/3 | **single observations can never ground a badge — N-of-M majority is mandatory** |
+| Stable when network cooperates | supabase & sentry frozen-discovery: **3/3 identical** `credentials-required` with full OAuth chain | the chain itself is reliable; the predicate is certifiable *given* observation semantics |
+
+Bonus: the broken-vs-under-published classifier cleanly split **all** incompletes (5 broken-style /
+7 under-published) — evidence for adding a distinct `broken` outcome ("declared but fails") as the
+next small product increment.
+
+**Conclusion for the "NessGate Ready" strategy:** NessGate is already a deterministic judge of
+*rules* (CI-proven: same evidence → same verdict). It is NOT yet a deterministic judge of
+*observations*, and no single-shot verdict can be. A certification predicate is viable only with:
+(1) a reliable, named vantage (edge, not laptop), (2) N-of-M majority verdicts with defined
+observation windows, (3) per-hop retries in metadata chains — i.e., exactly the re-verification
+machinery that the v2 plan gates behind Charter v2 activation. The strategy's sequencing is
+therefore confirmed, with data: checker feedback loop now; badge only after Charter v2 + observation
+semantics exist.
+
 **Production proposal:** see [`PROPOSAL.md`](PROPOSAL.md).
