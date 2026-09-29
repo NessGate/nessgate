@@ -52,6 +52,8 @@ const parityCases = [
   ["assessFetchFailure", ["a2a-agent-card", 403, "A2A agent card"]],
   ["assessFetchFailure", ["openapi", 0, "OpenAPI document"]],
   ["assessMcpReadiness", [{ init: { ok: false, status: 404 } }]],
+  ["assessOpenApiReadiness", [{ openapi: "3.0.3", servers: [{ url: "https://a" }], security: [] }]],
+  ["assessOpenApiReadiness", [{ openapi: "3.0.3", servers: [{ url: "https://a" }], security: [{ k: [] }] }]],
 ];
 for (const [fn, args] of parityCases) {
   eq(`parity ${fn}(${JSON.stringify(args[0]).slice(0, 40)}…)`, worker[fn](...args), lib[fn](...args));
@@ -100,6 +102,40 @@ eq("mcp handshake 404 → broken", lib.assessMcpReadiness({ init: { ok: false, s
 eq("mcp handshake 500 → broken", lib.assessMcpReadiness({ init: { ok: false, status: 502 } }).outcome, "broken");
 eq("mcp handshake network-fail → incomplete", lib.assessMcpReadiness({ init: { ok: false, status: 0 } }).outcome, "incomplete");
 eq("mcp handshake 405 (ambiguous legacy transport) → incomplete, NOT broken", lib.assessMcpReadiness({ init: { ok: false, status: 405 } }).outcome, "incomplete");
+
+/* OpenAPI explicit-open: security:[] is the spec's OWN "no auth" declaration */
+eq("openapi security:[] → ready (explicitly open)", lib.assessOpenApiReadiness({ openapi: "3.0.3", servers: [{ url: "https://a" }], security: [] }).outcome, "ready");
+eq("openapi security:[] → auth not required", lib.assessOpenApiReadiness({ openapi: "3.0.3", servers: [{ url: "https://a" }], security: [] }).auth.required, false);
+eq("openapi NO security + NO schemes → still incomplete (didn't say ≠ none)", lib.assessOpenApiReadiness({ openapi: "3.0.3", servers: [{ url: "https://a" }] }).outcome, "incomplete");
+eq("openapi non-empty security w/o schemes → incomplete (declares auth it never defines)", lib.assessOpenApiReadiness({ openapi: "3.0.3", servers: [{ url: "https://a" }], security: [{ k: [] }] }).outcome, "incomplete");
+
+/* ready-check CLI core: majority verdict + end-to-end with a mock fetch */
+const rc = await import("../packages/resolver/ready-check.mjs");
+eq("majority: unanimous ready → ready", rc.majorityVerdict(["ready", "ready", "ready"]), "ready");
+eq("majority: any disagreement → unstable (zapier class)", rc.majorityVerdict(["ready", "broken", "ready"]), "unstable");
+eq("majority: unanimous creds → credentials-required", rc.majorityVerdict(["credentials-required", "credentials-required"]), "credentials-required");
+eq("majority: empty → unobserved", rc.majorityVerdict([]), "unobserved");
+{
+  // Mock domain publishing ONLY an explicitly-open OpenAPI: readyCheck must PASS.
+  const spec = { openapi: "3.1.0", servers: [{ url: "https://api.ex.com" }], security: [], paths: {} };
+  const fetch = async (url) => {
+    const ok = String(url).endsWith("/openapi.json");
+    const body = ok ? JSON.stringify(spec) : "not found";
+    const bytes = new TextEncoder().encode(body);
+    return { ok, status: ok ? 200 : 404, url: String(url), headers: { get: () => null }, text: async () => body, arrayBuffer: async () => bytes.buffer };
+  };
+  const r = await rc.readyCheck("ex.com", { fetch, observations: 2, timeoutMs: 500, deadlineMs: 5000 });
+  eq("readyCheck e2e → verdict ready", r.verdict, "ready");
+  eq("readyCheck e2e → pass true", r.pass, true);
+  eq("readyCheck e2e → endpoint observed twice, unanimously", r.endpoints[0].observations, ["ready", "ready"]);
+}
+{
+  // Mock domain publishing nothing → FAIL with publish guidance.
+  const fetch = async (url) => ({ ok: false, status: 404, url: String(url), headers: { get: () => null }, text: async () => "nope", arrayBuffer: async () => new TextEncoder().encode("nope").buffer });
+  const r = await rc.readyCheck("empty.ex.com", { fetch, observations: 1, timeoutMs: 300, deadlineMs: 3000 });
+  eq("readyCheck empty → nothing-connectable", r.verdict, "nothing-connectable");
+  ok_("readyCheck empty → fail with publish guidance", r.pass === false && /Publish a machine-readable/.test(r.note));
+}
 
 /* matchClient (client × service) — deterministic intersection, tri-state */
 ok_("match: oauth2 service ∩ oauth2 client → compatible", lib.matchClient({ protocol: "mcp", auth: { required: true, type: "oauth2" } }, { protocol: "mcp", auth: ["oauth2", "none"] }).compatible === true);

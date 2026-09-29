@@ -2203,12 +2203,18 @@ export function assessOpenApiReadiness(spec) {
   out.version = typeof spec.openapi === "string" ? spec.openapi : typeof spec.swagger === "string" ? spec.swagger : null;
   const servers = Array.isArray(spec.servers) ? spec.servers.map((s) => s && s.url).filter(Boolean) : [];
   const schemes = (spec.components && typeof spec.components === "object" && spec.components.securitySchemes) || spec.securityDefinitions || null;
+  const hasSchemes = !!(schemes && Object.keys(schemes).length);
+  // OpenAPI's OWN way to declare "no auth required": an explicit empty top-level
+  // security array. Absent securitySchemes WITHOUT that declaration stays
+  // incomplete — "didn't say" is not "none needed".
+  const explicitlyOpen = Array.isArray(spec.security) && spec.security.length === 0;
   const missing = [];
   if (!servers.length) missing.push("servers[] (no base URL is declared)");
-  if (!schemes || !Object.keys(schemes).length) missing.push("securitySchemes (no auth method is declared)");
+  if (!hasSchemes && !explicitlyOpen) missing.push("securitySchemes (no auth method is declared; an api without auth should declare top-level security: [])");
   if (!out.version) missing.push("openapi/swagger version string");
   if (servers[0]) out.endpoint = servers[0];
   if (missing.length) return { ...out, outcome: "incomplete", missing };
+  if (explicitlyOpen) return { ...out, outcome: "ready", auth: { required: false } };
   const first = Object.values(schemes)[0] || {};
   const auth = { required: true, type: first.type };
   if (first.type === "http" && first.scheme) auth.type = "http:" + String(first.scheme).toLowerCase();
@@ -2552,7 +2558,7 @@ async function apiConnect(raw, env, ctx, request, clientCaps) {
 // (the tool dispatches to the same handler).
 
 const MCP_SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26"];
-const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.16.0" };
+const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.17.0" };
 const MCP_INSTRUCTIONS =
   "Three read-only tools. discover_domain: what a domain publishes (the raw normalized list). " +
   "connect_domain: given a domain AND your client's capabilities, HOW to connect — one outcome " +

@@ -114,6 +114,15 @@ already-shipped assessors:
 - Publishers can trigger re-verification at any time (rate-limited); there is no fee, no queue
   priority for anyone, and no path to a verdict other than passing the predicate.
 
+## 8b. Shipped already: the self-test profile
+
+A **CI profile** of this predicate ships as an open tool in `@nessgate/resolver` (bin
+`nessgate-ready`): back-to-back observations (default 3), unanimity required (the strict small-N
+mapping of §4's ≥80% rule), client-side execution on the publisher's own compute — so it needs no
+persistence, no hosted verdict, and therefore **no Charter v2 gate**. It is the incentive loop of
+§1 running today: publishers get pass/fail plus the exact missing field in CI, and anyone can
+re-run the same predicate. The hosted standing verdict described in this document remains gated.
+
 ## 9. Out of scope, explicitly
 
 Badges/logos programs, any storage or scheduling implementation (needs Charter v2 machinery), any

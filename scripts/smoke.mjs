@@ -90,6 +90,13 @@ await check("GET /connect (no body) is a helpful 405, never a 500", async () => 
   if (r.status !== 405) throw new Error(`status ${r.status}`);
 });
 
+await check("nessgate.com PASSES its own ready-check (dogfood: the self-test tool, 1 observation)", async () => {
+  const out = execSync("node packages/resolver/ready-check.mjs nessgate.com --observations=1 --json", { encoding: "utf8", timeout: 120000 });
+  const r = JSON.parse(out);
+  if (r.pass !== true) throw new Error(`self ready-check failed: verdict=${r.verdict} ${JSON.stringify(r.endpoints?.[0]?.missing || [])}`);
+  if (!["ready", "credentials-required"].includes(r.verdict)) throw new Error(`unexpected verdict ${r.verdict}`);
+});
+
 await check("POST /connect with NO client caps assumes a broad client and LABELS it (no false no-compatible-method)", async () => {
   const r = await fetch(BASE + "/connect/nessgate.com", {
     method: "POST", headers: { "content-type": "application/json" }, body: "{}",

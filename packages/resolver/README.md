@@ -32,6 +32,25 @@ A2A cards, the MCP OAuth chain RFC 9728 → RFC 8414). Read-only; credentials st
 Want just one resource's readiness? `assessReadiness(resource, { fetch })`. Want the raw list of
 everything a domain publishes? `resolve(domain)` — the original resolver, below.
 
+## Self-test your own domain (CI)
+
+```bash
+npx @nessgate/resolver yourdomain.com     # bin: nessgate-ready — exit 0 = connectable
+```
+
+Runs the open readiness predicate client-side (nothing is sent to nessgate.com or anywhere else):
+discovers what your domain publishes, assesses every connectable endpoint, repeats the observation
+3× (any disagreement = `unstable` = fail — a flaky endpoint must not pass CI), and exits non-zero
+with the **exact missing field** when your publication is incomplete or broken. Drop it in CI:
+
+```yaml
+- run: npx @nessgate/resolver yourdomain.com   # fails the build until agents can connect to you
+```
+
+Options: `--observations=N` · `--spacing=SECONDS` (certification-grade spaced runs) · `--json`.
+The predicate and its observation semantics are published in the NessGate repo
+(`docs/readiness-certification-draft.md`) — anyone can re-run it and get the same verdict.
+
 ## Discover (the raw list)
 
 ```js

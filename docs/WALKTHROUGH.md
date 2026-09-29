@@ -32,6 +32,7 @@ All four are also MCP tools at `POST /mcp`: `discover_domain`, `connect_domain`,
 | `lab/connection-plan/` | The R&D that produced readiness/connect: prototype, market measurement, `PROPOSAL.md`. Isolated (never imported by prod). |
 | `scripts/` | Tests, deploy, smoke. See below. |
 | `examples/langchain/` | LangChain tools (`connect_domain`, `discover_domain`) + MCP-adapter usage. |
+| `packages/resolver/ready-check.mjs` | `nessgate-ready` CLI (`npx @nessgate/resolver <domain>`): the open self-test / CI profile of the readiness predicate. |
 
 ## The parity model (read this before editing resolver/worker)
 

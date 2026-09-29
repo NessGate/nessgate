@@ -45,6 +45,15 @@ NessGate does exactly that, reads on demand, stores nothing, and stays neutral �
 agent, not a compatibility layer. It's free, open (Apache-2.0), and independently implementable; if
 nessgate.com vanished, every domain's files would still stand on the domain itself.
 
+**Publishing a service? Test yourself before agents do:**
+
+```bash
+npx @nessgate/resolver yourdomain.com    # exit 0 = agents can connect; otherwise it names the exact missing field
+```
+
+Runs the open readiness predicate on your machine (nothing reported anywhere), 3 observations,
+strict: flaky endpoints fail. Put it in CI and your publication stays connectable forever.
+
 Live at **https://nessgate.com** · [Specification](https://nessgate.com/spec) ·
 [Charter](https://nessgate.com/charter) · [API](https://nessgate.com/api)
 
