@@ -6,7 +6,7 @@ untouched (additive).
 
 ## What M5 is
 
-The Lab keeps the moat current: it turns spec/version changes and resolution anomalies into
+The Lab keeps the compatibility knowledge current: it turns spec/version changes and resolution anomalies into
 **human-reviewable proposals** (candidate fixtures + change notes). It sits around the deterministic
 resolver, never inside it.
 
@@ -51,5 +51,5 @@ Compatibility Foundation milestones complete: **M0.5** (frozen unseen ruler), **
 
 **Not started (deliberately):** persistent storage/index, publisher registration, Charter-v2
 activation. These remain gated on Charter v2 becoming the active charter and on a separate decision —
-the moat work (compatibility knowledge + unseen-domain correctness) is now self-sustaining without
+the core work (compatibility knowledge + unseen-domain correctness) is now self-sustaining without
 them.

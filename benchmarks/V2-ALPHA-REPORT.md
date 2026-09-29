@@ -95,7 +95,7 @@ provenance, never presented as authoritative or as "same organization".
 The balanced tier works, is honest, and is **clean**: +8 previously-empty domains rescued, 24 real Level-2
 results, **zero false associations, zero classification mistakes, zero authority ambiguity**. The gain is
 modest (useless-empty 82.4% → 78.4%) and would be somewhat larger with a reliable CT source — but it does
-**not** approach the 60–80% ambition, which remains gated on **publisher adoption**, not discovery power. This
+**not** approach the 60–80% target, which remains gated on **publisher uptake of the standards**, not discovery power. This
 is consistent with every prior measurement. The two-axis model and provenance make the added results safe to
 show precisely because each one says exactly why it exists and none claims authority it hasn't earned.
 

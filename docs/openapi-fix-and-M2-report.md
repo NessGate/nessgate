@@ -79,7 +79,7 @@ their official vectors is a follow-up when a stable, licensed source is availabl
 
 regression · v2 alpha · compatibility corpus (25 fixtures) · **openapi size handling** ·
 **official conformance (3 vectors)** · matrix consistency. Plus the frozen unseen benchmark as the
-separate moat ruler.
+separate core benchmark.
 
 ## Not started (awaiting review)
 

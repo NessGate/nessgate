@@ -1,6 +1,6 @@
 # Design: MCP `tools/list` Introspection
 
-Status: **IMPLEMENTED 2026-09-19** (reviewer-approved same day) — library
+Status: **IMPLEMENTED 2026-09-19** (approved same day) — library
 `resolve(domain, {mcp: true})` + hosted `?mcp=1`, per this design. Decisions taken on
 the open questions: endpoint cap N=3 (kept); single `auth-required` label for 401/403
 (no fingerprinting split); SSE parsing shipped hosted directly — `tools/list` responses

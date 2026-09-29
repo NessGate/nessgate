@@ -2,14 +2,14 @@
 
 Status: PROPOSAL (nothing implemented; per directive, plan before code)
 Date: 2026-09-15
-Inputs: v1.6.0 frozen codebase audit · frozen-200 benchmarks (NessGate v1.6 + NessReady P1/P2) · Neutrality Charter (live) · strategic directive of 2026-09-15
+Inputs: v1.6.0 frozen codebase audit · frozen-200 benchmarks (NessGate v1.6 + NessReady P1/P2) · Neutrality Charter (live) · direction decision of 2026-09-15
 
-> **STRATEGIC RECLASSIFICATION (2026-09-15).** The moat is accumulated *compatibility knowledge* and
+> **RECLASSIFICATION (2026-09-15).** The core capability is accumulated *compatibility knowledge* and
 > the system that maintains it — not this storage/index or general discovery. The persistent
 > storage, caching, and optional registration described in this document are hereby **supporting
-> infrastructure** (latency, freshness, publishing), **not the primary strategy**. Nothing here is
-> deleted; its role is demoted. The moat plan is **`docs/compatibility-foundation.md`**, and its
-> guiding line is: *NessGate's moat is not knowing every domain in advance; it is knowing how to
+> infrastructure** (latency, freshness, publishing), **not the primary focus**. Nothing here is
+> deleted; its role is demoted. The core plan is **`docs/compatibility-foundation.md`**, and its
+> guiding line is: *NessGate's core capability is not knowing every domain in advance; it is knowing how to
 > resolve domains it has never seen before.* The reconciled Stage-1 benchmark
 > (`benchmarks/V2-ALPHA-REPORT-RECONCILED.md`) supports this: CT/sitemap add only ~2 net domains over
 > strict+explore, so storage/registration should be justified on latency/publishing value, not
@@ -57,9 +57,9 @@ Rules (already proven in NessReady, now normative):
 - Every item carries `provenance[]` (the reproducible path: which page/file/record led here, every hop).
 - The per-report noise rule from NessReady (boilerplate-ubiquity + reciprocal-mention → `presentation: demoted-generic`, evidence preserved) ships with `publisher-linked` from day one, so the open resolver never returns "github.com" as a top result for every domain that has a footer link.
 
-**Useful-empty:** an empty answer must state which mechanisms were checked and link the publishing path ("publish llms.txt / register your declaration") — converting the resolver's biggest weakness into the adoption funnel for §9.
+**Useful-empty:** an empty answer must state which mechanisms were checked and link the publishing path ("publish llms.txt / register your declaration") — converting the resolver's biggest weakness into the entry point for §9.
 
-## 2. Index / database schema and TTL strategy
+## 2. Index / database schema and TTL policy
 
 One logical table (`records`), small pointer records only — never page content:
 
@@ -124,7 +124,7 @@ Every budget truncation is disclosed in the response (`truncations[]`), as today
 
 ## 6. Adapter architecture
 
-Formalize the existing `ADAPTERS` array into self-describing plug-ins (the long-term moat):
+Formalize the existing `ADAPTERS` array into self-describing plug-ins (the long-term core):
 
 ```js
 {
@@ -161,7 +161,7 @@ Read-side federation, consistent with the charter ("reads them and points back")
 - Adapters for MCP Registry (exists in /explore today), AGNTCY Directory, NANDA index; each **declares its own authentication method and keeps its own identity** — a federated result always names the source registry and how that registry verified it, never a generic "trusted" status.
 - **Domain-authenticated** registry entries (the registry proved the domain controls the namespace) → Level 1 `namespace-verified`, and MAY enter the authoritative layer, tagged `origin: federation:<registry>` with the authentication method recorded in provenance.
 - **Unauthenticated** attribution (a registry lists the domain without proving control) → Level 2 `registry-attributed`, discovery layer only, short TTL.
-- NessGate never presents itself as the source and never flattens registries into one badge: the strategic position is *many registries, each keeping its identity → one evidence-labelled normalized answer*.
+- NessGate never presents itself as the source and never flattens registries into one badge: the position is *many registries, each keeping its identity → one evidence-labelled normalized answer*.
 
 ## 9. Publisher registration / declaration (the coverage lever that actually reaches 60%+)
 

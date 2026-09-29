@@ -1,6 +1,6 @@
 # NessGate Compatibility Lab (M5)
 
-The Lab keeps the moat **current**: it turns spec/version changes and real resolution anomalies into
+The Lab keeps the compatibility knowledge **current**: it turns spec/version changes and real resolution anomalies into
 **human-reviewable proposals** — candidate regression fixtures and change notes — so compatibility
 knowledge accumulates instead of decaying. It sits *around* the deterministic resolver, never inside
 it.

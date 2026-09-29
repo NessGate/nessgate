@@ -1,12 +1,12 @@
-# NessGate Compatibility Foundation — moat-centered strategy & plan
+# NessGate Compatibility Foundation — core design & plan
 
 Status: PROPOSAL (planning only; **no production changes**). Date: 2026-09-15.
-Supersedes the *strategic emphasis* of `v2-architecture.md` (storage/index/registration are
-reclassified as supporting infrastructure, not the moat — see §9). Preserves all prior experimental
+Supersedes the *emphasis* of `v2-architecture.md` (storage/index/registration are
+reclassified as supporting infrastructure, not the core — see §9). Preserves all prior experimental
 work: the v2 storage/index design and the Stage-1 `discovery`-tier alpha remain valid; only their
-role in the strategy changes.
+role in the plan changes.
 
-> **NessGate's moat is not knowing every domain in advance; it is knowing how to resolve domains it
+> **NessGate's core capability is not knowing every domain in advance; it is knowing how to resolve domains it
 > has never seen before.**
 
 ## 0. Identity (unchanged, sharpened)
@@ -25,7 +25,7 @@ a permanent real-world regression corpus, official example vectors (canonical do
 conformance suites), fast fixes, a contributor
 ecosystem, trusted normalization semantics, and a measured reputation for resolving **unseen**
 domains correctly. Speed of compatibility maintenance and breadth of regression knowledge are the
-moat — not secrecy.
+core strength — not secrecy.
 
 ## 1. Compatibility corpus
 
@@ -161,9 +161,9 @@ lab's only outputs are proposed fixtures and proposed diffs that enter the *same
 any human change. AI lives in the lab, never in the authority decision path (§8). (The lab can reuse
 the multi-agent workflow tooling already used elsewhere; runs are offline and produce PRs.)
 
-## 6. Unseen-domain benchmark (the moat metric) — FROZEN FIRST (M0.5)
+## 6. Unseen-domain benchmark (the core metric) — FROZEN FIRST (M0.5)
 
-**Sequencing rule (reviewer directive):** the holdout cohort, its ground truth, and the first
+**Sequencing rule (fixed):** the holdout cohort, its ground truth, and the first
 untouched baseline are **frozen BEFORE the corpus is expanded (M1)** — otherwise, even
 unintentionally, corpus additions could bias the ruler. Establish the ruler, then build.
 
@@ -225,7 +225,7 @@ belongs in the Compatibility Lab, never in the live authority/classification pat
 
 The v2 storage/index/registration design (`v2-architecture.md`) is **preserved but demoted**: it is
 supporting infrastructure for **latency, freshness, temporary resolution state, and optional
-publisher registration/attestation** — not the moat. Hard constraints:
+publisher registration/attestation** — not the core. Hard constraints:
 
 - No giant permanent database mapping the Internet.
 - The domain's own public authoritative evidence remains the source NessGate **revalidates against**;
@@ -235,14 +235,14 @@ publisher registration/attestation** — not the moat. Hard constraints:
   a store or none.
 - All storage/registration work stays gated on Charter v2 becoming active (unchanged).
 
-## 10. Open-source moat (assume the code is copied)
+## 10. Open-source durability (assume the code is copied)
 
 Competitors can copy the code and public fixtures. The durable advantage must therefore be: faster
 compatibility maintenance; broader regression knowledge; trusted semantics; conformance quality; a
 contributor ecosystem; integrations/distribution; a reputation for correctness; and rapid adaptation
 to new protocols and real-world quirks. Do not depend on secrecy.
 
-## 11. Strategic non-goals (documented on purpose)
+## 11. Explicit non-goals (documented on purpose)
 
 NessGate is **not** trying to become: a general AI search engine; an agent marketplace; a ranking
 engine; the largest agent directory; a general-purpose web crawler; or a proprietary protocol
@@ -275,10 +275,10 @@ resolver behavior change and no Charter-v2 activation required for M0.5–M5**:
 - **M5 — Compatibility Lab (offline).** Watchers + analyzer + proposer, human/CI-gated; produces
   candidate fixtures/diffs only.
 - **Later — Supporting infra (former "Stage 2").** Storage/index + registration, justified on
-  latency/publishing/freshness (not discovery recall), sequenced after the moat work and gated on
+  latency/publishing/freshness (not discovery recall), sequenced after the core work and gated on
   Charter v2 activation. The Stage-1 `discovery` tier (CT/sitemap) remains an optional,
   source-substitutable library capability (reconciled benchmark: safe, correct, small recall gain
-  over strict+explore — supporting feature, not the moat).
+  over strict+explore — supporting feature, not the core).
 
 **Build now (approved): M0.5 then M1, then stop and report.** Do not begin M2/M4/M5, storage,
 registration, or Charter-v2 activation until that review. Keep all production behavior unchanged.

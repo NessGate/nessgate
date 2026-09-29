@@ -66,7 +66,7 @@ format NessGate defines.
 > **Never fix a compatibility problem only in code. Every real compatibility fix MUST add a
 > permanent regression fixture in `compat/fixtures/`.** A code fix without a fixture fails review.
 
-This is what makes the corpus a durable moat rather than a pile of one-off patches. If an unseen
+This is what makes the corpus a durable foundation rather than a pile of one-off patches. If an unseen
 domain (see `benchmarks/holdout-unseen.json`) teaches a fix, turn it into a fixture and replace it
 in the holdout with a fresh unseen domain — never tune against the holdout.
 

@@ -1,23 +1,23 @@
-// NessGate — external-usage / adoption report (Cloudflare zone analytics).
+// NessGate — external-usage report (Cloudflare zone analytics).
 //
 // NessGate is infrastructure FOR AI agents, so automated traffic is the point,
 // not noise. This report does NOT ask "human or bot" — it asks what each
 // automated caller REPRESENTS, using the functional taxonomy:
 //
 //   first-party   — the operator's own systems (e.g. NessReady). Meaningful
-//                   adoption, but NOT independent. Identified by caller IP
+//                   usage, but NOT independent. Identified by caller IP
 //                   prefix, declared out-of-band (never hardcoded — this repo
 //                   is public): --first-party=<prefix,prefix> or env
 //                   NESSGATE_FIRST_PARTY (comma-separated IP prefixes).
 //   monitoring    — self-declared registry/health/security probes (they ping
 //                   every MCP server; ecosystem presence, not dependency).
 //   independent   — everything else: candidate genuine external agent usage.
-//                   This is the number that matters for real adoption.
+//                   This is the number that matters for real external use.
 //   unidentified  — empty user agent (scanners / bare clients).
 //
-// Metrics reported per the strategic goal: successful calls (edge 2xx),
+// Metrics reported: successful calls (edge 2xx),
 // DISTINCT independent callers, and REPEAT independent callers (seen on >=2
-// days) — repeat use by external systems is the strongest adoption signal the
+// days) — repeat use by external systems is the strongest usage signal the
 // edge can see.
 //
 // MEASUREMENT BOUNDARY (stated so nobody over-reads this): edge analytics see
@@ -190,7 +190,7 @@ async function run() {
 
   if (AS_JSON) { console.log(JSON.stringify({ ...meta, endpoints: report }, null, 2)); return; }
 
-  console.log(`\nNessGate usage & adoption — zone ${ZONE} — last ${DAYS} day(s), newest PARTIAL`);
+  console.log(`\nNessGate external usage — zone ${ZONE} — last ${DAYS} day(s), newest PARTIAL`);
   console.log(`window: ${meta.since.slice(0, 10)} → ${meta.until.slice(0, 10)}  (auth: ${auth.src})`);
   console.log(`counts are ${sampled ? "ESTIMATES (adaptive sampling; weighted by sampleInterval)" : "unsampled"}`);
   console.log(FIRST_PARTY.length ? `first-party IP prefixes: ${FIRST_PARTY.join(", ")}` : `NO first-party prefixes declared — first-party traffic will show as "independent". Pass --first-party=<prefix,..> or set NESSGATE_FIRST_PARTY.`);

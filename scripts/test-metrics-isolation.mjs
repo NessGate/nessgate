@@ -1,5 +1,5 @@
 // Privacy + separation invariant for the anonymous discovery-outcome metric.
-// The reviewer's hard requirements, machine-checked:
+// Hard requirements, machine-checked:
 //  (1) Metrics must never influence resource classification or authority — so the
 //      discovery/classification CORE (the resolver library + its byte-twin) must
 //      reference nothing about metrics at all.

@@ -2,7 +2,7 @@
 //
 // Runs both resolvers on the frozen holdout (benchmarks/holdout-unseen.json) and
 // records, per domain and per tool: which protocols/resources each found, recall
-// vs. independently-established ground truth, latency, and — the reviewer's key
+// vs. independently-established ground truth, latency, and — the key
 // metric — NessGate's ADDITIONAL correct discoveries beyond what DNS-AID's
 // claimed surfaces can obtain.
 //
