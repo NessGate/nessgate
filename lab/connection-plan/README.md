@@ -206,6 +206,8 @@ next small product increment.
 observation windows, (3) per-hop retries in metadata chains — i.e., exactly the re-verification
 machinery that the v2 plan gates behind Charter v2 activation. The strategy's sequencing is
 therefore confirmed, with data: checker feedback loop now; badge only after Charter v2 + observation
-semantics exist.
+semantics exist. Those semantics are now drafted: **`docs/readiness-certification-draft.md`** (N-of-M
+majority, named vantage classes, per-hop retries, `undetermined`/`unstable` as first-class results —
+every rule traceable to a finding in this experiment).
 
 **Production proposal:** see [`PROPOSAL.md`](PROPOSAL.md).

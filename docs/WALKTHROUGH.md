@@ -120,3 +120,6 @@ Versioning: keep the npm package, `public/openapi.json` `info.version`, and the 
 - Adoption follow-ups discussed: keep the bridge **MCP-first** (already done — 3 tools);
   refresh `examples/langchain`; do **not** add a "fallback scan" that guesses (charter
   conflict); measure real usage via the new `connect:`/`readiness:` metrics.
+- `docs/readiness-certification-draft.md` — the "NessGate Ready" observation-semantics
+  proposal (N-of-M verdicts, vantage classes, per-hop retries), grounded in the lab
+  stability experiment. Gated on Charter v2; nothing implemented.
