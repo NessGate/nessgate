@@ -1091,11 +1091,11 @@ console.log("--- RFC 9727 api-catalog + MCP tool shapes");
 is(Array.isArray(API_CATALOG.linkset) && API_CATALOG.linkset.length === 1, true, "api-catalog is a linkset with one API");
 is(!!API_CATALOG.linkset[0].anchor, true, "linkset context has an anchor");
 is(API_CATALOG.linkset[0]["service-desc"][0].href, "https://nessgate.com/openapi.json", "service-desc links the OpenAPI description");
-is(MCP_TOOLS.map((t) => t.name), ["discover_domain"], "MCP exposes exactly the one resolver tool");
+is(MCP_TOOLS.map((t) => t.name), ["discover_domain", "connect_domain", "check_readiness"], "MCP exposes the resolver, connection-plan, and readiness tools");
 is(
   MCP_TOOLS.every((t) => t.description && t.inputSchema && t.inputSchema.required.includes("domain")),
   true,
-  "the MCP tool has a description and requires a domain argument"
+  "every MCP tool has a description and requires a domain argument"
 );
 
 console.log("--- HTML escaping (resource labels are attacker-controlled display text)");

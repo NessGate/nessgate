@@ -2519,13 +2519,45 @@ async function apiConnect(raw, env, ctx, request, clientCaps) {
 const MCP_SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26"];
 const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.15.0" };
 const MCP_INSTRUCTIONS =
-  "Use discover_domain to resolve a domain to the machine-readable resources it publishes " +
-  "across the supported discovery locations (ARD, A2A, llms.txt, API catalogs, OpenAPI, and " +
-  "more), normalized into one answer with a link back to each source. No authentication required.";
+  "Three read-only tools. discover_domain: what a domain publishes (the raw normalized list). " +
+  "connect_domain: given a domain AND your client's capabilities, HOW to connect — one outcome " +
+  "(ready | credentials-required | incomplete | no-compatible-method) with a connection plan, or the " +
+  "exact missing field. check_readiness: per-endpoint readiness for a domain, client-agnostic. All read " +
+  "the domain live, store nothing, make no ownership/safety claim; credentials stay with the caller.";
 
 const MCP_DOMAIN_INPUT = {
   type: "object",
   properties: { domain: { type: "string", description: "Registrable domain, e.g. example.com" } },
+  required: ["domain"],
+};
+
+// connect_domain also takes the CALLER's capabilities (input only — never stored).
+const MCP_CONNECT_INPUT = {
+  type: "object",
+  properties: {
+    domain: { type: "string", description: "Registrable domain, e.g. example.com" },
+    client: {
+      type: "object",
+      description: "The calling client's capabilities. Omit a dimension to accept any.",
+      properties: {
+        supports: {
+          type: "array",
+          description: "Protocols the client speaks, each optionally narrowing versions/transports/auth.",
+          items: {
+            type: "object",
+            properties: {
+              protocol: { type: "string", description: "e.g. mcp, openapi, a2a" },
+              versions: { type: "array", items: { type: "string" } },
+              transports: { type: "array", items: { type: "string" } },
+              auth: { type: "array", items: { type: "string" } },
+            },
+            required: ["protocol"],
+          },
+        },
+        prefer: { type: "array", description: "Optional cross-protocol tie-break order.", items: { type: "string" } },
+      },
+    },
+  },
   required: ["domain"],
 };
 
@@ -2539,6 +2571,27 @@ const MCP_TOOLS = [
       "ai-info.json, openapi.json, and more) and return one normalized answer. Each resource keeps a " +
       "sourceUrl pointing back to the domain so the caller can verify. NessGate reads the domain live " +
       "and stores nothing; it makes no ownership or safety claim.",
+    inputSchema: MCP_DOMAIN_INPUT,
+  },
+  {
+    name: "connect_domain",
+    title: "Get a connection plan for this client",
+    description:
+      "Given a domain AND the calling client's capabilities, return HOW the client can connect: one " +
+      "outcome (ready | credentials-required | incomplete | no-compatible-method) with a connection plan " +
+      "(protocol, endpoint, transport, version, and the auth metadata the service published — e.g. the " +
+      "OAuth authorize/token endpoints and scopes), or the exact missing field when the service " +
+      "under-publishes. Deterministic matching, no scores. Read-only; credentials stay with the caller " +
+      "and are never sent to NessGate.",
+    inputSchema: MCP_CONNECT_INPUT,
+  },
+  {
+    name: "check_readiness",
+    title: "Check how ready a domain's endpoints are to connect to",
+    description:
+      "Given a domain, return each connectable resource it publishes with a readiness assessment " +
+      "(ready | credentials-required | incomplete, with the exact missing field) read from the service's " +
+      "own metadata. Client-agnostic; read-only. Use connect_domain when you know the client's capabilities.",
     inputSchema: MCP_DOMAIN_INPUT,
   },
 ];
@@ -2600,13 +2653,14 @@ async function mcpEndpoint(request, env, ctx) {
   if (msg.method === "tools/list") return json(rpcResult(msg.id, { tools: MCP_TOOLS }), 200, headers);
   if (msg.method === "tools/call") {
     const name = msg.params && msg.params.name;
-    if (name !== "discover_domain") {
+    const args = (msg.params && msg.params.arguments) || {};
+    const handler = name === "discover_domain" ? mcpToolResult : name === "connect_domain" ? mcpConnectResult : name === "check_readiness" ? mcpReadinessResult : null;
+    if (!handler) {
       return json(rpcError(msg.id, -32602, `Unknown tool: ${String(name)}`), 200, headers);
     }
-    const args = (msg.params && msg.params.arguments) || {};
     let result;
     try {
-      result = await mcpToolResult(args, env, ctx, request);
+      result = await handler(args, env, ctx, request);
     } catch {
       recordDiscovery(env, "error");
       result = {
@@ -2634,6 +2688,34 @@ async function mcpToolResult(args, env, ctx, request) {
   recordDiscovery(env, discoveryOutcome(status, body));
   const text = JSON.stringify(body, null, 2);
   const out = { content: [{ type: "text", text }], isError: status === 429 || status >= 500 };
+  if (body && typeof body === "object" && !Array.isArray(body)) out.structuredContent = body;
+  return out;
+}
+
+// connect_domain over MCP — same behavior as POST /connect/{domain}, one tool, two
+// transports. The client's capabilities ride in args.client (input only, never stored).
+async function mcpConnectResult(args, env, ctx, request) {
+  const domain = normalizeDomain(args.domain, true);
+  if (!domain) {
+    recordDiscovery(env, "connect:invalid");
+    return { content: [{ type: "text", text: "Invalid domain. Provide a bare registrable domain like example.com." }], isError: true };
+  }
+  const client = args && typeof args.client === "object" && args.client ? args.client : {};
+  const { status, body } = await connectData(domain, env, ctx, request, client); // records connect:<outcome>
+  const out = { content: [{ type: "text", text: JSON.stringify(body, null, 2) }], isError: status === 429 || status >= 500 };
+  if (body && typeof body === "object" && !Array.isArray(body)) out.structuredContent = body;
+  return out;
+}
+
+// check_readiness over MCP — same behavior as GET /explore/{domain}?readiness=1.
+async function mcpReadinessResult(args, env, ctx, request) {
+  const domain = normalizeDomain(args.domain, true);
+  if (!domain) {
+    recordDiscovery(env, "readiness:invalid");
+    return { content: [{ type: "text", text: "Invalid domain. Provide a bare registrable domain like example.com." }], isError: true };
+  }
+  const { status, body } = await exploreData(domain, env, ctx, request, [], false, false, true); // readiness=1; records readiness:<agg>
+  const out = { content: [{ type: "text", text: JSON.stringify(body, null, 2) }], isError: status === 429 || status >= 500 };
   if (body && typeof body === "object" && !Array.isArray(body)) out.structuredContent = body;
   return out;
 }

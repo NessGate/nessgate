@@ -108,7 +108,9 @@ await check("?mcp=1 introspects the self MCP server read-only (labeled, verbatim
   if (!r) throw new Error("self mcp resource missing");
   if (!r.introspection || r.introspection.ok !== true) throw new Error(`self MCP introspection failed: ${JSON.stringify(r.introspection)}`);
   const names = (r.capabilities || []).map((c) => c.name);
-  if (!names.includes("discover_domain")) throw new Error(`self MCP tools missing discover_domain (got ${names.join(",")})`);
+  for (const want of ["discover_domain", "connect_domain", "check_readiness"]) {
+    if (!names.includes(want)) throw new Error(`self MCP tools missing ${want} (got ${names.join(",")})`);
+  }
   // Default (no ?mcp) must NOT introspect.
   const d0 = await (await get("/discover/nessgate.com")).json();
   if (d0.introspected) throw new Error("default response must not carry the introspected label");
@@ -189,7 +191,7 @@ await check("openapi.json documents /discover (and not the removed registry path
   }
 });
 
-await check("MCP server: initialize + tools/list (discover_domain only) + a real tool call", async () => {
+await check("MCP server: initialize + tools/list (3 tools) + real discover & connect calls", async () => {
   const rpc = (body) =>
     fetch(BASE + "/mcp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const init = await (await rpc({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } })).json();
@@ -197,7 +199,8 @@ await check("MCP server: initialize + tools/list (discover_domain only) + a real
   if (!init.result.capabilities.tools) throw new Error("tools capability missing");
   const list = await (await rpc({ jsonrpc: "2.0", id: 2, method: "tools/list" })).json();
   const names = (list.result.tools || []).map((t) => t.name);
-  if (JSON.stringify(names) !== JSON.stringify(["discover_domain"])) throw new Error(`tools should be [discover_domain], got ${names}`);
+  if (JSON.stringify(names) !== JSON.stringify(["discover_domain", "connect_domain", "check_readiness"]))
+    throw new Error(`tools should be [discover_domain, connect_domain, check_readiness], got ${names}`);
   const call = await (await rpc({
     jsonrpc: "2.0", id: 3, method: "tools/call",
     params: { name: "discover_domain", arguments: { domain: "nessgate.com" } },
@@ -206,6 +209,15 @@ await check("MCP server: initialize + tools/list (discover_domain only) + a real
   if (!call.result.structuredContent || call.result.structuredContent.provenance !== "self-published") {
     throw new Error("discover tool did not return the normalized structured content");
   }
+  // connect_domain over MCP: real end-to-end, honest outcome enum + domain echo.
+  const conn = await (await rpc({
+    jsonrpc: "2.0", id: 4, method: "tools/call",
+    params: { name: "connect_domain", arguments: { domain: "nessgate.com", client: { supports: [{ protocol: "mcp" }, { protocol: "openapi" }] } } },
+  })).json();
+  const cc = conn.result && conn.result.structuredContent;
+  if (!cc || cc.domain !== "nessgate.com") throw new Error("connect tool did not echo the domain");
+  if (!["ready", "credentials-required", "incomplete", "no-compatible-method"].includes(cc.outcome))
+    throw new Error(`connect tool outcome not in the honest enum: ${cc.outcome}`);
 });
 
 await check("MCP server: unknown method and unknown tool are handled per JSON-RPC", async () => {
