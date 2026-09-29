@@ -90,6 +90,17 @@ await check("GET /connect (no body) is a helpful 405, never a 500", async () => 
   if (r.status !== 405) throw new Error(`status ${r.status}`);
 });
 
+await check("POST /connect with NO client caps assumes a broad client and LABELS it (no false no-compatible-method)", async () => {
+  const r = await fetch(BASE + "/connect/nessgate.com", {
+    method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+  });
+  if (r.status !== 200) throw new Error(`status ${r.status}`);
+  const d = await r.json();
+  if (d.clientAssumed !== true) throw new Error("empty client not labeled clientAssumed");
+  if (!/ASSUMED/.test(d.note || "")) throw new Error("note does not disclose the assumption");
+  if (d.compatibility.clientMethods === 0) throw new Error("assumed client should have methods");
+});
+
 await check("?fast=1 is a LABELED reduced mode (skips optional alternate ARD locators)", async () => {
   const d = await (await get("/discover/nessgate.com?fast=1")).json();
   if (d.mode !== "fast") throw new Error(`fast mode must be labeled mode:"fast", got ${d.mode}`);

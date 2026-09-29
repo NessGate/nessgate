@@ -1559,6 +1559,14 @@ export async function plan(domain, clientCaps, opts = {}) {
   const supports = new Map();
   for (const s of supportsList) if (s && s.protocol) supports.set(canonClientProtocol(s.protocol), s);
   const prefer = (Array.isArray(caps.prefer) ? caps.prefer : []).map(canonClientProtocol);
+  // A caller that declares NO capabilities must not read as "nothing is compatible"
+  // (that would be a false negative on every connectable domain). Assume a broad
+  // default client instead — and LABEL the assumption so the answer stays honest.
+  let clientAssumed = false;
+  if (supports.size === 0) {
+    clientAssumed = true;
+    for (const p of ["mcp", "openapi", "a2a-agent-card"]) supports.set(p, { protocol: p });
+  }
   const discovery = await resolve(domain, { ...opts, readiness: false });
 
   const seen = new Set(), plans = [], rejected = [], serviceProtocols = new Set();
@@ -1599,6 +1607,7 @@ export async function plan(domain, clientCaps, opts = {}) {
   return {
     domain: discovery.domain,
     outcome,
+    ...(clientAssumed ? { clientAssumed: true } : {}),
     connection: plans[0] || null,
     alternatives: plans.slice(1),
     selectedByClientPreference: prefer.length && plans.length ? { protocol: plans[0].protocol, endpoint: plans[0].endpoint, reason: "client preference order" } : null,

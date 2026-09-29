@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "NessGate API",
-    "version": "1.15.0",
+    "version": "1.15.1",
     "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads whatever that domain already publishes across the standard machine-discovery locations (llms.txt, ARD / ai-catalog.json, A2A agent card, RFC 9727 API catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP manifest, RFC 6415 host-meta) and returns one normalized answer, each record carrying a sourceUrl back to the domain. NessGate stores nothing, never crawls or indexes, and makes no ownership or safety claim. Read endpoints are public, unauthenticated, and CORS-open. The response contract is stable and additive: new optional fields may appear; clients must ignore unknown fields.",
     "contact": { "email": "contact@nessgate.com", "url": "https://nessgate.com/contact" },
     "termsOfService": "https://nessgate.com/terms",
@@ -205,7 +205,7 @@
                 "properties": {
                   "client": {
                     "type": "object",
-                    "description": "The calling client's capabilities.",
+                    "description": "The calling client's capabilities. If omitted (or supports is empty), NessGate assumes a broad default client (mcp, openapi, a2a) and labels the response clientAssumed:true — pass supports for a real match.",
                     "properties": {
                       "supports": { "type": "array", "description": "Protocols the client speaks, each optionally narrowing versions/transports/auth (omitting a dimension = accepts any).", "items": { "type": "object", "properties": { "protocol": { "type": "string", "example": "mcp" }, "versions": { "type": "array", "items": { "type": "string" } }, "transports": { "type": "array", "items": { "type": "string" } }, "auth": { "type": "array", "items": { "type": "string" } } }, "required": ["protocol"] } },
                       "prefer": { "type": "array", "description": "Optional cross-protocol tie-break order; the only place client preference lives.", "items": { "type": "string" } }

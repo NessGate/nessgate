@@ -2454,6 +2454,14 @@ async function connectData(raw, env, ctx, request, clientCaps) {
   const supports = new Map();
   for (const s of supportsList) if (s && s.protocol) supports.set(canonClientProtocol(s.protocol), s);
   const prefer = (Array.isArray(caps.prefer) ? caps.prefer : []).map(canonClientProtocol);
+  // A caller that declares NO capabilities must not read as "nothing is compatible"
+  // (that would be a false negative on every connectable domain). Assume a broad
+  // default client instead — and LABEL the assumption so the answer stays honest.
+  let clientAssumed = false;
+  if (supports.size === 0) {
+    clientAssumed = true;
+    for (const p of ["mcp", "openapi", "a2a-agent-card"]) supports.set(p, { protocol: p });
+  }
 
   const deadline = Date.now() + READINESS_DEADLINE_MS;
   const seen = new Set(), plans = [], rejected = [], serviceProtocols = new Set();
@@ -2495,7 +2503,10 @@ async function connectData(raw, env, ctx, request, clientCaps) {
     body: {
       domain,
       outcome,
-      note: "Connection plan: how this client can connect. Read-only, from the service's own published metadata; credentials stay with the caller. No scores.",
+      ...(clientAssumed ? { clientAssumed: true } : {}),
+      note:
+        "Connection plan: how this client can connect. Read-only, from the service's own published metadata; credentials stay with the caller. No scores." +
+        (clientAssumed ? " No client capabilities were declared, so a broad default client (mcp, openapi, a2a) was ASSUMED — pass client.supports for a real match." : ""),
       connection: plans[0] || null,
       alternatives: plans.slice(1),
       selectedByClientPreference: prefer.length && plans.length ? { protocol: plans[0].protocol, endpoint: plans[0].endpoint, reason: "client preference order" } : null,
@@ -2517,7 +2528,7 @@ async function apiConnect(raw, env, ctx, request, clientCaps) {
 // (the tool dispatches to the same handler).
 
 const MCP_SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26"];
-const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.15.0" };
+const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.15.1" };
 const MCP_INSTRUCTIONS =
   "Three read-only tools. discover_domain: what a domain publishes (the raw normalized list). " +
   "connect_domain: given a domain AND your client's capabilities, HOW to connect — one outcome " +
@@ -2538,7 +2549,9 @@ const MCP_CONNECT_INPUT = {
     domain: { type: "string", description: "Registrable domain, e.g. example.com" },
     client: {
       type: "object",
-      description: "The calling client's capabilities. Omit a dimension to accept any.",
+      description:
+        "The calling client's capabilities. Omit a dimension to accept any. If client/supports is omitted " +
+        "entirely, a broad default (mcp, openapi, a2a) is assumed and the response carries clientAssumed:true.",
       properties: {
         supports: {
           type: "array",
