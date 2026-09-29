@@ -1,10 +1,10 @@
 # Proposal — promote the Connection-Readiness layer toward production
 
-Status: **TRANCHE A + B IMPLEMENTED (working tree; not committed, not deployed).** Date: 2026-09-27.
+Status: **STAGES 1 + 2 IMPLEMENTED (working tree; not committed, not deployed).** Date: 2026-09-27.
 
-## Implementation status (Tranche B — the connection plan)
+## Implementation status (Stage 2 — the connection plan)
 
-The client-matched verdict, additive on top of Tranche A:
+The client-matched verdict, additive on top of Stage 1:
 
 - **Library** (`public/resolver.mjs` → `packages/resolver/index.mjs`, version → **1.14.0**): pure `matchClient(readiness, entry)`
   (deterministic tri-state intersection — a fact, not a score) + `canonClientProtocol` + IO `plan(domain, clientCaps, opts)`
@@ -24,7 +24,7 @@ time + readiness time (~≤ explore + 17s) — acceptable for an opt-in endpoint
 ---
 
 
-## Implementation status (Tranche A — the readiness checker)
+## Implementation status (Stage 1 — the readiness checker)
 
 Landed as a strictly additive, opt-in feature; the default `/discover`, default `/explore`, and default
 `resolve()` outputs are byte-unchanged (proven: `test.mjs` + `test-v2.mjs` pass; live plain `/explore` carried
@@ -53,7 +53,7 @@ normalization-document-shaped; adding a new `readiness` fixture kind would requi
 
 **Not done (correctly gated / owner actions):** committing, deploying, publishing npm 1.13.0, the live
 `smoke`/prod-equality checks (need a deploy), and a charter read-scope confirmation for one-hop OAuth-metadata
-following (§3). Tranche B (`POST /connect` + library `plan()`) remains future work.
+following (§3). Stage 2 (`POST /connect` + library `plan()`) remains future work.
 
 ---
 
@@ -89,22 +89,22 @@ client registration), every element carrying its source. The MCP OAuth chain (RF
 | Modern AI-tooling cohort (/explore) | ~92% | 58% |
 
 **Honest read:** readiness is **near-zero across the general web** and **~58% in the modern AI-tooling segment**
-adopting MCP+OAuth. It tracks the adoption wave. Two capabilities fall out, with different maturity:
+adopting MCP+OAuth. It tracks MCP+OAuth uptake. Two capabilities fall out, with different maturity:
 
 - **Connection-readiness** — high value *now* for the agentic/MCP segment (which is precisely NessGate's audience), low elsewhere.
-- **Readiness-checker** — universal *now*: 100% of `incomplete` cases named the exact missing field per the service's own protocol. This is the adoption flywheel for the ~90–100% not yet complete.
+- **Readiness-checker** — universal *now*: 100% of `incomplete` cases named the exact missing field per the service's own protocol. It gives the ~90–100% not yet complete an exact, actionable fix.
 
 ## 2. Recommendation
 
-Promote in **two tranches**, smaller/safer first, because their value/maturity differ:
+Promote in **two stages**, smaller/safer first, because their value/maturity differ:
 
-**Tranche A (recommended first): the readiness-CHECKER, additive on `/explore`.**
+**Stage 1 (recommended first): the readiness-CHECKER, additive on `/explore`.**
 A `?readiness=1` flag on `/explore` that adds, per connectable resource, a `readiness` block: `outcome`,
 `missing[]` (the exact under-published fields), and `provenance`. No new endpoint, no behavior change when the
 flag is absent. This ships the universally-valuable half and creates the publish-more feedback loop, with minimal
 surface area. It performs only the bounded, read-only metadata GETs already characteristic of `/explore`.
 
-**Tranche B (after A proves out): the connection-PLAN output.**
+**Stage 2 (after A proves out): the connection-PLAN output.**
 The full `ready | credentials-required | incomplete | no-compatible-method` verdict + connection plan, exposed as
 `POST /connect {domain, client}` (client capabilities are required input, so a body is natural) and as a library
 `plan(domain, clientCaps, {tier})`. Library-first is the natural home (the client's own vantage gives a truer
@@ -126,7 +126,7 @@ Strains / must-decide:
 
 ## 4. Honest caveats (do not oversell)
 
-- The headline is **not** "58% of the web is connectable." It is "58% of the *agentic segment*; ~0–3% of the general/legacy web." The aggregate rate is low and will stay low until adoption rises — which the checker is designed to accelerate.
+- The correct summary is **not** "58% of the web is connectable." It is "58% of the *agentic segment*; ~0–3% of the general/legacy web." The aggregate rate is low and will stay low until adoption rises — which the checker is designed to accelerate.
 - Live MCP `version` is frequently `?` (servers gate `initialize` behind auth, or return non-standard bodies). Honest, unavoidable without credentials.
 - `/explore`-sourced A2A loses the inline card body, forcing a re-fetch that a target's bot protection can block. A production build should carry the card body through (as `/discover` already fetches it) rather than re-fetch.
 
@@ -136,11 +136,11 @@ Strains / must-decide:
 2. Add a fixture corpus for each readiness resolver under `compat/` (per the repo rule: every real behavior gets a permanent fixture) — MCP OAuth chain, OpenAPI security, A2A schema, and reject/недо cases.
 3. Confirm charter read-scope covers one-hop OAuth-metadata following; amend/clarify if required (transparency-first, per the v2 sequencing).
 4. Neutrality CI: outcomes identical from identical captured evidence regardless of source (discover vs explore vs stored).
-5. Ship **Tranche A** (checker) first; measure adoption-funnel effect before **Tranche B** (plans).
+5. Ship **Stage 1** (checker) first; measure usage before **Stage 2** (plans).
 
 ## 6. What stays out of scope
 
-No proxying, no protocol translation, no credential storage, no AI, no new publishing format — all as the reviewer
+No proxying, no protocol translation, no credential storage, no AI, no new publishing format — all as design review
 constrained. NessGate prepares the plan; the client connects directly.
 
 ---

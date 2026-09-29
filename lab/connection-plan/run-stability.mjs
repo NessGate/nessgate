@@ -1,6 +1,6 @@
 // Verdict-STABILITY experiment (lab-only).
 //
-// The certification question ("NessGate Ready") stands or falls on one property:
+// Readiness verification stands or falls on one property:
 // is the readiness VERDICT stable — across repeated runs, and across vantages?
 // Determinism of the RULES is already CI-proven (same evidence → same verdict);
 // this measures determinism of the OBSERVATIONS (same network → same evidence?).

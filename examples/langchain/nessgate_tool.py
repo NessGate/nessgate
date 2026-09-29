@@ -4,7 +4,7 @@ and get back HOW to connect, plus the raw list of what the domain publishes.
 Two tools, no API key, no auth, open CORS. NessGate reads what the domain already
 publishes and stores nothing; the agent can always follow `sourceUrl` to verify.
 
-  - connect_domain(domain, client)  → the headline: one outcome
+  - connect_domain(domain, client)  → one outcome
       (ready | credentials-required | incomplete | no-compatible-method) plus a
       connection plan (protocol, endpoint, transport, version, auth metadata), read
       from the service's own published metadata. Credentials stay with the caller.

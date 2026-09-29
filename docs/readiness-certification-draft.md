@@ -1,18 +1,18 @@
-# NessGate Ready — observation semantics and certification predicate (DRAFT)
+# Readiness verification — observation semantics (DRAFT)
 
 Status: **PROPOSAL — nothing implemented, nothing active.** Date: 2026-09-27.
 Preconditions (hard gates, per `v2-architecture.md` §14): this program cannot become production
 behavior until (1) **Charter v2 is the active charter** (a standing verdict requires persistence and
 re-verification, which Charter v1 forbids), (2) this predicate is published and versioned, and
-(3) the segment pass-rate makes a gate useful (measured via the `readiness:`/`connect:` metrics).
+(3) the underlying standards are published widely enough that verification is informative (measured via the `readiness:`/`connect:` metrics).
 
 Grounding: the verdict-stability experiment (`lab/connection-plan/README.md`,
 `lab/connection-plan/run-stability.mjs`, 2026-09-27). Its findings are the reason every rule below
 exists; none of this is speculative design.
 
-## 1. What "NessGate Ready" would mean — and what it never means
+## 1. What a verified-readiness result would mean — and what it never means
 
-A domain's connectable surface is **Ready** when a published, versioned, machine-verifiable
+A domain's connectable surface is **verified ready** when a published, versioned, machine-verifiable
 predicate passes under the observation semantics below. It is a **reproducible measurement, not an
 endorsement**: no safety claim, no quality claim, no ownership claim, no ranking among Ready
 services. It is never purchasable, never subjective, and never a score.
@@ -24,9 +24,8 @@ The verdict is a claim of the form:
 
 Every element (`P`, `V`, `W`, the per-observation evidence) is recorded and republishable, so any
 independent party running the open checker from a comparable vantage over a comparable window
-reaches the same verdict class. **If a verdict is only trustworthy because NessGate issued it, the
-design has failed** — NessGate is the reference implementation of a public predicate, not an
-authority.
+reaches the same verdict class. Trust derives from reproducibility, not from the issuer: NessGate is the reference
+implementation of a public predicate, not an authority.
 
 ## 2. Why single observations can never ground a verdict (measured, not argued)
 
@@ -34,12 +33,12 @@ The stability experiment measured the readiness pipeline over repeated runs and 
 
 | Finding | Data | Rule it forces |
 |---|---|---|
-| Genuine service flakiness | zapier, identical frozen discovery: handshake `ok` 2/3, rejected 1/3 | **N-of-M majority** (§4) |
-| One dropped hop flips a verdict | sentry: a single failed RFC 8414 fetch turned `credentials-required` into `incomplete` | **per-hop retries** (§5) |
-| Verdicts are vantage-relative | elevenlabs/vercel OpenAPI fetch fails 3/3 from one vantage, differs from the edge | **named vantage class** (§3) |
+| Service-side variance | one measured service, identical frozen discovery: handshake `ok` 2/3, rejected 1/3 | **N-of-M majority** (§4) |
+| One dropped hop flips a verdict | a single failed RFC 8414 fetch turned `credentials-required` into `incomplete` | **per-hop retries** (§5) |
+| Verdicts are vantage-relative | two measured services: OpenAPI fetch fails 3/3 from one vantage, differs at the edge | **named vantage class** (§3) |
 | The observer can be the flaky part | 6 `fetch failed` errors from the experiment machine — including to nessgate.com | vantage quality requirements (§3) |
 | Denials are ambiguous | bare 403: authorization OR bot-wall — undecidable from a safe probe | **`undetermined` never counts as failure evidence** (§6) |
-| Stable when the network cooperates | supabase/sentry OAuth chains: 3/3 byte-identical verdicts | the predicate itself is certifiable, given these semantics |
+| Stable when the network cooperates | two measured OAuth chains: 3/3 byte-identical verdicts | the predicate itself is certifiable, given these semantics |
 
 ## 3. Vantage (`V`)
 
@@ -66,13 +65,13 @@ The stability experiment measured the readiness pipeline over repeated runs and 
 - **Broken requires the same bar in reverse**: ≥ 4 of 5 observations with *positive* failure
   evidence (the service answered and the answer contradicts the declaration — the
   `assessFetchFailure` rule already shipped in 1.16.0). Mixed results are `unstable`, reported as
-  such — zapier under this predicate would today be `unstable`, which is the truthful description.
+  such — a mixed-observation endpoint under this predicate is `unstable`, which is the truthful description.
 
 ## 5. Per-hop semantics within one observation
 
 - Every metadata hop (protected-resource metadata, authorization-server metadata, spec fetch, card
   fetch) gets **K = 2 retries** (3 attempts total, bounded backoff) before the hop counts as failed
-  *within that observation*. This absorbs the sentry-class single-drop flip without masking a dead
+  *within that observation*. This absorbs a single-dropped-hop flip without masking a dead
   endpoint (which fails all attempts, in all observations).
 - All existing bounds carry over unchanged: read-only, HTTPS-only, SSRF-guarded, byte/time-capped,
   no credentials ever sent. Retries respect `Retry-After` and never tighten the request rate beyond
@@ -119,9 +118,7 @@ already-shipped assessors:
 A **CI profile** of this predicate ships as an open tool in `@nessgate/resolver` (bin
 `nessgate-ready`): back-to-back observations (default 3), unanimity required (the strict small-N
 mapping of §4's ≥80% rule), client-side execution on the publisher's own compute — so it needs no
-persistence, no hosted verdict, and therefore **no Charter v2 gate**. It is the incentive loop of
-§1 running today: publishers get pass/fail plus the exact missing field in CI, and anyone can
-re-run the same predicate. The hosted standing verdict described in this document remains gated.
+persistence, no hosted verdict, and therefore **no Charter v2 gate**. It implements the §1 self-check today: publishers get pass/fail plus the exact missing field in CI, and anyone can re-run the same predicate. The hosted standing verdict described in this document remains gated.
 
 ## 9. Out of scope, explicitly
 
@@ -134,7 +131,7 @@ stage.
 
 1. Is 4-of-5 over 48h the right reference strictness, or should Ready require passing in **two**
    consecutive windows before first issuance?
-2. Should `unstable` (zapier-class) be published as its own verdict, or fold into `undetermined`?
+2. Should `unstable` (mixed observations) be published as its own verdict, or fold into `undetermined`?
    (Draft position: publish it — it is the most actionable signal a flaky service can receive.)
 3. Minimum distinct egress points: 2 (draft) or 3?
 4. Does the charter v2 draft's read-scope language cover scheduled re-verification fetches, or does

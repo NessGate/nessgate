@@ -52,7 +52,7 @@ npx @nessgate/resolver yourdomain.com    # exit 0 = agents can connect; otherwis
 ```
 
 Runs the open readiness predicate on your machine (nothing reported anywhere), 3 observations,
-strict: flaky endpoints fail. Put it in CI and your publication stays connectable forever.
+strict: flaky endpoints fail. Put it in CI to keep your publication connectable.
 
 Live at **https://nessgate.com** · [Specification](https://nessgate.com/spec) ·
 [Charter](https://nessgate.com/charter) · [API](https://nessgate.com/api)

@@ -11,7 +11,7 @@ invents no taxonomy). Runs anywhere with `fetch`: Node ≥18, Deno, Bun, Workers
 npm install @nessgate/resolver
 ```
 
-## Connect (the headline)
+## Connect
 
 ```js
 import { plan } from "@nessgate/resolver";

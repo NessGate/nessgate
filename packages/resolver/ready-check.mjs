@@ -12,7 +12,7 @@
 //   PASS  — at least one endpoint is unanimously `ready` (connect now, no
 //           credentials) or `credentials-required` (everything known; you
 //           supply your own secret) across ALL observations.  exit 0
-//   FAIL  — otherwise: `unstable` (observations disagreed — the zapier class),
+//   FAIL  — otherwise: `unstable` (observations disagreed),
 //           `broken` (declared but demonstrably fails), `incomplete` (the
 //           protocol-defined metadata is not published; missing[] names each
 //           field), or nothing connectable at all.               exit 1

@@ -50,8 +50,8 @@ await check("discover returns the normalized answer shape, labeled self-publishe
   if (!Array.isArray(d.discovered)) throw new Error("discovered not an array");
 });
 
-// --- Connection readiness + connection plan (real end-to-end, dogfooded on our
-// own domain so the gate never depends on a third party's live auth config). ---
+// --- Connection readiness + connection plan (real end-to-end, self-tested against
+// our own domain so the gate never depends on a third party's live auth config). ---
 const CONNECT_OUTCOMES = ["ready", "credentials-required", "incomplete", "broken", "no-compatible-method"];
 
 await check("explore?readiness=1 is additive and attaches well-formed readiness blocks", async () => {
@@ -90,7 +90,7 @@ await check("GET /connect (no body) is a helpful 405, never a 500", async () => 
   if (r.status !== 405) throw new Error(`status ${r.status}`);
 });
 
-await check("nessgate.com PASSES its own ready-check (dogfood: the self-test tool, 1 observation)", async () => {
+await check("nessgate.com passes its own ready-check (self-test tool, 1 observation)", async () => {
   const out = execSync("node packages/resolver/ready-check.mjs nessgate.com --observations=1 --json", { encoding: "utf8", timeout: 120000 });
   const r = JSON.parse(out);
   if (r.pass !== true) throw new Error(`self ready-check failed: verdict=${r.verdict} ${JSON.stringify(r.endpoints?.[0]?.missing || [])}`);

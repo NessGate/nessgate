@@ -2,7 +2,7 @@
 //
 // resolve() (unmodified) → assessReadiness() (fill connection details + safe
 // handshake) → one of: ready / credentials-required / incomplete / no-compatible.
-// Measures the reviewer's thesis: how many services can NessGate make
+// Measures: how many services can NessGate make
 // connection-ready-except-credentials, and for the rest, does it name EXACTLY
 // what their published metadata is missing?
 //

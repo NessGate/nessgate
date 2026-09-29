@@ -1,7 +1,7 @@
 // NessGate — Connection-READINESS layer (EXPERIMENTAL, lab-only).
 //
 // Builds on plan.mjs. Where the planner answers "is this compatible?", this layer
-// answers the reviewer's stronger question:
+// answers the stronger question:
 //
 //   "Make the connection ready as far as possible — I only supply credentials."
 //
@@ -21,7 +21,7 @@
 //                           checker loop).
 //   no-compatible-method  — no published protocol the client speaks.
 //
-// HARD LINES (reviewer's constraints, all honored here):
+// HARD LINES (design constraints):
 //   - Advisory & local: we prepare the plan; the CLIENT connects directly.
 //   - No credential storage — NessGate never sees or holds a secret.
 //   - No proxying, no protocol translation, no AI, no new NessGate format.

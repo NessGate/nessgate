@@ -6,7 +6,7 @@ Give a LangChain agent a domain **and its own capabilities**, and NessGate tells
 transport, version, auth metadata), read from the service's own published metadata.
 Two tools:
 
-- **`connect_domain(domain, client)`** — the headline: how this client connects.
+- **`connect_domain(domain, client)`** — how this client connects.
 - **`discover_domain(domain)`** — the raw normalized list of everything a domain
   publishes across every supported standard, each linked to its source.
 

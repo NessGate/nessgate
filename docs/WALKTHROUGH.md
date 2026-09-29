@@ -1,7 +1,7 @@
 # NessGate — developer walkthrough
 
 Onboarding for anyone continuing this work. Pairs with `README.md` (product) and
-`CONTRIBUTING.md` (process). Current release: **1.15.0**.
+`CONTRIBUTING.md` (process). See `packages/resolver/package.json` for the current release.
 
 ## What NessGate does (four things, one worker)
 
@@ -101,7 +101,7 @@ npm test                 # offline regression (parity, normalization, SSRF, …)
 npm run test:readiness   # readiness/connect: parity + outcomes + MCP OAuth chain + neutrality
 npm run check            # full offline suite + live smoke + npm parity
 npm run deploy           # HARD pre-deploy gate (offline suite incl. test:readiness) → wrangler deploy (stamps BUILD_ID=git SHA)
-npm run smoke            # post-deploy: prod health + /connect + readiness e2e (dogfooded on nessgate.com)
+npm run smoke            # post-deploy: prod health + /connect + readiness e2e (self-tested against nessgate.com)
 ```
 
 **Deploy flow:** commit → `npm run deploy` → `npm run smoke` (verifies prod `/version`
@@ -110,17 +110,18 @@ push, then `gh workflow run publish-resolver.yml` (OIDC, tokenless); verify with
 `node scripts/check-npm-parity.mjs`. Rollback: `npx wrangler rollback`.
 
 Versioning: keep the npm package, `public/openapi.json` `info.version`, and the MCP
-`serverInfo.version` in step (all `1.15.0` now).
+`serverInfo.version` in step.
 
 ## Where to look next
 
-- `lab/connection-plan/PROPOSAL.md` — the tranche plan, remaining follow-ups
+- `lab/connection-plan/PROPOSAL.md` — the staged implementation record, remaining follow-ups
   (A2A `securitySchemes` depth, version-string preservation, charter read-scope note).
 - `lab/connection-plan/README.md` — the market-rate findings (readiness is
   concentrated in the modern MCP/OAuth segment; ~0% of the general web).
-- Adoption follow-ups discussed: keep the bridge **MCP-first** (already done — 3 tools);
-  refresh `examples/langchain`; do **not** add a "fallback scan" that guesses (charter
-  conflict); measure real usage via the new `connect:`/`readiness:` metrics.
-- `docs/readiness-certification-draft.md` — the "NessGate Ready" observation-semantics
+- Integration notes: the MCP server is the framework-neutral bridge (3 tools);
+  `examples/langchain` mirrors it. Fallback scans that guess are out of scope by
+  charter (results are never fabricated). Usage is measured via the
+  `connect:`/`readiness:` metric labels.
+- `docs/readiness-certification-draft.md` — the readiness-verification observation-semantics
   proposal (N-of-M verdicts, vantage classes, per-hop retries), grounded in the lab
   stability experiment. Gated on Charter v2; nothing implemented.

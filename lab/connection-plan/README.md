@@ -62,7 +62,7 @@ Outcomes: **4 protocol-only · 3 pointers-only · 1 none-found.**
 3. **The MCP + introspection path is where "complete" will come from** (zapier already reaches transport-known + auth-observed). Preserving the OpenAPI/MCP **version** string in the resolver would move Q2 off 0% immediately.
 4. **Run the planner on `/explore`, not `/discover`.** 3 of 8 domains published only pointer/catalog surfaces (`llms.txt`, `api-catalog`); reaching their real endpoints needs delegation, which `/explore` already does. The planner belongs on top of `/explore` output.
 
-## Findings — readiness layer (reviewer's stronger direction)
+## Findings — readiness layer (extended requirements)
 
 Pipeline: compatibility plan → **fill connection details (safe read-only GETs)** → **safe handshake** → one of
 **ready / credentials-required / incomplete / no-compatible-method**. Live run, 12 domains, polyglot client:
@@ -85,8 +85,8 @@ The **MCP OAuth chain** (RFC 9728 protected-resource metadata → RFC 8414 autho
 
 ### Conclusions
 
-1. **The reviewer's direction is the right one and it works** — supabase reached `credentials-required` with a complete, sourced plan a developer can act on without reading the OpenAPI/OAuth specs.
-2. **The declaration gap still dominates today** (8% ready-or-creds), so the highest-value capability is the **readiness-checker**: 11/11 incomplete cases produced a precise, protocol-specific missing-field reason. That is the flywheel — it tells service owners exactly how to fix their *existing* publication.
+1. **The extended pipeline works** — supabase reached `credentials-required` with a complete, sourced plan a developer can act on without reading the OpenAPI/OAuth specs.
+2. **The declaration gap still dominates today** (8% ready-or-creds), so the highest-value capability is the **readiness-checker**: 11/11 incomplete cases produced a precise, protocol-specific missing-field reason. It tells service owners exactly how to fix their *existing* publication.
 3. **Honesty held under real conditions** — the bare-403 case is reported as undetermined, not as a false OAuth requirement; unreachable handshakes are reported as such; nothing is guessed.
 
 ## Findings — bounded delegation (following pointers one level)
@@ -111,7 +111,7 @@ extractor removed the spurious candidates (anthropic +8→0, zapier +5→1) with
 
 1. **The full pipeline works and is honest** — discovery → compatibility → fill details → safe verify → 4 clear outcomes, with provenance on every claim and no scores. Two real successes (elevenlabs `ready`, supabase `credentials-required`) are connect-ready results a developer can act on without reading specs.
 2. **Delegation is worth it** — it doubled the connection-ready rate (8%→17%) by reaching endpoints that pointer-only domains merely name. The hosted `/explore` already does richer delegation; this proves the value locally.
-3. **The declaration gap remains the ceiling**, so the **readiness-checker** (10/10 incomplete cases name the exact missing field per the service's own protocol) is the durable, ecosystem-improving capability — the flywheel that raises that ceiling over time.
+3. **The declaration gap remains the ceiling**, so the **readiness-checker** (10/10 incomplete cases name the exact missing field per the service's own protocol) is the broadly applicable capability: it tells publishers exactly what to fix, which raises that ceiling over time.
 
 ## Findings — sourcing from the hosted `/explore` (the recall ceiling)
 
@@ -142,10 +142,10 @@ RFC 8414; cloudflare: A2A transport+version; mintlify/notion: pointer-only; anth
 
 ### Overall conclusion
 
-With `/explore`'s recall, the reviewer's thesis is fully realized on real services: **"this is compatible, I
+With `/explore`'s recall, the extended requirements are fully met on real services: **"this is compatible, I
 verified what I safely can, and the connection is ready except for the credentials only you can provide."**
 58% of a positive cohort reached ready-or-credentials, and 100% of the rest were told exactly what to publish
-to get there. The two capabilities compose into the flywheel: connection-readiness for the well-published,
+to get there. The two capabilities are complementary: connection-readiness for the well-published,
 precise readiness-checker feedback for everyone else. Recall (delegation depth) is the dominant lever;
 per-protocol readiness resolvers (MCP OAuth done; OpenAPI done; A2A partial) convert that recall into plans.
 
@@ -164,10 +164,9 @@ large, unbiased samples. The rate is strongly **segment-dependent**:
 Real connection-ready hits even via the dependency-free local path: `thisispaper.com`, `cleartracedata.com`
 (public MCP → **ready**), `upres.ai` (complete OpenAPI → **credentials-required**).
 
-**Honest conclusion:** full connection-readiness is **near-zero across the general and legacy-API web today**
-and **concentrated (~58%) in the modern AI-tooling segment** that has adopted MCP + OAuth. Connection-readiness
-tracks the MCP/OAuth adoption wave. This is exactly why the **readiness-checker** is the durable capability: it
-names the precise missing field for the ~90–100% who publish nothing complete yet, which is the adoption flywheel.
+**Conclusion:** full connection-readiness is **near-zero across the general and legacy-API web today**
+and **concentrated (~58%) among services that have adopted MCP + OAuth**. The readiness-checker
+applies regardless: it names the precise missing field for publishers that are not yet complete.
 
 ### Step-2/3 note (metadata coverage)
 
@@ -179,7 +178,7 @@ protection). These are honest ceilings, not defects; the fixes are unit-proven (
 
 ## Findings — verdict stability (the certification question)
 
-Can a readiness verdict be a *standing* claim ("NessGate Ready")? `run-stability.mjs` measured it:
+Can a readiness verdict be a *standing* claim? `run-stability.mjs` measured it:
 3 full local runs × 12 domains + a production-vantage `/connect` pass, then a controlled follow-up
 (3× assessment on ONE frozen discovery snapshot — pure assessment-layer variance).
 
@@ -192,21 +191,19 @@ observations are the problem, with separable causes:**
 | Self-inflicted rate limiting | prod `/connect` 429s late in the run (`outcome=null` rows) | budget the observation plan |
 | Per-vantage deterministic walls | elevenlabs/vercel OpenAPI fetch fails **3/3 consistently** locally, differs at the edge | verdicts are vantage-relative; a badge must name its vantage |
 | One dropped hop in an AND-chain | sentry run2: a single failed OAuth-metadata fetch flipped `credentials-required` → `incomplete` | per-hop retries required |
-| **Genuine service flakiness** | zapier, frozen discovery: `ready(ok)` 2/3, MCP handshake rejected 1/3 | **single observations can never ground a badge — N-of-M majority is mandatory** |
+| **Service-side variance** | zapier, frozen discovery: `ready(ok)` 2/3, MCP handshake rejected 1/3 | **single observations can never ground a badge — N-of-M majority is mandatory** |
 | Stable when network cooperates | supabase & sentry frozen-discovery: **3/3 identical** `credentials-required` with full OAuth chain | the chain itself is reliable; the predicate is certifiable *given* observation semantics |
 
 Bonus: the broken-vs-under-published classifier cleanly split **all** incompletes (5 broken-style /
 7 under-published) — evidence for adding a distinct `broken` outcome ("declared but fails") as the
 next small product increment.
 
-**Conclusion for the "NessGate Ready" strategy:** NessGate is already a deterministic judge of
+**Conclusion for readiness verification:** NessGate is already a deterministic judge of
 *rules* (CI-proven: same evidence → same verdict). It is NOT yet a deterministic judge of
 *observations*, and no single-shot verdict can be. A certification predicate is viable only with:
 (1) a reliable, named vantage (edge, not laptop), (2) N-of-M majority verdicts with defined
 observation windows, (3) per-hop retries in metadata chains — i.e., exactly the re-verification
-machinery that the v2 plan gates behind Charter v2 activation. The strategy's sequencing is
-therefore confirmed, with data: checker feedback loop now; badge only after Charter v2 + observation
-semantics exist. Those semantics are now drafted: **`docs/readiness-certification-draft.md`** (N-of-M
+machinery that the v2 plan gates behind Charter v2 activation. Measurement supports the sequencing: the self-check is usable now; hosted standing verdicts only after Charter v2 + observation semantics exist. Those semantics are now drafted: **`docs/readiness-certification-draft.md`** (N-of-M
 majority, named vantage classes, per-hop retries, `undetermined`/`unstable` as first-class results —
 every rule traceable to a finding in this experiment).
 

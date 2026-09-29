@@ -1,4 +1,4 @@
-// Gate test for the opt-in connection-readiness checker (Tranche A).
+// Gate test for the opt-in connection-readiness checker.
 //
 //  (1) PARITY: the five pure assessors are byte-behaviorally identical in the
 //      worker (src/worker.js) and the library (public/resolver.mjs).
