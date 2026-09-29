@@ -2098,14 +2098,14 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
     // outcome across connectable resources), no domain / payload / IP — emitted via
     // the single metrics site (recordDiscovery), preserving the privacy invariant.
     const ro = pool.map((r) => r.readiness && r.readiness.outcome);
-    recordDiscovery(env, "readiness:" + (ro.includes("ready") ? "ready" : ro.includes("credentials-required") ? "credentials-required" : ro.includes("incomplete") ? "incomplete" : "none-connectable"));
+    recordDiscovery(env, "readiness:" + (ro.includes("ready") ? "ready" : ro.includes("credentials-required") ? "credentials-required" : ro.includes("incomplete") ? "incomplete" : ro.includes("broken") ? "broken" : "none-connectable"));
   }
 
   const body = {
     domain,
     note: org ? EXPLORE_NOTE + " " + ORG_NOTE : EXPLORE_NOTE,
     ...(readiness
-      ? { readinessNote: "readiness[] per connectable resource: ready | credentials-required | incomplete (with missing[]). Read-only, from the service's own published metadata; credentials stay with the caller. No scores." }
+      ? { readinessNote: "readiness[] per connectable resource: ready | credentials-required | incomplete | broken (with missing[]). Read-only, from the service's own published metadata; credentials stay with the caller. No scores." }
       : {}),
     // Outcome label; /explore adds "incomplete" — budgets/deadline cut the walk
     // before it finished, so an empty result may just be an unfinished one.
@@ -2246,6 +2246,19 @@ export function assessA2aReadiness(card) {
   return { ...out, outcome: "credentials-required", auth: { required: true, type: first.type || "declared" } };
 }
 
+// Pure: classify a FAILED metadata fetch into broken vs incomplete. "broken" is
+// claimed ONLY on positive evidence — the service ANSWERED and the answer
+// contradicts its own declaration (404/410/5xx at a declared location, or 200 with
+// an unparseable document). Denials (401/403 — authorization OR a bot-wall) and
+// network failures (vantage, not service) never read as broken: measured in the
+// stability experiment, those are frequently not the service's fault.
+export function assessFetchFailure(protocol, status, what) {
+  if (status === 404 || status === 410 || status >= 500) return { protocol, outcome: "broken", missing: [`a working ${what} — the declared location answered HTTP ${status}`] };
+  if (status === 200) return { protocol, outcome: "broken", missing: [`a valid ${what} — the declared location answers but the document is not parseable`] };
+  if (status === 401 || status === 403) return { protocol, outcome: "incomplete", missing: [`a readable ${what} (HTTP ${status}: requires authorization or is walled — unverifiable from this vantage)`] };
+  return { protocol, outcome: "incomplete", missing: [`a reachable ${what} (fetch failed from this vantage)`] };
+}
+
 // Pure: MCP readiness from an initialize result plus an OPTIONAL OAuth metadata
 // chain (RFC 9728 protected-resource metadata → RFC 8414 authorization-server
 // metadata). A bare 403 is undetermined (auth OR bot/WAF), never a false OAuth wall.
@@ -2269,6 +2282,9 @@ export function assessMcpReadiness({ init, prm, as }) {
     return { ...base, outcome: "incomplete", auth: { required: true, type: "oauth2" }, verified: "auth-required", missing };
   }
   if (init && init.status === 403) return { ...base, outcome: "incomplete", verified: "denied:403", missing: ["undetermined: endpoint returned 403 with no auth challenge (authorization OR bot/WAF protection — a safe probe cannot distinguish them)"] };
+  // Positive evidence the declaration is wrong: the endpoint ANSWERED with
+  // gone/not-found/server-error → broken, not merely incomplete.
+  if (init && (init.status === 404 || init.status === 410 || init.status >= 500)) return { ...base, outcome: "broken", verified: "error:" + init.status, missing: [`a working MCP endpoint — the declared endpoint answered HTTP ${init.status}`] };
   return { ...base, outcome: "incomplete", verified: init && init.status ? "error:" + init.status : "unreachable", missing: ["a reachable MCP endpoint (initialize handshake did not succeed)"] };
 }
 
@@ -2333,20 +2349,22 @@ async function readinessReadBounded(res, max) {
 }
 // Read-only JSON GET with the worker's SSRF guards. Redirects are NOT followed
 // (manual) — a metadata endpoint that redirects reads as unavailable, which is safe.
+// Returns { status, json } — status is kept so failures can be honestly classified
+// (assessFetchFailure): an answered 404 is evidence, a network failure is not.
 async function readinessFetchJson(url, deadline) {
-  if (deadline && Date.now() > deadline) return null;
-  let u; try { u = new URL(url); } catch { return null; }
-  if (u.protocol !== "https:") return null;
+  if (deadline && Date.now() > deadline) return { status: 0, json: null };
+  let u; try { u = new URL(url); } catch { return { status: 0, json: null }; }
+  if (u.protocol !== "https:") return { status: 0, json: null };
   const host = u.hostname.toLowerCase().replace(/\.+$/, "");
-  if (isForbiddenHost(host)) return null;
-  try { await assertPublicDns(host); } catch { return null; }
+  if (isForbiddenHost(host)) return { status: 0, json: null };
+  try { await assertPublicDns(host); } catch { return { status: 0, json: null }; }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), READINESS_FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(u.toString(), { method: "GET", redirect: "manual", signal: controller.signal, headers: { "User-Agent": "NessGate-Readiness/1.0 (+https://nessgate.com)", Accept: "application/json" }, cf: { cacheTtl: 0 } });
-    if (res.status !== 200) { try { await res.body?.cancel(); } catch {} return null; }
-    try { return JSON.parse(await readinessReadBounded(res, READINESS_BYTES)); } catch { return null; }
-  } catch { return null; } finally { clearTimeout(timer); }
+    if (res.status !== 200) { try { await res.body?.cancel(); } catch {} return { status: res.status || 0, json: null }; }
+    try { return { status: 200, json: JSON.parse(await readinessReadBounded(res, READINESS_BYTES)) }; } catch { return { status: 200, json: null }; }
+  } catch { return { status: 0, json: null }; } finally { clearTimeout(timer); }
 }
 // Read-only MCP initialize (no tools/call, no credentials). Returns status even on
 // 401/403 (the auth signal), plus the RFC 9728 pointer and negotiated version.
@@ -2368,7 +2386,7 @@ async function readinessMcpInit(url, deadline) {
 }
 async function readinessFillMcp(endpoint, deadline) {
   if (/\.json(\?|$)/i.test(endpoint) || /server-card|agent-card/i.test(endpoint)) {
-    const card = await readinessFetchJson(endpoint, deadline);
+    const card = (await readinessFetchJson(endpoint, deadline)).json;
     const inner = card && (card.url || card.endpoint || card.serverUrl || card.mcpUrl || (card.server && card.server.url));
     if (typeof inner === "string" && /^https:\/\//i.test(inner)) endpoint = inner;
   }
@@ -2379,12 +2397,12 @@ async function readinessFillMcp(endpoint, deadline) {
     const m = init.wwwAuthenticate && init.wwwAuthenticate.match(/resource_metadata="?([^",\s]+)"?/i);
     if (m) prmUrl = m[1];
     else { try { prmUrl = new URL("/.well-known/oauth-protected-resource", endpoint).toString(); } catch {} }
-    if (prmUrl) prm = await readinessFetchJson(prmUrl, deadline);
+    if (prmUrl) prm = (await readinessFetchJson(prmUrl, deadline)).json;
     const asBase = prm && Array.isArray(prm.authorization_servers) && prm.authorization_servers[0];
     if (asBase) {
       for (const path of ["/.well-known/oauth-authorization-server", "/.well-known/openid-configuration"]) {
         let asUrl; try { asUrl = new URL(path, asBase).toString(); } catch { continue; }
-        const doc = await readinessFetchJson(asUrl, deadline);
+        const doc = (await readinessFetchJson(asUrl, deadline)).json;
         if (doc && doc.token_endpoint) { as = doc; break; }
       }
     }
@@ -2396,8 +2414,14 @@ async function readinessForResource(resource, deadline) {
   const proto = readinessProtocol(resource);
   if (!proto) return null;
   const stamp = (a) => ({ ...a, endpoint: a.endpoint || resource.url });
-  if (proto === "openapi") return stamp(assessOpenApiReadiness(await readinessFetchJson(resource.url, deadline)));
-  if (proto === "a2a-agent-card") return stamp(assessA2aReadiness(await readinessFetchJson(resource.sourceUrl || resource.url, deadline)));
+  if (proto === "openapi") {
+    const r = await readinessFetchJson(resource.url, deadline);
+    return stamp(r.json ? assessOpenApiReadiness(r.json) : { ...assessFetchFailure("openapi", r.status, "OpenAPI document"), transport: "https" });
+  }
+  if (proto === "a2a-agent-card") {
+    const r = await readinessFetchJson(resource.sourceUrl || resource.url, deadline);
+    return stamp(r.json ? assessA2aReadiness(r.json) : assessFetchFailure("a2a-agent-card", r.status, "A2A agent card"));
+  }
   if (proto === "mcp") return stamp(await readinessFillMcp(resource.url, deadline));
   return stamp({ protocol: proto, outcome: "incomplete", missing: [`no readiness resolver implemented for "${proto}" yet`] });
 }
@@ -2484,11 +2508,11 @@ async function connectData(raw, env, ctx, request, clientCaps) {
     plans.push({ ...readiness, matchedOn: m.matchedOn });
   }
 
-  const RANK = { ready: 0, "credentials-required": 1, incomplete: 2 };
+  const RANK = { ready: 0, "credentials-required": 1, incomplete: 2, broken: 3 };
   const pidx = (p) => { const i = prefer.indexOf(canonClientProtocol(p)); return i < 0 ? prefer.length : i; };
-  plans.sort((a, b) => pidx(a.protocol) - pidx(b.protocol) || (RANK[a.outcome] ?? 3) - (RANK[b.outcome] ?? 3) || String(a.protocol).localeCompare(String(b.protocol)));
+  plans.sort((a, b) => pidx(a.protocol) - pidx(b.protocol) || (RANK[a.outcome] ?? 4) - (RANK[b.outcome] ?? 4) || String(a.protocol).localeCompare(String(b.protocol)));
   const has = (o) => plans.some((p) => p.outcome === o);
-  const outcome = has("ready") ? "ready" : has("credentials-required") ? "credentials-required" : plans.length ? "incomplete" : serviceProtocols.size ? "no-compatible-method" : "incomplete";
+  const outcome = has("ready") ? "ready" : has("credentials-required") ? "credentials-required" : has("incomplete") ? "incomplete" : plans.length ? "broken" : serviceProtocols.size ? "no-compatible-method" : "incomplete";
   const clientOnly = [];
   for (const s of supportsList) { const p = canonClientProtocol(s.protocol); if (p && !serviceProtocols.has(p)) clientOnly.push({ protocol: p, reason: `service publishes no ${p} surface` }); }
   const seenRej = new Set();
@@ -2528,11 +2552,11 @@ async function apiConnect(raw, env, ctx, request, clientCaps) {
 // (the tool dispatches to the same handler).
 
 const MCP_SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26"];
-const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.15.1" };
+const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.16.0" };
 const MCP_INSTRUCTIONS =
   "Three read-only tools. discover_domain: what a domain publishes (the raw normalized list). " +
   "connect_domain: given a domain AND your client's capabilities, HOW to connect — one outcome " +
-  "(ready | credentials-required | incomplete | no-compatible-method) with a connection plan, or the " +
+  "(ready | credentials-required | incomplete | broken | no-compatible-method) with a connection plan, or the " +
   "exact missing field. check_readiness: per-endpoint readiness for a domain, client-agnostic. All read " +
   "the domain live, store nothing, make no ownership/safety claim; credentials stay with the caller.";
 
@@ -2591,7 +2615,7 @@ const MCP_TOOLS = [
     title: "Get a connection plan for this client",
     description:
       "Given a domain AND the calling client's capabilities, return HOW the client can connect: one " +
-      "outcome (ready | credentials-required | incomplete | no-compatible-method) with a connection plan " +
+      "outcome (ready | credentials-required | incomplete | broken | no-compatible-method) with a connection plan " +
       "(protocol, endpoint, transport, version, and the auth metadata the service published — e.g. the " +
       "OAuth authorize/token endpoints and scopes), or the exact missing field when the service " +
       "under-publishes. Deterministic matching, no scores. Read-only; credentials stay with the caller " +
@@ -2603,7 +2627,7 @@ const MCP_TOOLS = [
     title: "Check how ready a domain's endpoints are to connect to",
     description:
       "Given a domain, return each connectable resource it publishes with a readiness assessment " +
-      "(ready | credentials-required | incomplete, with the exact missing field) read from the service's " +
+      "(ready | credentials-required | incomplete | broken, with the exact missing field) read from the service's " +
       "own metadata. Client-agnostic; read-only. Use connect_domain when you know the client's capabilities.",
     inputSchema: MCP_DOMAIN_INPUT,
   },

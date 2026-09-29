@@ -52,7 +52,7 @@ await check("discover returns the normalized answer shape, labeled self-publishe
 
 // --- Connection readiness + connection plan (real end-to-end, dogfooded on our
 // own domain so the gate never depends on a third party's live auth config). ---
-const CONNECT_OUTCOMES = ["ready", "credentials-required", "incomplete", "no-compatible-method"];
+const CONNECT_OUTCOMES = ["ready", "credentials-required", "incomplete", "broken", "no-compatible-method"];
 
 await check("explore?readiness=1 is additive and attaches well-formed readiness blocks", async () => {
   const r = await get("/explore/nessgate.com?readiness=1");
@@ -60,7 +60,7 @@ await check("explore?readiness=1 is additive and attaches well-formed readiness 
   const d = await r.json();
   if (typeof d.readinessNote !== "string") throw new Error("missing readinessNote (flag path did not run)");
   for (const x of (d.resources || []).filter((y) => y.readiness)) {
-    if (!["ready", "credentials-required", "incomplete"].includes(x.readiness.outcome)) throw new Error(`bad readiness outcome ${x.readiness.outcome}`);
+    if (!["ready", "credentials-required", "incomplete", "broken"].includes(x.readiness.outcome)) throw new Error(`bad readiness outcome ${x.readiness.outcome}`);
     if (!Array.isArray(x.readiness.missing)) throw new Error("readiness.missing is not an array");
   }
 });
@@ -227,7 +227,7 @@ await check("MCP server: initialize + tools/list (3 tools) + real discover & con
   })).json();
   const cc = conn.result && conn.result.structuredContent;
   if (!cc || cc.domain !== "nessgate.com") throw new Error("connect tool did not echo the domain");
-  if (!["ready", "credentials-required", "incomplete", "no-compatible-method"].includes(cc.outcome))
+  if (!CONNECT_OUTCOMES.includes(cc.outcome))
     throw new Error(`connect tool outcome not in the honest enum: ${cc.outcome}`);
 });
 

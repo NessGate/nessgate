@@ -1409,6 +1409,19 @@ export function assessA2aReadiness(card) {
   return { ...out, outcome: "credentials-required", auth: { required: true, type: first.type || "declared" } };
 }
 
+// Pure: classify a FAILED metadata fetch into broken vs incomplete. "broken" is
+// claimed ONLY on positive evidence — the service ANSWERED and the answer
+// contradicts its own declaration (404/410/5xx at a declared location, or 200 with
+// an unparseable document). Denials (401/403 — authorization OR a bot-wall) and
+// network failures (vantage, not service) never read as broken: measured in the
+// stability experiment, those are frequently not the service's fault.
+export function assessFetchFailure(protocol, status, what) {
+  if (status === 404 || status === 410 || status >= 500) return { protocol, outcome: "broken", missing: [`a working ${what} — the declared location answered HTTP ${status}`] };
+  if (status === 200) return { protocol, outcome: "broken", missing: [`a valid ${what} — the declared location answers but the document is not parseable`] };
+  if (status === 401 || status === 403) return { protocol, outcome: "incomplete", missing: [`a readable ${what} (HTTP ${status}: requires authorization or is walled — unverifiable from this vantage)`] };
+  return { protocol, outcome: "incomplete", missing: [`a reachable ${what} (fetch failed from this vantage)`] };
+}
+
 // Pure: MCP readiness from an initialize result plus an OPTIONAL OAuth metadata
 // chain (RFC 9728 protected-resource metadata → RFC 8414 authorization-server
 // metadata). A bare 403 is undetermined (auth OR bot/WAF), never a false OAuth wall.
@@ -1432,6 +1445,9 @@ export function assessMcpReadiness({ init, prm, as }) {
     return { ...base, outcome: "incomplete", auth: { required: true, type: "oauth2" }, verified: "auth-required", missing };
   }
   if (init && init.status === 403) return { ...base, outcome: "incomplete", verified: "denied:403", missing: ["undetermined: endpoint returned 403 with no auth challenge (authorization OR bot/WAF protection — a safe probe cannot distinguish them)"] };
+  // Positive evidence the declaration is wrong: the endpoint ANSWERED with
+  // gone/not-found/server-error → broken, not merely incomplete.
+  if (init && (init.status === 404 || init.status === 410 || init.status >= 500)) return { ...base, outcome: "broken", verified: "error:" + init.status, missing: [`a working MCP endpoint — the declared endpoint answered HTTP ${init.status}`] };
   return { ...base, outcome: "incomplete", verified: init && init.status ? "error:" + init.status : "unreachable", missing: ["a reachable MCP endpoint (initialize handshake did not succeed)"] };
 }
 
@@ -1446,10 +1462,18 @@ function readinessBadHost(h) {
   if (/^(10|127)\./.test(h) || /^192\.168\./.test(h) || /^169\.254\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
   return false;
 }
+// Returns { status, json } — status is kept so failures can be honestly classified
+// (assessFetchFailure): an answered 404 is evidence, a network failure is not.
 async function readinessGetJson(fetchImpl, url, timeoutMs, maxBytes) {
-  let u; try { u = new URL(url); } catch { return null; }
-  if (u.protocol !== "https:" || readinessBadHost(u.hostname)) return null;
-  try { const r = await fetchBounded(fetchImpl, url, timeoutMs, maxBytes); return JSON.parse(r.text); } catch { return null; }
+  let u; try { u = new URL(url); } catch { return { status: 0, json: null }; }
+  if (u.protocol !== "https:" || readinessBadHost(u.hostname)) return { status: 0, json: null };
+  try {
+    const r = await fetchBounded(fetchImpl, url, timeoutMs, maxBytes);
+    try { return { status: 200, json: JSON.parse(r.text) }; } catch { return { status: 200, json: null }; }
+  } catch (e) {
+    const m = String(e && e.message || "").match(/HTTP (\d+)/);
+    return { status: m ? +m[1] : 0, json: null };
+  }
 }
 // Read-only MCP initialize (no tools/call, no credentials): status + the RFC 9728
 // WWW-Authenticate pointer + the negotiated protocol version.
@@ -1470,7 +1494,7 @@ async function readinessMcpInitialize(fetchImpl, url, timeoutMs) {
 async function readinessFillMcp(fetchImpl, endpoint, timeoutMs) {
   // If the declared URL is a server CARD (a JSON doc), read the endpoint it names.
   if (/\.json(\?|$)/i.test(endpoint) || /server-card|agent-card/i.test(endpoint)) {
-    const card = await readinessGetJson(fetchImpl, endpoint, timeoutMs, 262144);
+    const card = (await readinessGetJson(fetchImpl, endpoint, timeoutMs, 262144)).json;
     const inner = card && (card.url || card.endpoint || card.serverUrl || card.mcpUrl || (card.server && card.server.url));
     if (typeof inner === "string" && /^https:\/\//i.test(inner)) endpoint = inner;
   }
@@ -1481,12 +1505,12 @@ async function readinessFillMcp(fetchImpl, endpoint, timeoutMs) {
     const m = init.wwwAuthenticate && init.wwwAuthenticate.match(/resource_metadata="?([^",\s]+)"?/i);
     if (m) prmUrl = m[1];
     else { try { prmUrl = new URL("/.well-known/oauth-protected-resource", endpoint).toString(); } catch {} }
-    if (prmUrl) prm = await readinessGetJson(fetchImpl, prmUrl, timeoutMs, 262144);
+    if (prmUrl) prm = (await readinessGetJson(fetchImpl, prmUrl, timeoutMs, 262144)).json;
     const asBase = prm && Array.isArray(prm.authorization_servers) && prm.authorization_servers[0];
     if (asBase) {
       for (const path of ["/.well-known/oauth-authorization-server", "/.well-known/openid-configuration"]) {
         let asUrl; try { asUrl = new URL(path, asBase).toString(); } catch { continue; }
-        const doc = await readinessGetJson(fetchImpl, asUrl, timeoutMs, 262144);
+        const doc = (await readinessGetJson(fetchImpl, asUrl, timeoutMs, 262144)).json;
         if (doc && doc.token_endpoint) { as = doc; break; }
       }
     }
@@ -1504,8 +1528,14 @@ export async function assessReadiness(resource, opts = {}) {
   const stamp = (a) => ({ ...a, endpoint: a.endpoint || (resource && resource.url), sourceUrl: resource && resource.sourceUrl, evidence: resource && (resource.evidence || resource.class) });
   const proto = readinessProtocol(resource);
   if (!proto) return stamp({ protocol: resource && resource.type, outcome: "incomplete", missing: ["a connectable endpoint — this is a pointer/catalog surface; follow it (delegation) to reach one"] });
-  if (proto === "openapi") return stamp(assessOpenApiReadiness(await readinessGetJson(fetchImpl, resource.url, timeoutMs, 1_000_000)));
-  if (proto === "a2a-agent-card") return stamp(assessA2aReadiness(await readinessGetJson(fetchImpl, resource.sourceUrl || resource.url, timeoutMs, 262144)));
+  if (proto === "openapi") {
+    const r = await readinessGetJson(fetchImpl, resource.url, timeoutMs, 1_000_000);
+    return stamp(r.json ? assessOpenApiReadiness(r.json) : { ...assessFetchFailure("openapi", r.status, "OpenAPI document"), transport: "https" });
+  }
+  if (proto === "a2a-agent-card") {
+    const r = await readinessGetJson(fetchImpl, resource.sourceUrl || resource.url, timeoutMs, 262144);
+    return stamp(r.json ? assessA2aReadiness(r.json) : assessFetchFailure("a2a-agent-card", r.status, "A2A agent card"));
+  }
   if (proto === "mcp") return stamp(await readinessFillMcp(fetchImpl, resource.url, timeoutMs));
   return stamp({ protocol: proto, outcome: "incomplete", missing: [`no readiness resolver implemented for "${proto}" yet`] });
 }
@@ -1588,14 +1618,15 @@ export async function plan(domain, clientCaps, opts = {}) {
     plans.push({ ...readiness, matchedOn: m.matchedOn });
   }
 
-  const RANK = { ready: 0, "credentials-required": 1, incomplete: 2 };
+  const RANK = { ready: 0, "credentials-required": 1, incomplete: 2, broken: 3 };
   const pidx = (p) => { const i = prefer.indexOf(canonClientProtocol(p)); return i < 0 ? prefer.length : i; };
-  plans.sort((a, b) => pidx(a.protocol) - pidx(b.protocol) || (RANK[a.outcome] ?? 3) - (RANK[b.outcome] ?? 3) || String(a.protocol).localeCompare(String(b.protocol)));
+  plans.sort((a, b) => pidx(a.protocol) - pidx(b.protocol) || (RANK[a.outcome] ?? 4) - (RANK[b.outcome] ?? 4) || String(a.protocol).localeCompare(String(b.protocol)));
   const has = (o) => plans.some((p) => p.outcome === o);
   let outcome;
   if (has("ready")) outcome = "ready";
   else if (has("credentials-required")) outcome = "credentials-required";
-  else if (plans.length) outcome = "incomplete";
+  else if (has("incomplete")) outcome = "incomplete";
+  else if (plans.length) outcome = "broken"; // every compatible path was declared but demonstrably fails
   else if (serviceProtocols.size) outcome = "no-compatible-method"; // connectable methods exist, none the client can use
   else outcome = "incomplete";
 
@@ -1617,4 +1648,4 @@ export async function plan(domain, clientCaps, opts = {}) {
   };
 }
 
-export default { resolve, plan, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, detectOpenApiYaml, extractOpenApiCapabilities, dedupeResources, reachabilityFromStatus, classifyDenial, parseMcpMessages, mcpToolCapabilities, probeFailureKind, resolutionOutcome, fetchBounded, assessReadiness, readinessProtocol, extractProtocolVersion, assessOpenApiReadiness, assessA2aReadiness, assessMcpReadiness, matchClient, canonClientProtocol, ADAPTERS };
+export default { resolve, plan, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, detectOpenApiYaml, extractOpenApiCapabilities, dedupeResources, reachabilityFromStatus, classifyDenial, parseMcpMessages, mcpToolCapabilities, probeFailureKind, resolutionOutcome, fetchBounded, assessReadiness, readinessProtocol, extractProtocolVersion, assessOpenApiReadiness, assessA2aReadiness, assessMcpReadiness, assessFetchFailure, matchClient, canonClientProtocol, ADAPTERS };

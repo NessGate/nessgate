@@ -17,7 +17,7 @@ const eq = (name, got, want) => { const ok = JSON.stringify(got) === JSON.string
 const ok_ = (name, cond) => { if (cond) pass++; else { fail++; console.error(`FAIL  ${name}`); } };
 
 /* (1) worker/library parity on the pure assessors + matcher -------------- */
-const PURE = ["extractProtocolVersion", "readinessProtocol", "assessOpenApiReadiness", "assessA2aReadiness", "assessMcpReadiness", "matchClient", "canonClientProtocol"];
+const PURE = ["extractProtocolVersion", "readinessProtocol", "assessOpenApiReadiness", "assessA2aReadiness", "assessMcpReadiness", "assessFetchFailure", "matchClient", "canonClientProtocol"];
 for (const fn of PURE) ok_(`worker & library both export ${fn}`, typeof worker[fn] === "function" && typeof lib[fn] === "function");
 
 const parityCases = [
@@ -47,6 +47,11 @@ const parityCases = [
   ["matchClient", [{ protocol: "a2a-agent-card", transport: "jsonrpc", version: "0.3.0", auth: { required: false } }, { protocol: "a2a", auth: ["oauth2"] }]],
   ["canonClientProtocol", ["a2a"]],
   ["canonClientProtocol", ["rest"]],
+  ["assessFetchFailure", ["openapi", 404, "OpenAPI document"]],
+  ["assessFetchFailure", ["openapi", 200, "OpenAPI document"]],
+  ["assessFetchFailure", ["a2a-agent-card", 403, "A2A agent card"]],
+  ["assessFetchFailure", ["openapi", 0, "OpenAPI document"]],
+  ["assessMcpReadiness", [{ init: { ok: false, status: 404 } }]],
 ];
 for (const [fn, args] of parityCases) {
   eq(`parity ${fn}(${JSON.stringify(args[0]).slice(0, 40)}…)`, worker[fn](...args), lib[fn](...args));
@@ -82,6 +87,19 @@ eq("mcp+oauth chain → credentials-required", lib.assessMcpReadiness({ init: { 
 ok_("mcp+oauth → DCR detected", lib.assessMcpReadiness({ init: { ok: false, status: 401 }, prm: {}, as: { authorization_endpoint: "https://a/az", token_endpoint: "https://a/tok", registration_endpoint: "https://a/reg" } }).auth.dynamicClientRegistration === true);
 ok_("mcp no-metadata → names RFC 9728", lib.assessMcpReadiness({ init: { ok: false, status: 401 } }).missing[0].includes("RFC 9728"));
 ok_("mcp bare-403 → undetermined (not a false OAuth wall)", lib.assessMcpReadiness({ init: { ok: false, status: 403, wwwAuthenticate: null } }).missing[0].includes("undetermined"));
+
+/* broken vs incomplete (grounded in the stability experiment): broken ONLY on
+   positive evidence — an ANSWER that contradicts the declaration. Denials and
+   network failures are vantage-ambiguous and never read as broken. */
+eq("fetch 404 → broken", lib.assessFetchFailure("openapi", 404, "OpenAPI document").outcome, "broken");
+eq("fetch 5xx → broken", lib.assessFetchFailure("openapi", 503, "OpenAPI document").outcome, "broken");
+eq("fetch 200-unparseable → broken", lib.assessFetchFailure("openapi", 200, "OpenAPI document").outcome, "broken");
+eq("fetch 403 (denial) → incomplete, NOT broken", lib.assessFetchFailure("openapi", 403, "OpenAPI document").outcome, "incomplete");
+eq("fetch network-fail → incomplete, NOT broken", lib.assessFetchFailure("openapi", 0, "OpenAPI document").outcome, "incomplete");
+eq("mcp handshake 404 → broken", lib.assessMcpReadiness({ init: { ok: false, status: 404 } }).outcome, "broken");
+eq("mcp handshake 500 → broken", lib.assessMcpReadiness({ init: { ok: false, status: 502 } }).outcome, "broken");
+eq("mcp handshake network-fail → incomplete", lib.assessMcpReadiness({ init: { ok: false, status: 0 } }).outcome, "incomplete");
+eq("mcp handshake 405 (ambiguous legacy transport) → incomplete, NOT broken", lib.assessMcpReadiness({ init: { ok: false, status: 405 } }).outcome, "incomplete");
 
 /* matchClient (client × service) — deterministic intersection, tri-state */
 ok_("match: oauth2 service ∩ oauth2 client → compatible", lib.matchClient({ protocol: "mcp", auth: { required: true, type: "oauth2" } }, { protocol: "mcp", auth: ["oauth2", "none"] }).compatible === true);
