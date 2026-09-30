@@ -1722,7 +1722,7 @@ async function fetchMcpRegistry(namespace) {
       signal: ctrl.signal,
       cf: { cacheTtl: 300 },
     });
-    if (!res.ok) return "";
+    if (!res.ok) return null; // registry answered abnormally — UNAVAILABLE, not "empty"
     // Bounded read with the abort timer still armed: the registry is a trusted
     // party, but its response is still an external body — cap it so an oversized
     // or slow-trickling reply can neither bloat nor hang the invocation.
@@ -1735,7 +1735,7 @@ async function fetchMcpRegistry(namespace) {
       size += value.length;
       if (size > MCP_REGISTRY_MAX_BYTES) {
         try { await reader.cancel(); } catch {}
-        return "";
+        return null; // could not read the registry reliably — UNAVAILABLE
       }
       chunks.push(value);
     }
@@ -1744,7 +1744,7 @@ async function fetchMcpRegistry(namespace) {
     for (const chunk of chunks) { buf.set(chunk, off); off += chunk.length; }
     return new TextDecoder().decode(buf);
   } catch {
-    return "";
+    return null; // timeout / network failure — UNAVAILABLE, never silently "no results"
   } finally {
     clearTimeout(timer);
   }
@@ -1895,7 +1895,11 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
   }
 
   // Merge the concurrent registry federation (namespace-verified evidence).
+  // null = the registry could not be checked (timeout/error) — disclosed as
+  // federatedUnavailable so absence-of-results is never mistaken for
+  // checked-and-empty.
   const regText = await registryPromise;
+  const registryUnavailable = namespace ? regText === null : false;
   if (namespace && regText) for (const rec of mcpRegistryRecords(regText, namespace, domain)) out.push(rec);
 
   // Phase 4 — OPTIONAL candidate verification (opt-in via POST body). NessGate
@@ -2127,6 +2131,9 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
         }
       : {}),
     federated: ["mcp-registry"],
+    ...(registryUnavailable
+      ? { federatedUnavailable: ["mcp-registry"], federatedNote: "The MCP Registry could not be checked on this request (timeout or error) — registry-backed results may be missing. This is disclosed so it is never mistaken for checked-and-empty." }
+      : {}),
     stats: {
       publisherHosted: resources.filter((r) => r.evidence === "publisher-hosted").length,
       publisherDeclared: resources.filter((r) => r.evidence === "publisher-declared").length,
@@ -2189,10 +2196,14 @@ export function readinessProtocol(r) {
   // and each requires the word as a bounded path SEGMENT — so /mcp and /openapi.json
   // match, but /mcp-guide and /openapi-tips do not.
   const isDoc = /\.(md|mdx|html?|txt|pdf|rst)($|\?)/.test(path);
+  // A documentation-section path is a page ABOUT a protocol, not an endpoint —
+  // the fuzzy path heuristics below never fire on one. Explicit adapter/type
+  // labels are unaffected.
+  const isDocSection = /\/(docs?|documentation|blog|guides?|reference|help|learn|tutorials?)(\/|$)/.test(path);
   if (src === "aid" && r.raw && typeof r.raw === "object" && typeof r.raw.proto === "string") { const p = r.raw.proto.toLowerCase(); return p === "mcp" ? "mcp" : p || null; }
-  if (src === "openapi" || type.includes("openapi") || (!isDoc && /\/(openapi|swagger)(\.(json|ya?ml))?(\/|\?|$)/.test(path))) return "openapi";
-  if (src === "mcp" || type === "mcp" || type === "mcp-server" || type === "application/mcp-server-card+json" || (!isDoc && (host.startsWith("mcp.") || /\/mcp(\/|\?|$)/.test(path)))) return "mcp";
-  if (src === "a2a-agent-card" || type.includes("agent-card") || (!isDoc && /\/agent(-card)?\.json(\?|$)/.test(path))) return "a2a-agent-card";
+  if (src === "openapi" || type.includes("openapi") || (!isDoc && !isDocSection && /\/(openapi|swagger)(\.(json|ya?ml))?(\/|\?|$)/.test(path))) return "openapi";
+  if (src === "mcp" || type === "mcp" || type === "mcp-server" || type === "application/mcp-server-card+json" || (!isDoc && (host.startsWith("mcp.") || (!isDocSection && /\/mcp(\/|\?|$)/.test(path))))) return "mcp";
+  if (src === "a2a-agent-card" || type.includes("agent-card") || (!isDoc && !isDocSection && /\/agent(-card)?\.json(\?|$)/.test(path))) return "a2a-agent-card";
   return null;
 }
 
@@ -2272,7 +2283,11 @@ export function assessMcpReadiness({ init, prm, as }) {
   const transport = init && init.status === 405 ? "sse-legacy" : "streamable-http";
   const version = (init && init.protocolVersion) || null;
   const base = { protocol: "mcp", transport, version };
-  if (init && init.ok) return { ...base, outcome: "ready", auth: { required: false }, verified: "ok", missing: [] };
+  // ready requires PROTOCOL-level evidence, not transport success: a documentation
+  // page answers HTTP 200 to a POST too. Only a parseable JSON-RPC initialize
+  // result (its REQUIRED protocolVersion) proves an MCP endpoint.
+  if (init && init.ok && init.protocolVersion) return { ...base, outcome: "ready", auth: { required: false }, verified: "ok", missing: [] };
+  if (init && init.ok) return { ...base, outcome: "incomplete", verified: "http-200-not-mcp", missing: ["a valid MCP initialize response — the endpoint answered HTTP 200 but not with a JSON-RPC initialize result (a documentation page can do that); protocol-level evidence is required for ready"] };
   const authWall = init && (init.status === 401 || (init.status === 403 && init.wwwAuthenticate));
   if (authWall) {
     if (as && as.authorization_endpoint && as.token_endpoint) {
@@ -2558,7 +2573,7 @@ async function apiConnect(raw, env, ctx, request, clientCaps) {
 // (the tool dispatches to the same handler).
 
 const MCP_SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26"];
-const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.17.2" };
+const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.18.0" };
 const MCP_INSTRUCTIONS =
   "Three read-only tools. discover_domain: what a domain publishes (the raw normalized list). " +
   "connect_domain: given a domain AND your client's capabilities, HOW to connect — one outcome " +

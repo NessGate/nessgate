@@ -1162,9 +1162,9 @@ export async function resolve(domain, opts = {}) {
       }
     } catch {}
     const hosts = [];
-    const take = (h) => { if (!hosts.includes(h) && hosts.length < 4) hosts.push(h); };
+    const take = (h) => { if (!hosts.includes(h) && hosts.length < 6) hosts.push(h); };
     for (const h of homepageHosts) if (DEV_LABELS.includes(h.split(".")[0])) take(h);
-    for (const p of ["docs", "developers", "cloud", "api"]) take(p + "." + d);
+    for (const p of ["docs", "developers", "cloud", "api", "developer", "platform", "learn"]) take(p + "." + d);
     for (const h of hosts) {
       if (Date.now() - startedAt > deadlineMs) { deadlineHit = true; break; }
       orgChecked.push(h);
@@ -1352,10 +1352,14 @@ export function readinessProtocol(r) {
   // and each requires the word as a bounded path SEGMENT — so /mcp and /openapi.json
   // match, but /mcp-guide and /openapi-tips do not.
   const isDoc = /\.(md|mdx|html?|txt|pdf|rst)($|\?)/.test(path);
+  // A documentation-section path is a page ABOUT a protocol, not an endpoint —
+  // the fuzzy path heuristics below never fire on one. Explicit adapter/type
+  // labels are unaffected.
+  const isDocSection = /\/(docs?|documentation|blog|guides?|reference|help|learn|tutorials?)(\/|$)/.test(path);
   if (src === "aid" && r.raw && typeof r.raw === "object" && typeof r.raw.proto === "string") { const p = r.raw.proto.toLowerCase(); return p === "mcp" ? "mcp" : p || null; }
-  if (src === "openapi" || type.includes("openapi") || (!isDoc && /\/(openapi|swagger)(\.(json|ya?ml))?(\/|\?|$)/.test(path))) return "openapi";
-  if (src === "mcp" || type === "mcp" || type === "mcp-server" || type === "application/mcp-server-card+json" || (!isDoc && (host.startsWith("mcp.") || /\/mcp(\/|\?|$)/.test(path)))) return "mcp";
-  if (src === "a2a-agent-card" || type.includes("agent-card") || (!isDoc && /\/agent(-card)?\.json(\?|$)/.test(path))) return "a2a-agent-card";
+  if (src === "openapi" || type.includes("openapi") || (!isDoc && !isDocSection && /\/(openapi|swagger)(\.(json|ya?ml))?(\/|\?|$)/.test(path))) return "openapi";
+  if (src === "mcp" || type === "mcp" || type === "mcp-server" || type === "application/mcp-server-card+json" || (!isDoc && (host.startsWith("mcp.") || (!isDocSection && /\/mcp(\/|\?|$)/.test(path))))) return "mcp";
+  if (src === "a2a-agent-card" || type.includes("agent-card") || (!isDoc && !isDocSection && /\/agent(-card)?\.json(\?|$)/.test(path))) return "a2a-agent-card";
   return null;
 }
 
@@ -1435,7 +1439,11 @@ export function assessMcpReadiness({ init, prm, as }) {
   const transport = init && init.status === 405 ? "sse-legacy" : "streamable-http";
   const version = (init && init.protocolVersion) || null;
   const base = { protocol: "mcp", transport, version };
-  if (init && init.ok) return { ...base, outcome: "ready", auth: { required: false }, verified: "ok", missing: [] };
+  // ready requires PROTOCOL-level evidence, not transport success: a documentation
+  // page answers HTTP 200 to a POST too. Only a parseable JSON-RPC initialize
+  // result (its REQUIRED protocolVersion) proves an MCP endpoint.
+  if (init && init.ok && init.protocolVersion) return { ...base, outcome: "ready", auth: { required: false }, verified: "ok", missing: [] };
+  if (init && init.ok) return { ...base, outcome: "incomplete", verified: "http-200-not-mcp", missing: ["a valid MCP initialize response — the endpoint answered HTTP 200 but not with a JSON-RPC initialize result (a documentation page can do that); protocol-level evidence is required for ready"] };
   const authWall = init && (init.status === 401 || (init.status === 403 && init.wwwAuthenticate));
   if (authWall) {
     if (as && as.authorization_endpoint && as.token_endpoint) {

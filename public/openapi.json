@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "NessGate API",
-    "version": "1.17.2",
+    "version": "1.18.0",
     "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads whatever that domain already publishes across the standard machine-discovery locations (llms.txt, ARD / ai-catalog.json, A2A agent card, RFC 9727 API catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP manifest, RFC 6415 host-meta) and returns one normalized answer, each record carrying a sourceUrl back to the domain. NessGate stores nothing, never crawls or indexes, and makes no ownership or safety claim. Read endpoints are public, unauthenticated, and CORS-open. The response contract is stable and additive: new optional fields may appear; clients must ignore unknown fields.",
     "contact": { "email": "contact@nessgate.com", "url": "https://nessgate.com/contact" },
     "termsOfService": "https://nessgate.com/terms",
@@ -126,7 +126,7 @@
             "name": "readiness",
             "in": "query",
             "required": false,
-            "description": "Set to 1 for connection-readiness: attach a readiness block to each connectable resource, assessed from the service's own published metadata (OpenAPI servers+securitySchemes, A2A card, MCP OAuth chain RFC 9728 -> RFC 8414). Outcomes: ready | credentials-required | incomplete (under-published; missing[] names the field) | broken (declared but demonstrably fails: the location answered 404/410/5xx or an unparseable document). Read-only, no scores, credentials never touch NessGate. Bounded + SSRF-guarded. Default /explore (no flag) is unchanged.",
+            "description": "Set to 1 for connection-readiness: attach a readiness block to each connectable resource, assessed from the service's own published metadata (OpenAPI servers+securitySchemes, A2A card, MCP OAuth chain RFC 9728 -> RFC 8414). Outcomes: ready | credentials-required | incomplete (under-published; missing[] names the field) | broken (declared but demonstrably fails: the location answered 404/410/5xx or an unparseable document). ready requires protocol-level evidence appropriate to the transport (e.g. a valid MCP initialize result), never HTTP success alone. Read-only, no scores, credentials never touch NessGate. Bounded + SSRF-guarded. Default /explore (no flag) is unchanged.",
             "schema": { "type": "string", "enum": ["1"] }
           }
         ],
@@ -143,7 +143,8 @@
                     "outcome": { "type": "string", "enum": ["found", "none-found", "blocked", "incomplete"], "description": "The single honest outcome label; /explore adds incomplete = budgets or the deadline cut the walk before it finished, so an empty result may just be unfinished." },
                     "blockedProbes": { "type": "integer", "description": "Present when any probe was refused: count of refused probes (uncertainty is never hidden)." },
                     "checked": { "type": "array", "items": { "type": "string" } },
-                    "federated": { "type": "array", "items": { "type": "string" }, "example": ["mcp-registry"] },
+                    "federated": { "type": "array", "items": { "type": "string" }, "example": ["mcp-registry"], "description": "External registries this request ATTEMPTED to federate." },
+                    "federatedUnavailable": { "type": "array", "items": { "type": "string" }, "description": "Present when an attempted registry could not be checked (timeout or error) - registry-backed results may be missing. Disclosed so absence of registry results is never mistaken for checked-and-empty." },
                     "related": { "type": "array", "description": "Only with ?related=1: cross-registrable-domain entries, each { host, class: publisher-declared-related | registry-verified-related | infrastructure-correlated-candidate, declaration?, attribution?, signals[], resources[] }. Separate from resources[]; signals are corroborating only.", "items": { "type": "object" } },
                     "relatedNote": { "type": "string" },
                     "resources": {

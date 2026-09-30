@@ -54,6 +54,10 @@ const parityCases = [
   ["assessMcpReadiness", [{ init: { ok: false, status: 404 } }]],
   ["assessOpenApiReadiness", [{ openapi: "3.0.3", servers: [{ url: "https://a" }], security: [] }]],
   ["assessOpenApiReadiness", [{ openapi: "3.0.3", servers: [{ url: "https://a" }], security: [{ k: [] }] }]],
+  ["assessMcpReadiness", [{ init: { ok: true, status: 200, protocolVersion: null } }]],
+  ["readinessProtocol", [{ source: "llms.txt", type: "llms.txt", url: "https://replicate.com/docs/reference/mcp" }]],
+  ["readinessProtocol", [{ source: "x", type: "x", url: "https://x.com/blog/mcp" }]],
+  ["readinessProtocol", [{ source: "x", type: "x", url: "https://x.com/reference/openapi" }]],
 ];
 for (const [fn, args] of parityCases) {
   eq(`parity ${fn}(${JSON.stringify(args[0]).slice(0, 40)}…)`, worker[fn](...args), lib[fn](...args));
@@ -102,6 +106,18 @@ eq("mcp handshake 404 → broken", lib.assessMcpReadiness({ init: { ok: false, s
 eq("mcp handshake 500 → broken", lib.assessMcpReadiness({ init: { ok: false, status: 502 } }).outcome, "broken");
 eq("mcp handshake network-fail → incomplete", lib.assessMcpReadiness({ init: { ok: false, status: 0 } }).outcome, "incomplete");
 eq("mcp handshake 405 (ambiguous legacy transport) → incomplete, NOT broken", lib.assessMcpReadiness({ init: { ok: false, status: 405 } }).outcome, "incomplete");
+
+/* ready requires PROTOCOL evidence — an HTML docs page answering 200 is not an
+   MCP endpoint (real false positive found in external testing: replicate.com) */
+eq("mcp 200 WITHOUT initialize result → incomplete, never ready", lib.assessMcpReadiness({ init: { ok: true, status: 200, protocolVersion: null } }).outcome, "incomplete");
+ok_("mcp 200-not-mcp → names protocol-level evidence", lib.assessMcpReadiness({ init: { ok: true, status: 200, protocolVersion: null } }).missing[0].includes("protocol-level evidence"));
+eq("mcp 200 WITH initialize result → ready (unchanged)", lib.assessMcpReadiness({ init: { ok: true, status: 200, protocolVersion: "2025-06-18" } }).outcome, "ready");
+/* doc-section paths never fuzzy-match as endpoints */
+eq("noise: /docs/reference/mcp (the replicate FP) → null", lib.readinessProtocol({ source: "llms.txt", type: "llms.txt", url: "https://replicate.com/docs/reference/mcp" }), null);
+eq("noise: /blog/mcp → null", rp("https://x.com/blog/mcp"), null);
+eq("noise: /reference/openapi → null", rp("https://x.com/reference/openapi"), null);
+eq("keep: pinecone-style /mcp/ → mcp", rp("https://www.pinecone.io/mcp/"), "mcp");
+eq("keep: explicit type=mcp even under /docs/ → mcp (labels trusted)", lib.readinessProtocol({ source: "awp", type: "mcp", url: "https://x.com/docs/endpoint" }), "mcp");
 
 /* OpenAPI explicit-open: security:[] is the spec's OWN "no auth" declaration */
 eq("openapi security:[] → ready (explicitly open)", lib.assessOpenApiReadiness({ openapi: "3.0.3", servers: [{ url: "https://a" }], security: [] }).outcome, "ready");
