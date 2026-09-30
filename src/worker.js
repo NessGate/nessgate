@@ -2341,6 +2341,7 @@ export function matchClient(readiness, entry) {
   return { compatible: !hardFail, reason: hardFail ? `client and service both declare ${hardFail} and they do not intersect` : undefined, matchedOn: { protocol: true, version, transport, auth } };
 }
 
+const READINESS_CAPACITY_MSG = "readiness could not run on this request — the combined discovery flags consumed the platform request budget before assessment; retry with ?readiness=1 alone (without org/related) for a full assessment";
 const READINESS_MAX = 4; // cap connectable resources assessed per /explore call
 const READINESS_BYTES = 262144;
 const READINESS_FETCH_TIMEOUT_MS = 5000; // per readiness hop (tighter than the discovery fetch timeout)
@@ -2385,7 +2386,7 @@ async function readinessFetchJson(url, deadline) {
     const res = await fetch(u.toString(), { method: "GET", redirect: "manual", signal: controller.signal, headers: { "User-Agent": "NessGate-Readiness/1.0 (+https://nessgate.com)", Accept: "application/json" }, cf: { cacheTtl: 0 } });
     if (res.status !== 200) { try { await res.body?.cancel(); } catch {} return { status: res.status || 0, json: null }; }
     try { return { status: 200, json: JSON.parse(await readinessReadBounded(res, READINESS_BYTES)) }; } catch { return { status: 200, json: null }; }
-  } catch { return { status: 0, json: null }; } finally { clearTimeout(timer); }
+  } catch (e) { return { status: String(e && e.message || "").includes("Too many subrequests") ? -1 : 0, json: null }; } finally { clearTimeout(timer); }
 }
 // Read-only MCP initialize (no tools/call, no credentials). Returns status even on
 // 401/403 (the auth signal), plus the RFC 9728 pointer and negotiated version.
@@ -2403,7 +2404,7 @@ async function readinessMcpInit(url, deadline) {
     const res = await fetch(u.toString(), { method: "POST", redirect: "manual", signal: controller.signal, headers: { "content-type": "application/json", accept: "application/json, text/event-stream", "User-Agent": "NessGate-Readiness/1.0 (+https://nessgate.com)" }, cf: { cacheTtl: 0 }, body });
     const text = await readinessReadBounded(res, 65536);
     return { ok: res.status === 200, status: res.status, wwwAuthenticate: res.headers.get("www-authenticate") || null, protocolVersion: extractProtocolVersion(text) };
-  } catch { return { ok: false, status: 0 }; } finally { clearTimeout(timer); }
+  } catch (e) { return { ok: false, status: String(e && e.message || "").includes("Too many subrequests") ? -1 : 0 }; } finally { clearTimeout(timer); }
 }
 async function readinessFillMcp(endpoint, deadline) {
   if (/\.json(\?|$)/i.test(endpoint) || /server-card|agent-card/i.test(endpoint)) {
@@ -2428,6 +2429,10 @@ async function readinessFillMcp(endpoint, deadline) {
       }
     }
   }
+  // Platform request budget exhausted before the handshake could run: disclose
+  // it explicitly — this is a capacity condition of THIS request, not a fact
+  // about the service (never reported as if the service were assessed).
+  if (init.status === -1) return { protocol: "mcp", outcome: "incomplete", verified: "skipped:capacity", missing: [READINESS_CAPACITY_MSG], endpoint };
   return { ...assessMcpReadiness({ init, prm, as }), endpoint };
 }
 // IO: assess one connectable resource (worker vantage). Read-only, no credentials.
@@ -2435,12 +2440,15 @@ async function readinessForResource(resource, deadline) {
   const proto = readinessProtocol(resource);
   if (!proto) return null;
   const stamp = (a) => ({ ...a, endpoint: a.endpoint || resource.url });
+  const capacity = (protocol) => stamp({ protocol, outcome: "incomplete", verified: "skipped:capacity", missing: [READINESS_CAPACITY_MSG] });
   if (proto === "openapi") {
     const r = await readinessFetchJson(resource.url, deadline);
+    if (r.status === -1) return capacity("openapi");
     return stamp(r.json ? assessOpenApiReadiness(r.json) : { ...assessFetchFailure("openapi", r.status, "OpenAPI document"), transport: "https" });
   }
   if (proto === "a2a-agent-card") {
     const r = await readinessFetchJson(resource.sourceUrl || resource.url, deadline);
+    if (r.status === -1) return capacity("a2a-agent-card");
     return stamp(r.json ? assessA2aReadiness(r.json) : assessFetchFailure("a2a-agent-card", r.status, "A2A agent card"));
   }
   if (proto === "mcp") return stamp(await readinessFillMcp(resource.url, deadline));
@@ -2573,7 +2581,7 @@ async function apiConnect(raw, env, ctx, request, clientCaps) {
 // (the tool dispatches to the same handler).
 
 const MCP_SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26"];
-const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.18.0" };
+const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.18.1" };
 const MCP_INSTRUCTIONS =
   "Three read-only tools. discover_domain: what a domain publishes (the raw normalized list). " +
   "connect_domain: given a domain AND your client's capabilities, HOW to connect — one outcome " +
