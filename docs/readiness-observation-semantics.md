@@ -43,7 +43,7 @@ The stability experiment measured the readiness pipeline over repeated runs and 
 ## 3. Vantage (`V`)
 
 - Every observation names its **vantage class**: e.g. `edge:<provider>` (production-grade egress) or
-  `local:<unspecified>`. Certification observations MUST come from a vantage class with a published
+  `local:<unspecified>`. Verification observations MUST come from a vantage class with a published
   reliability baseline (the vantage must first pass a self-check: N consecutive successful control
   fetches of a known-good reference endpoint). A vantage that fails its control is disqualified for
   that window — its observations are discarded, not counted as service failures.
@@ -83,7 +83,7 @@ The stability experiment measured the readiness pipeline over repeated runs and 
   without protocol evidence) and network failures are `undetermined` inputs**: they can prevent
   Ready, but can never establish Broken. NessGate identifies walls; it never evades them and never
   blames the service for them.
-- The verification/relationship split is preserved: certification reads the **readiness axis only**.
+- The verification/relationship split is preserved: verification reads the **readiness axis only**.
   Evidence classes (`publisher-hosted` / `publisher-declared` / `namespace-verified`) are reported
   alongside, never merged into the verdict (the two-axis rule of `v2-architecture.md` §1).
 

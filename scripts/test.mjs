@@ -213,7 +213,7 @@ is(classifyJson('{"entries":[]}'), "ard-catalog", "classifyJson: ARD catalog");
 is(classifyJson('{"openapi":"3.0.0"}'), "openapi", "classifyJson: OpenAPI");
 is(classifyJson('{"aic":"x","name":"A","certificate":{"requestedValidity":1}}'), "gbz-185-4", "classifyJson: GB/Z ACS recognized");
 is(classifyJson('{"name":"Card","supportedInterfaces":[{"url":"https://x/a"}]}'), "a2a-agent-card", "classifyJson: A2A needs A2A-specific structure");
-is(classifyJson('{"name":"NessReady","url":"https://x"}'), null, "classifyJson: bare name/url (ai-info-like) NOT mislabelled as A2A");
+is(classifyJson('{"name":"ExampleCo","url":"https://x"}'), null, "classifyJson: bare name/url (ai-info-like) NOT mislabelled as A2A");
 is(classifyJson('{"random":true}'), null, "classifyJson: unknown JSON → null");
 is(classifyJson("not json"), null, "classifyJson: non-JSON → null");
 

@@ -9,7 +9,7 @@
 //  - Discovery comes from the hosted /explore (10-min edge cache), so N
 //    back-to-back runs see IDENTICAL discovery. Any run-to-run variance is
 //    therefore the ASSESSMENT layer (MCP handshakes, OAuth metadata chains,
-//    spec fetches) — exactly the layer a certification predicate depends on.
+//    spec fetches) — exactly the layer a standing verdict depends on.
 //  - N local runs per domain (assessment fresh every time), then ONE production
 //    POST /connect per domain: a different vantage (Cloudflare edge) running the
 //    same rules — measures vantage variance on the final outcome.

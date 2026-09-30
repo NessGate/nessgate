@@ -122,6 +122,6 @@ Versioning: keep the npm package, `public/openapi.json` `info.version`, and the 
   `examples/langchain` mirrors it. Fallback scans that guess are out of scope by
   charter (results are never fabricated). Usage is measured via the
   `connect:`/`readiness:` metric labels.
-- `docs/readiness-certification-draft.md` — the readiness-verification observation-semantics
+- `docs/readiness-observation-semantics.md` — the readiness-verification observation-semantics
   proposal (N-of-M verdicts, vantage classes, per-hop retries), grounded in the lab
   stability experiment. Gated on Charter v2; nothing implemented.

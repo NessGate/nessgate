@@ -4,7 +4,7 @@
 // not noise. This report does NOT ask "human or bot" — it asks what each
 // automated caller REPRESENTS, using the functional taxonomy:
 //
-//   first-party   — the operator's own systems (e.g. NessReady). Meaningful
+//   first-party   — the operator's own systems. Meaningful
 //                   usage, but NOT independent. Identified by caller IP
 //                   prefix, declared out-of-band (never hardcoded — this repo
 //                   is public): --first-party=<prefix,prefix> or env

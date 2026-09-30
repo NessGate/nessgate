@@ -176,7 +176,7 @@ because servers gate `initialize` behind auth (unknowable without credentials �
 `/explore` path loses the inline A2A card body (must re-fetch, occasionally blocked by the target's own bot
 protection). These are honest ceilings, not defects; the fixes are unit-proven (40 readiness tests).
 
-## Findings — verdict stability (the certification question)
+## Findings — verdict stability (the standing-verdict question)
 
 Can a readiness verdict be a *standing* claim? `run-stability.mjs` measured it:
 3 full local runs × 12 domains + a production-vantage `/connect` pass, then a controlled follow-up
@@ -200,10 +200,10 @@ next small product increment.
 
 **Conclusion for readiness verification:** NessGate is already a deterministic judge of
 *rules* (CI-proven: same evidence → same verdict). It is NOT yet a deterministic judge of
-*observations*, and no single-shot verdict can be. A certification predicate is viable only with:
+*observations*, and no single-shot verdict can be. A standing-verdict predicate is viable only with:
 (1) a reliable, named vantage (edge, not laptop), (2) N-of-M majority verdicts with defined
 observation windows, (3) per-hop retries in metadata chains — i.e., exactly the re-verification
-machinery that the v2 plan gates behind Charter v2 activation. Measurement supports the sequencing: the self-check is usable now; hosted standing verdicts only after Charter v2 + observation semantics exist. Those semantics are now drafted: **`docs/readiness-certification-draft.md`** (N-of-M
+machinery that the v2 plan gates behind Charter v2 activation. Measurement supports the sequencing: the self-check is usable now; hosted standing verdicts only after Charter v2 + observation semantics exist. Those semantics are now drafted: **`docs/readiness-observation-semantics.md`** (N-of-M
 majority, named vantage classes, per-hop retries, `undetermined`/`unstable` as first-class results —
 every rule traceable to a finding in this experiment).
 

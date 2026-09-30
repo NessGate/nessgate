@@ -239,15 +239,34 @@ const { resources } = await resolve("example.com");</code></pre>
 <a href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a> ·
 <a href="https://www.npmjs.com/package/@nessgate/resolver" rel="noopener">npm</a>.</p>
 
+<h2>Connection readiness &amp; connection plan</h2>
+<pre><code>GET  /explore/{domain}?readiness=1   — per-endpoint readiness assessment
+POST /connect/{domain}               — connection plan for YOUR client</code></pre>
+<p>Beyond listing what a domain publishes, NessGate can assess <em>how ready each published
+endpoint is to connect to</em>, read from the service's own metadata (OpenAPI
+<code>servers</code>+<code>securitySchemes</code>, A2A agent cards, and the MCP OAuth metadata
+chain, RFC&nbsp;9728&nbsp;→&nbsp;RFC&nbsp;8414). Outcomes are honest enums, never scores:
+<code>ready</code> (connect now, no credentials), <code>credentials-required</code> (everything is
+known — you supply your own secret, which never touches NessGate), <code>incomplete</code> (the
+protocol-defined metadata is not published; <code>missing[]</code> names each field), or
+<code>broken</code> (the declared location answers but contradicts the declaration).</p>
+<p><code>POST /connect/{domain}</code> takes your client's capabilities —
+<code>{"client":{"supports":[{"protocol":"mcp","auth":["oauth2","none"]}]}}</code> — and returns one
+outcome plus a concrete plan (protocol, endpoint, transport, version, auth metadata) with
+provenance. Capabilities are input only; nothing is stored. Publishers can self-test with
+<code>npx @nessgate/resolver yourdomain.com</code>.</p>
+
 <h2>MCP server (for AI agents)</h2>
 <pre><code>POST /mcp          — Model Context Protocol, Streamable HTTP transport</code></pre>
 <p>AI agents can call the resolver natively over the
 <a href="https://modelcontextprotocol.io" rel="nofollow">Model Context Protocol</a> instead of the
-REST API. The server is stateless, requires no authentication, and exposes one read-only tool that
-dispatches to the same handler (and rate limits) as <code>/discover</code>:</p>
+REST API. The server is stateless, requires no authentication, and exposes three read-only tools
+that dispatch to the same handlers (and rate limits) as the REST endpoints:</p>
 <table>
 <tr><th>Tool</th><th>Returns</th></tr>
 <tr><td><code>discover_domain</code></td><td>The normalized machine-readable resources the domain publishes (same answer as <code>/discover/{domain}</code>), with a <code>sourceUrl</code> on each record.</td></tr>
+<tr><td><code>connect_domain</code></td><td>A connection plan for the calling client (same answer as <code>POST /connect/{domain}</code>): one outcome — ready / credentials-required / incomplete / broken / no-compatible-method — plus endpoint, transport, version, and published auth metadata. Client capabilities ride in <code>arguments.client</code> (input only).</td></tr>
+<tr><td><code>check_readiness</code></td><td>Per-endpoint readiness for the domain (same answer as <code>/explore/{domain}?readiness=1</code>), client-agnostic.</td></tr>
 </table>
 <pre><code>$ curl -X POST https://nessgate.com/mcp -H "Content-Type: application/json" -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",

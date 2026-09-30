@@ -18,7 +18,7 @@ import { plan } from "@nessgate/resolver";
 
 const p = await plan("supabase.com", { supports: [{ protocol: "mcp", auth: ["oauth2", "none"] }] });
 
-p.outcome;      // "ready" | "credentials-required" | "incomplete" | "no-compatible-method"
+p.outcome;      // "ready" | "credentials-required" | "incomplete" | "broken" | "no-compatible-method"
 p.connection;   // { protocol, endpoint, transport, version, auth:{ type, tokenEndpoint, scopes, … } }
                 // → everything needed to connect; you supply your own credentials (never sent to anyone).
 p.unmatched;    // what the service offered that your client can't use, and vice-versa
@@ -47,9 +47,9 @@ with the **exact missing field** when your publication is incomplete or broken. 
 - run: npx @nessgate/resolver yourdomain.com   # fails the build until agents can connect to you
 ```
 
-Options: `--observations=N` · `--spacing=SECONDS` (certification-grade spaced runs) · `--json`.
+Options: `--observations=N` · `--spacing=SECONDS` (spaced observation runs) · `--json`.
 The predicate and its observation semantics are published in the NessGate repo
-(`docs/readiness-certification-draft.md`) — anyone can re-run it and get the same verdict.
+(`docs/readiness-observation-semantics.md`) — anyone can re-run it and get the same verdict.
 
 ## Discover (the raw list)
 

@@ -18,7 +18,7 @@
 //
 // Explicitly NOT here (later stages, gated on Charter v2 becoming active):
 // persistent storage/index, publisher registration, hosted crawling/page-reading,
-// async refresh, registry federation, any NessReady integration. This module has
+// async refresh, registry federation, any external-service integration. This module has
 // NO store and reads nothing but the domain's own well-known files, its
 // robots/sitemap, and public certificate-transparency data — each with provenance.
 //

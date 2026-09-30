@@ -17,10 +17,10 @@
 //           protocol-defined metadata is not published; missing[] names each
 //           field), or nothing connectable at all.               exit 1
 //
-// Unanimity is the strict small-N mapping of the certification draft's ≥80%
-// majority rule (docs/readiness-certification-draft.md). This CI profile runs
-// observations back-to-back; certification-grade runs space them across a
-// window (--spacing). Read-only; no credentials are ever sent; nothing is
+// Unanimity is the strict small-N mapping of the observation-semantics draft's
+// ≥80% majority rule (docs/readiness-observation-semantics.md). This CI profile
+// runs observations back-to-back; spaced runs distribute them across a window
+// (--spacing). Read-only; no credentials are ever sent; nothing is
 // reported anywhere — the check runs and stays on your machine.
 //
 // Options: --observations=N (default 3) · --spacing=SECONDS (default 0)

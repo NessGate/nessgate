@@ -31,6 +31,38 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h2>2026</h2>
 
+<h3 id="readiness-2026-09-29">Connection readiness, connection plans, three MCP tools, and an open self-test (1.13.0 → 1.17.1)</h3>
+<ul>
+<li><strong>Connection readiness (opt-in):</strong> <code>GET /explore/{domain}?readiness=1</code>
+attaches a <code>readiness</code> block to each connectable resource, assessed read-only from the
+service's own published metadata — OpenAPI <code>servers</code>+<code>securitySchemes</code>, A2A
+agent cards, and the MCP OAuth metadata chain (RFC 9728 → RFC 8414). Outcomes are enums, never
+scores: <code>ready</code>, <code>credentials-required</code>, <code>incomplete</code> (with
+<code>missing[]</code> naming the exact under-published field), and — from 1.16.0 —
+<code>broken</code>, claimed only on positive evidence (the declared location answered 404/410/5xx
+or an unparseable document; denials and network failures never read as broken). Default
+<code>/explore</code> output is unchanged. (1.13.0, 2026-09-27; broken outcome 1.16.0, 2026-09-29)</li>
+<li><strong>Connection plan:</strong> <code>POST /connect/{domain}</code> matches the caller's
+declared client capabilities against what the domain publishes (deterministic intersection) and
+returns one outcome with a concrete plan — protocol, endpoint, transport, version, and the auth
+metadata the service published. Capabilities are input only (nothing stored); responses are
+uncached; credentials stay with the caller. An empty <code>client</code> is answered with a broad
+default and labeled <code>clientAssumed:true</code> rather than a false
+<code>no-compatible-method</code> (1.15.1). (1.14.0, 2026-09-27)</li>
+<li><strong>MCP server grew to three read-only tools:</strong> <code>discover_domain</code>,
+<code>connect_domain</code>, <code>check_readiness</code> — same handlers and rate limits as the
+REST endpoints. (1.17.0, 2026-09-29)</li>
+<li><strong>Open self-test:</strong> <code>npx @nessgate/resolver yourdomain.com</code> (bin
+<code>nessgate-ready</code>) runs the readiness assessment client-side — repeated observations,
+unanimity required, exit 0 only when a connectable path is consistently usable; otherwise it names
+the exact missing field. Nothing is reported anywhere. An OpenAPI document that declares top-level
+<code>security: []</code> now reads as explicitly open. (1.17.0, 2026-09-29)</li>
+<li><strong>Anonymous usage outcomes:</strong> the existing single-site categorical metric gained
+<code>connect:&lt;outcome&gt;</code> and <code>readiness:&lt;aggregate&gt;</code> labels — one label
+per call, no domains, IPs, client payloads, or identifiers. Library versions 1.13.0–1.17.1 on npm;
+worker, OpenAPI description, and MCP serverInfo versions kept in step. (2026-09-27 → 2026-09-29)</li>
+</ul>
+
 <h3 id="antibot-2026-09-22">Anti-bot honesty in the verify pass: identify walls, never assume, never evade</h3>
 <ul>
 <li>The reachability states grew to distinguish what a denial actually <em>means</em>:

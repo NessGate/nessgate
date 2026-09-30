@@ -2,7 +2,7 @@
 
 Status: PROPOSAL (nothing implemented; per directive, plan before code)
 Date: 2026-09-15
-Inputs: v1.6.0 frozen codebase audit · frozen-200 benchmarks (NessGate v1.6 + NessReady P1/P2) · Neutrality Charter (live) · direction decision of 2026-09-15
+Inputs: v1.6.0 frozen codebase audit · frozen-200 benchmarks (NessGate v1.6 + extended-prototype P1/P2) · Neutrality Charter (live) · direction decision of 2026-09-15
 
 > **RECLASSIFICATION (2026-09-15).** The core capability is accumulated *compatibility knowledge* and
 > the system that maintains it — not this storage/index or general discovery. The persistent
@@ -22,12 +22,12 @@ Inputs: v1.6.0 frozen codebase audit · frozen-200 benchmarks (NessGate v1.6 + N
 Facts this plan is built on, so we do not design against wishes:
 
 - **v1.6 strict+explore coverage:** 57/200 frozen-cohort seeds positive (28.5%).
-- **NessReady P2 with everything on** (crawl, CT, GitHub, npm, unbounded verification): 53/200 seeds gained beyond-T0 verified items; union with strict ≈ 40–45%. **No configuration of discovery reached 60%+.** The remaining gap is publishers that publish nothing machine-readable. Discovery cannot find what does not exist.
+- **The P2 extended prototype with everything on** (crawl, CT, GitHub, npm, unbounded verification): 53/200 seeds gained beyond-T0 verified items; union with strict ≈ 40–45%. **No configuration of discovery reached 60%+.** The remaining gap is publishers that publish nothing machine-readable. Discovery cannot find what does not exist.
 - **What produced coverage:** publisher link-graph reading + removing per-invocation verification budget ≈ most of the gain; CT subdomains +6 verified orgs; sitemaps +1; GitHub org evidence +0 verified orgs (18 corroborating evidence rows); npm +0 (evidence rows only).
 - **Hosted-worker physics:** synchronous deep discovery hit CPU limits (1102), needed 20 s deadlines, and a full deep report takes ~97 s even queued. A universal resolver cannot answer like that.
 
 Consequences:
-1. The coverage target for v2 is honest: **~40–50% organization coverage** with useful verified resources; 60%+ is reachable only through the **publishing side** (§9), not through more discovery.
+1. The measured coverage expectation for v2: **~40–50% organization coverage** with useful verified resources; more is reachable only through the **publishing side** (§9), not through more discovery.
 2. The one discovery mechanism that materially moves coverage — bounded publisher-surface reading — is exactly the one requiring a charter amendment (§10). It is a deliberate decision, not a technical detail.
 3. Depth belongs in the **open-source library** (integrator pays compute) and in **asynchronous index refresh**, never in the synchronous hosted path.
 
@@ -35,7 +35,7 @@ Consequences:
 
 ## 1. Two-level / two-axis result model
 
-Adopt the NessReady two-axis model as the foundational result shape, mapped to the directive's two levels.
+Adopt the P2 two-axis model as the foundational result shape, mapped to the directive's two levels.
 
 Every result item carries two independent facts:
 
@@ -51,11 +51,11 @@ Evidence classes (existing /explore classes, renamed only where noted, no numeri
 | **Level 1 — Authoritative** | `publisher-hosted`, `publisher-declared`, `registered` (new, §9), `namespace-verified` (federated registry, domain-authenticated), `publisher-declared-related` (RWS/Asset Links) |
 | **Level 2 — Discovered** | `same-registrable-domain` (rename of `same-domain-host`, aligns with published wording "namespace proximity only"), `publisher-linked` (new: reached via the publisher's own pages/sitemap), `registry-attributed` (registry entry without domain authentication), `publisher-redirect-candidate`, `infrastructure-correlated` (signal only, never promotes), `candidate` (caller-supplied) |
 
-Rules (already proven in NessReady, now normative):
+Rules (already proven in the P2 prototype, now normative):
 - Verification NEVER upgrades relationship. A verified resource on a linked host is still `publisher-linked`.
 - Level 2 is returned in a structurally separate array (`discovered[]` beside `resources[]`), never merged.
 - Every item carries `provenance[]` (the reproducible path: which page/file/record led here, every hop).
-- The per-report noise rule from NessReady (boilerplate-ubiquity + reciprocal-mention → `presentation: demoted-generic`, evidence preserved) ships with `publisher-linked` from day one, so the open resolver never returns "github.com" as a top result for every domain that has a footer link.
+- The per-report noise rule from P2 (boilerplate-ubiquity + reciprocal-mention → `presentation: demoted-generic`, evidence preserved) ships with `publisher-linked` from day one, so the open resolver never returns "github.com" as a top result for every domain that has a footer link.
 
 **Useful-empty:** an empty answer must state which mechanisms were checked and link the publishing path ("publish llms.txt / register your declaration") — converting the resolver's biggest weakness into the entry point for §9.
 
@@ -148,7 +148,7 @@ Hosted behavior (Queues + the storage layer):
 ```
 query → serve fast tier from index+live immediately (labelled, with per-record freshness)
       → if the domain has no fresh balanced-tier cache AND passes demand gating:
-          enqueue one bounded balanced/deep refresh job (NessReady jobs pattern:
+          enqueue one bounded balanced/deep refresh job (P2 jobs pattern:
           one candidate verification per queue message, fresh budget each)
       → next query gets the richer cached answer
 ```
@@ -163,7 +163,7 @@ Read-side federation, consistent with the charter ("reads them and points back")
 - **Unauthenticated** attribution (a registry lists the domain without proving control) → Level 2 `registry-attributed`, discovery layer only, short TTL.
 - NessGate never presents itself as the source and never flattens registries into one badge: the position is *many registries, each keeping its identity → one evidence-labelled normalized answer*.
 
-## 9. Publisher registration / declaration (the coverage lever that actually reaches 60%+)
+## 9. Publisher registration / declaration (how coverage can exceed the discovery ceiling)
 
 Constraint carried over from the 2026-09 direction decision: **NessGate ships no publish file of its own.** The front-door-manifest niche is already taken (AWP `/.well-known/awp.json`, A2A `agent.json`, ARD `ai-catalog.json`); a NessGate-specific file would be the reinvention trap and would recreate a publisher-adoption barrier. Declarations therefore ride entirely on the standards NessGate already reads:
 
@@ -193,7 +193,7 @@ Carried into Charter v2 as explicit public commitments:
 2. **Two questions, never merged.** NessGate reports *whether a resource is real* and *how strongly it relates to a domain* as two separate facts. Finding or verifying a resource never makes it "official."
 3. **Storage independence.** Any persistent store is an implementation choice, never part of the protocol. The same captured evidence, evaluated under the same open rules, yields the same classification with any store or none.
 4. **Operator independence.** nessgate.com is one reference deployment. The open implementation runs for anyone on their own database or with no database, and reaches the same classifications from the same captured evidence and the same open rules.
-5. **No privileged submitter — including our own commercial layer.** Anyone may submit candidate resources; every submission, from any party including NessReady, is evaluated under the identical public rules and remains *discovered* until it independently earns authority. There is no private path to promotion, and none for sale.
+5. **No privileged submitter.** Anyone may submit candidate resources; every submission — from any party, including any party affiliated with the operator — is evaluated under the identical public rules and remains *discovered* until it independently earns authority. There is no private path to promotion, and none for sale.
 6. **Source-preserving federation.** When a result comes from another registry, NessGate names that registry and its verification method. Registries are never flattened into a generic "trusted" stamp.
 7. **No proprietary publishing format.** NessGate introduces no publishing file for domains to adopt. It reads the standards that already exist; a domain's own standard files are its declaration.
 
@@ -210,14 +210,14 @@ Unchanged v1 commitments — free forever, no ranking/placement sales, neutral t
 
 - Synchronous paths keep current budgets (10/60 s edge burst; /discover 120/h; /explore 60/h; 20 s deadline; 24 req; 6 MB) — v2 makes the hosted service FASTER (index hits), never heavier.
 - Registration: 5/day/IP + one pending challenge per domain.
-- Async refresh: demand-gated (§7), global daily job budget, per-domain 24 h cooldown, queue depth capped; refresh jobs use the NessReady one-candidate-per-message pattern so no invocation exceeds platform budgets.
+- Async refresh: demand-gated (§7), global daily job budget, per-domain 24 h cooldown, queue depth capped; refresh jobs use the P2 one-candidate-per-message pattern so no invocation exceeds platform budgets.
 - All storage rows carry origin + TTL, so cost is bounded by real demand, not by the size of the web.
 
-## 13. NessReady → OSS moves, and what stays commercial
+## 13. Scope boundary for the open resolver
 
-**Moves into OSS NessGate** (deterministic, reproducible, free-source): two-axis model + noise rule; CT-subdomain adapter; sitemap-host adapter; publisher-surface adapter (deep, charter-gated); per-candidate embedded verification pattern; storage interface + reference stores; queued-refresh pattern.
+**Belongs in the open resolver** (deterministic, reproducible, free-source): the two-axis model + noise rule; CT-subdomain adapter; sitemap-host adapter; publisher-surface adapter (deep, charter-gated); per-candidate embedded verification pattern; storage interface + reference stores; queued-refresh pattern.
 
-**Stays in NessReady** (explicitly commercial): paid search APIs; AI-assisted candidate generation; multi-vantage fetching; history/monitoring/diffs/alerts; organization reports and PDF artifacts; done-for-you setup; SLAs. **NessReady has no private definition of "NessGate verified"** — it calls the same open resolver; its value is breadth, vantage, history, and workflow, not a different truth.
+**Out of scope for the open resolver**: paid search APIs; AI-assisted candidate generation; multi-vantage fetching; history/monitoring/diffs/alerts; report artifacts; done-for-you setup; SLAs — anything requiring paid dependencies or operator services. Any layer built on top, run by anyone, calls the same open resolver and has **no private definition of "NessGate verified"**: its value is breadth, vantage, history, and workflow, not a different truth.
 
 ## 14. Staged implementation order (smallest safe first release)
 
@@ -241,7 +241,7 @@ Each stage is independently shippable and reversible; the frozen v1.6 behavior r
 
 Re-run the SAME frozen 200-domain cohorts (no new cohorts, no hardcoding, no optimizing around examples) after stages 3, 5, and 6:
 
-- **Useless-empty rate** (primary): fraction of seeds returning zero items at balanced tier. v1.6 baseline: 71.5%. Target after stage 6: ≤ 55% — honest given the measured publishing ceiling; anything better comes from §9 adoption, tracked separately as *declared-domain count* (an adoption metric, not a benchmark metric).
+- **Useless-empty rate** (primary): fraction of seeds returning zero items at balanced tier. v1.6 baseline: 71.5%. Reference point after stage 6: ≤ 55%, reflecting the measured publishing ceiling; further movement depends on publishers adopting the existing standards (§9), tracked separately as *declared-domain count*.
 - **Trust invariants (hard gates, any failure blocks release):** zero Level 2 items presented as Level 1; zero classification differences between store-backed and stateless runs on identical evidence (§4 test); zero results derived from non-public or paid sources; spot-audit of 30 random verified items shows ≥ 95% genuinely live and correctly classed (P1 audit method).
 - **Latency:** p50 of cached balanced answers < 1 s; p50 cold fast answers ≤ current /discover.
 - **Noise:** generic high-degree destinations (measured per report, no host list) appear as primary in < 5% of reports where the noise rule has ≥ 3 crawled pages of signal.
@@ -251,4 +251,4 @@ Re-run the SAME frozen 200-domain cohorts (no new cohorts, no hardcoding, no opt
 
 ### Out of scope for v2 (explicit)
 
-Web search, AI candidate generation, historical snapshots, monitoring, multi-vantage, paid anything — NessReady. Global federation of NessGate instances (multiple index operators with delegation) — a v3 question; v2's storage abstraction and origin-tagged records are designed so it becomes possible without schema breakage.
+Web search, AI candidate generation, historical snapshots, monitoring, multi-vantage, paid anything — out of scope for the open resolver (§13). Global federation of NessGate instances (multiple index operators with delegation) — a v3 question; v2's storage abstraction and origin-tagged records are designed so it becomes possible without schema breakage.

@@ -43,7 +43,7 @@ active published charter.</p>
 <p>NessGate today reads only what a domain publishes at its exact host, live, storing nothing. That
 is trustworthy, but on measurement it returns nothing for most domains — useful resources often
 live on a subdomain, a related property, or a public registry the strict resolver never reaches. A
-resolver that is empty most of the time will be routed around. The proposal below lets NessGate
+resolver that is empty most of the time is far less useful than one that finds what genuinely exists. The proposal below lets NessGate
 find and normalize more of what genuinely exists, <em>without</em> loosening what "verified" or
 "official" means: every result still says exactly why it exists, and weak evidence is never
 presented as authoritative. The full technical design is public in
@@ -110,9 +110,9 @@ grouping is not ranking and buys no one placement.</p>
 <li><strong>Operator independence.</strong> nessgate.com is one reference deployment. The open
     implementation runs for anyone on their own database or with no database, and reaches the same
     classifications from the same captured evidence and the same open rules.</li>
-<li><strong>No privileged submitter — including our own commercial layer.</strong> Anyone may
-    submit candidate resources; every submission, from any party including NessReady, is evaluated
-    under the identical public rules and remains <em>discovered</em> until it independently earns
+<li><strong>No privileged submitter.</strong> Anyone may
+    submit candidate resources; every submission — from any party, including any party affiliated
+    with the operator — is evaluated under the identical public rules and remains <em>discovered</em> until it independently earns
     authority. There is no private path to promotion, and none for sale.</li>
 <li><strong>Source-preserving federation.</strong> When a result comes from another registry,
     NessGate names that registry and its verification method. Registries are never flattened into a
