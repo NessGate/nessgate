@@ -39,3 +39,7 @@ __pycache__/
 lab/connection-plan/*.log
 lab/connection-plan/last-run*.json
 lab/connection-plan/market-*.json
+
+# nessgate-inspect lab: transient run outputs (scripts and docs are committed)
+lab/nessgate-inspect/last-run*.json
+lab/nessgate-inspect/*.log
