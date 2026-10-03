@@ -33,6 +33,7 @@ All four are also MCP tools at `POST /mcp`: `discover_domain`, `connect_domain`,
 | `scripts/` | Tests, deploy, smoke. See below. |
 | `examples/langchain/` | LangChain tools (`connect_domain`, `discover_domain`) + MCP-adapter usage. |
 | `packages/resolver/ready-check.mjs` | `nessgate-ready` CLI (`npx @nessgate/resolver <domain>`): the open self-test / CI profile of the readiness predicate. |
+| `packages/inspect/` | npm `@nessgate/inspect` (0.x, experimental): inbound-request inspection (tiers, Web Bot Auth, network attribution) + Express middleware. Tests/validation live in `lab/nessgate-inspect/`. |
 
 ## The parity model (read this before editing resolver/worker)
 
@@ -109,8 +110,9 @@ npm run smoke            # post-deploy: prod health + /connect + readiness e2e (
 push, then `gh workflow run publish-resolver.yml` (OIDC, tokenless); verify with
 `node scripts/check-npm-parity.mjs`. Rollback: `npx wrangler rollback`.
 
-Versioning: keep the npm package, `public/openapi.json` `info.version`, and the MCP
-`serverInfo.version` in step.
+Versioning: keep the resolver npm package, `public/openapi.json` `info.version`, and the
+MCP `serverInfo.version` in step. `@nessgate/inspect` versions independently (0.x while
+the underlying drafts evolve); publish it with `gh workflow run publish-inspect.yml`.
 
 ## Where to look next
 

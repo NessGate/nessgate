@@ -11,7 +11,7 @@
 //  the operator's infrastructure. That is the honest result.)
 
 import { createServer } from "node:http";
-import { nessgateInspect, summarize } from "./middleware.mjs";
+import { nessgateInspect, summarize } from "../../../packages/inspect/middleware.mjs";
 
 // This is the entire integration:
 const inspectMiddleware = nessgateInspect({ log: true });

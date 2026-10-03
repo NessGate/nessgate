@@ -8,14 +8,14 @@
 // wants with them (log them, branch on them, ignore them).
 //
 // Express, drop in and use:
-//   import { nessgateInspect } from "./integrations/middleware.mjs";
+//   import { nessgateInspect } from "@nessgate/inspect/middleware";
 //   app.use(nessgateInspect({ log: true }));
 //   app.get("/", (req, res) => { /* read req.nessgate / req.nessgate.summary */ });
 //
 // Trusted source IP = the REAL socket peer. X-Forwarded-For is NOT trusted unless
 // you pass { trustProxy: true } AND you actually run behind a trusted proxy.
 
-import { inspect } from "../inspect.mjs";
+import { inspect } from "./inspect.mjs";
 
 export function nessgateInspect(options = {}) {
   const prop = options.property || "nessgate";

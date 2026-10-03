@@ -1,4 +1,12 @@
-# NessGate Inspect (EXPERIMENTAL — lab-only)
+# NessGate Inspect — validation harnesses
+
+The module itself now lives in [`packages/inspect/`](../../packages/inspect/) and is
+published as the experimental package `@nessgate/inspect` (0.x). This directory keeps
+its deterministic test suites and real-world validation tools, which import the
+package by path. The description below documents the module; file paths under
+"Files" refer to `packages/inspect/` for the modules and here for the harnesses.
+
+# NessGate Inspect (EXPERIMENTAL)
 
 The domain-owner side of a two-sided, neutral observation layer:
 
@@ -120,14 +128,13 @@ only show that a `Signature` header *is present*. Inspect adds:
 | `demo.mjs` | Reproducible exposure-delta demonstration (signed request vs GPTBot UA). |
 | `serve.mjs` | Standalone `node:http` demo server (`node serve.mjs`) — run Inspect over REAL inbound requests. Not the production worker; `src/` is untouched. |
 
-## Packaging mechanics (recorded; not published)
+## Packaging
 
-If this module is ever published as a package, the mechanics are: it is already
-self-contained (Node built-ins `node:crypto` and `node:dns/promises` plus sibling files;
-zero dependencies); `files` would be the six modules plus README/LICENSE; no bin. A new npm
-package name requires maintainer-side registry setup for tokenless publishing (the same
-OIDC trusted-publishing arrangement the resolver package uses) before a workflow can publish
-it. Until a publication decision is made it remains lab-only, imported by path.
+Published as `@nessgate/inspect` (0.x, experimental) from `packages/inspect/` via
+`.github/workflows/publish-inspect.yml` (OIDC trusted publishing, same arrangement as the
+resolver package). Zero dependencies; exports `.` (inspect) and `./middleware`. The 0.x
+version signals that field names may change while the underlying drafts evolve; the
+classification principles will not.
 
 ## Status & next
 

@@ -3,8 +3,8 @@
 // (2) a GPTBot User-Agent request. No external network — a mock directory is used
 // for the signed case. Run: node demo.mjs
 import { generateKeyPairSync, sign as edSign } from "node:crypto";
-import { inspect } from "./inspect.mjs";
-import { buildSignatureBase, parseSignatureInput, rfc7638ThumbprintOKP } from "./webbotauth.mjs";
+import { inspect } from "../../packages/inspect/inspect.mjs";
+import { buildSignatureBase, parseSignatureInput, rfc7638ThumbprintOKP } from "../../packages/inspect/webbotauth.mjs";
 
 const { publicKey, privateKey } = generateKeyPairSync("ed25519");
 const jwk = publicKey.export({ format: "jwk" });

@@ -138,20 +138,23 @@ endpoints (path 2) are a few lines in any language.
 ## 5. Inbound requests — inspecting callers (experimental)
 
 The reverse direction — describing what an *incoming* automated caller declares and can
-prove — is an experimental module in [`lab/nessgate-inspect/`](../lab/nessgate-inspect/). It
-observes only (no allow/deny, no scores) and returns tiered, provenanced facts.
+prove — is the experimental package
+[`@nessgate/inspect`](https://www.npmjs.com/package/@nessgate/inspect) (0.x; source in
+[`packages/inspect/`](../packages/inspect/), validation harnesses in
+[`lab/nessgate-inspect/`](../lab/nessgate-inspect/)). It observes only (no allow/deny, no
+scores) and returns tiered, provenanced facts.
 
 **Express / Connect (two lines):**
 
 ```js
-import { nessgateInspect } from "./lab/nessgate-inspect/integrations/middleware.mjs";
+import { nessgateInspect } from "@nessgate/inspect/middleware";   // npm i @nessgate/inspect
 app.use(nessgateInspect({ log: true }));     // every handler then has req.nessgate
 ```
 
 **Cloudflare Worker (edge):**
 
 ```js
-import { inspect } from "./lab/nessgate-inspect/inspect.mjs";
+import { inspect } from "@nessgate/inspect";
 export default {
   async fetch(req) {
     const headers = Object.fromEntries(req.headers);

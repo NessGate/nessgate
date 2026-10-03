@@ -1,0 +1,45 @@
+name: Publish @nessgate/inspect
+
+# Tokenless publish to npm via GitHub Actions Trusted Publishing (OIDC), same
+# arrangement as publish-resolver.yml. Nothing publishes automatically on push.
+#
+# First-time note: npm must have a trusted publisher configured for the
+# @nessgate/inspect package (repository NessGate/nessgate, workflow
+# publish-inspect.yml) before this job can publish.
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write   # required for OIDC Trusted Publishing + provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/inspect
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      # Trusted Publishing + provenance require a recent npm.
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      # Gate: the module's full deterministic test suite must pass.
+      - name: Run inspect test suites
+        working-directory: .
+        run: |
+          node lab/nessgate-inspect/test-inspect.mjs
+          node lab/nessgate-inspect/integrations/test-integration.mjs
+
+      - name: Publish (provenance, public, tokenless via OIDC)
+        run: npm publish --provenance --access public

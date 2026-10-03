@@ -5,8 +5,8 @@
 // the no-decision/no-score invariant. Run: node test-inspect.mjs
 
 import { generateKeyPairSync, sign as edSign } from "node:crypto";
-import { inspect } from "./inspect.mjs";
-import { buildSignatureBase, parseSignatureInput, rfc7638ThumbprintOKP } from "./webbotauth.mjs";
+import { inspect } from "../../packages/inspect/inspect.mjs";
+import { buildSignatureBase, parseSignatureInput, rfc7638ThumbprintOKP } from "../../packages/inspect/webbotauth.mjs";
 
 let pass = 0, fail = 0;
 const ok = (n, c) => { if (c) { pass++; } else { fail++; console.error("FAIL  " + n); } };
@@ -136,7 +136,7 @@ for (const [ua, operator] of [["Mozilla/5.0 (compatible; GPTBot/1.2; +https://op
 }
 
 /* --- 6d. Verified Network Attribution (injected DNS + ranges = deterministic) --- */
-import { ipInCidr, verifyNetworkAttribution } from "./netattr.mjs";
+import { ipInCidr, verifyNetworkAttribution } from "../../packages/inspect/netattr.mjs";
 // CIDR math
 eq("CIDR v4 in-range", ipInCidr("20.171.5.9", "20.171.0.0/16"), true);
 eq("CIDR v4 out-of-range", ipInCidr("8.8.8.8", "20.171.0.0/16"), false);

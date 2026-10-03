@@ -13,8 +13,8 @@
 // and what the RAW request alone reveals. Run: node validate-agents.mjs
 
 import { generateKeyPairSync, sign as edSign } from "node:crypto";
-import { inspect } from "./inspect.mjs";
-import { buildSignatureBase, parseSignatureInput, rfc7638ThumbprintOKP } from "./webbotauth.mjs";
+import { inspect } from "../../packages/inspect/inspect.mjs";
+import { buildSignatureBase, parseSignatureInput, rfc7638ThumbprintOKP } from "../../packages/inspect/webbotauth.mjs";
 
 // label, UA. Tokens are the operators' real published identifiers.
 const COHORT = [
@@ -98,7 +98,7 @@ function signedRequest() {
 }
 
 // --- REAL network attribution (live: OpenAI published ranges + Googlebot rDNS) ---
-import { verifyNetworkAttribution, networkMethodFor, ipInCidr } from "./netattr.mjs";
+import { verifyNetworkAttribution, networkMethodFor, ipInCidr } from "../../packages/inspect/netattr.mjs";
 console.log("\n--- VERIFIED NETWORK ATTRIBUTION (live) ---");
 const net = {};
 

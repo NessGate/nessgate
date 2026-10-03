@@ -12,7 +12,7 @@
 // stores nothing and holds no credential. Env PORT overrides the port.
 
 import { createServer } from "node:http";
-import { inspect } from "./inspect.mjs";
+import { inspect } from "../../packages/inspect/inspect.mjs";
 
 const PORT = Number(process.env.PORT || 8799);
 

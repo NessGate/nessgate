@@ -27,8 +27,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { inspect } from "./inspect.mjs";
-import { networkMethodFor } from "./netattr.mjs";
+import { inspect } from "../../packages/inspect/inspect.mjs";
+import { networkMethodFor } from "../../packages/inspect/netattr.mjs";
 
 const API = "https://api.cloudflare.com/client/v4/graphql";
 const ZONE = process.env.NESSGATE_ZONE_TAG || "93ba78d35b23082dbb4880dfeed7fd47"; // nessgate.com (public identifier)

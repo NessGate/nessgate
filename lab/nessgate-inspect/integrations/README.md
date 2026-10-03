@@ -7,7 +7,7 @@ no policy. Your app reads the facts and does whatever it wants (usually: log the
 ## Express / Connect — the whole integration is 2 lines
 
 ```js
-import { nessgateInspect } from "./middleware.mjs";   // 1
+import { nessgateInspect } from "@nessgate/inspect/middleware";   // 1
 app.use(nessgateInspect({ log: true }));               // 2
 // now every handler has req.nessgate (+ req.nessgate.summary2: the six fields)
 ```

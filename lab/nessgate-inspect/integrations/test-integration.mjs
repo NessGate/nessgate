@@ -1,5 +1,5 @@
 // Tests for the drop-in middleware (no network needed). Run: node test-integration.mjs
-import { nessgateInspect, summarize } from "./middleware.mjs";
+import { nessgateInspect, summarize } from "../../../packages/inspect/middleware.mjs";
 
 let pass = 0, fail = 0;
 const ok = (n, c) => { if (c) pass++; else { fail++; console.error("FAIL  " + n); } };
