@@ -118,7 +118,7 @@ async function route(request, env, ctx) {
   // leaves the operator's machine. Served with no extension, hence an explicit
   // route (static assets need a recognized type).
   if (path === "/.well-known/mcp-registry-auth") {
-    return new Response("v=MCPv1; k=ed25519; p=dypLCrlHTOErhb8mLhd67kAW15Vd5M/TJ5cGNvkxVFM=\n", {
+    return new Response("v=MCPv1; k=ed25519; p=26s1TrUXE1IXtqNCc5Eu2I9WkYK2hMlHliFi38PsBVM=\n", {
       headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=86400" },
     });
   }
