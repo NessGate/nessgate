@@ -14,7 +14,7 @@
 // profile is still evolving, and Inspect never claims a verification it did not
 // actually perform to a settled standard. (Web Bot Auth remains the verified tier.)
 
-import { safeFetchJson } from "./webbotauth.mjs";
+import { safeFetchJson, parseSfDict } from "./webbotauth.mjs";
 
 const headerGet = (headers, name) => { for (const k in headers || {}) if (k.toLowerCase() === name.toLowerCase()) return headers[k]; return undefined; };
 const str = (v) => (typeof v === "string" ? v : undefined);
@@ -28,7 +28,15 @@ export function cardCandidates(request) {
   if (typeof explicit === "string" && /^https:\/\//i.test(explicit.trim())) out.push({ url: explicit.trim().replace(/^"|"$/g, ""), origin: "caller-declared header" });
   let sigAgent = headerGet(headers, "signature-agent");
   if (typeof sigAgent === "string") {
-    sigAgent = sigAgent.trim().replace(/^"|"$/g, "");
+    sigAgent = sigAgent.trim();
+    // Current form is a Structured Fields dictionary; the legacy form is one
+    // bare sf-string. Either way only the declared host is used — never a path.
+    if (/^[a-zA-Z*][a-zA-Z0-9_.*-]*=/.test(sigAgent)) {
+      const members = parseSfDict(sigAgent);
+      sigAgent = members.length ? members[0].value : "";
+    } else {
+      sigAgent = sigAgent.replace(/^"|"$/g, "");
+    }
     let host = null;
     try { host = new URL(/^https:\/\//i.test(sigAgent) ? sigAgent : "https://" + sigAgent).host; } catch {}
     if (host) for (const p of ["/.well-known/agent-card.json", "/.well-known/agent.json"]) out.push({ url: `https://${host}${p}`, origin: "A2A well-known on the declared Signature-Agent host" });

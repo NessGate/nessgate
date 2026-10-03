@@ -7,10 +7,10 @@ name: Publish @nessgate/inspect
 # @nessgate/inspect package (repository NessGate/nessgate, workflow
 # publish-inspect.yml) before this job can publish.
 
+# workflow_dispatch ONLY: a GitHub Release must never publish this package as a
+# side effect (releases are resolver-versioned; this already misfired once).
 on:
   workflow_dispatch:
-  release:
-    types: [published]
 
 permissions:
   contents: read
@@ -38,12 +38,6 @@ jobs:
       - name: Run the deterministic gate
         working-directory: .
         run: npm run gate
-
-      - name: Show the OIDC claims npm receives (for trusted-publisher matching)
-        working-directory: .
-        run: |
-          TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=npm:registry.npmjs.org" | jq -r .value)
-          echo $TOKEN | cut -d. -f2 | base64 -d 2>/dev/null | jq "{repository, repository_owner, workflow_ref, job_workflow_ref, ref, environment, sub}" || true
 
       - name: Publish (provenance, public, tokenless via OIDC)
         run: npm publish --provenance --access public

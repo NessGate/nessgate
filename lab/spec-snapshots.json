@@ -25,17 +25,17 @@
     "seen": "2026-10-03"
   },
   "mcp:https://modelcontextprotocol.io/specification/latest": {
-    "hash": "3d257ea31b1555bd",
-    "bytes": 319496,
+    "hash": "f2b28206a69d1d2e",
+    "bytes": 322407,
     "seen": "2026-10-03"
   },
-  "web-bot-auth:https://datatracker.ietf.org/doc/draft-meunier-web-bot-auth-architecture/": {
-    "hash": "5c6308a8a8f9462d",
-    "bytes": 42708,
+  "web-bot-auth:https://datatracker.ietf.org/doc/draft-ietf-webbotauth-httpsig-protocol/": {
+    "hash": "7d413e0394f6350f",
+    "bytes": 138532,
     "seen": "2026-10-03"
   },
   "wimse:https://datatracker.ietf.org/doc/draft-ietf-wimse-arch/": {
-    "hash": "e075527df6fed493",
+    "hash": "8f6f59e228d54063",
     "bytes": 128198,
     "seen": "2026-10-03"
   },

@@ -84,7 +84,7 @@ function signedRequest({ now = 1_000_000, expiresIn = 300, method = "GET", url =
   const r = await inspect(request, { fetch: async () => ({ ok: false, status: 503, text: async () => "" }), now, dns: PUBDNS });
   const wba = r.facts.find((f) => f.kind === "web-bot-auth");
   eq("key directory 503 → tier claimed", wba.tier, "claimed");
-  ok("directory failure → reason recorded", /directory/i.test(wba.reason || ""));
+  ok("directory failure → reason recorded", /key discovery/i.test(wba.reason || ""));
 }
 
 /* --- 5. known real-world robots, UA only → directory-attributed + claimed --- */
@@ -276,12 +276,12 @@ import { safeFetchJson } from "../../packages/inspect/webbotauth.mjs";
   const big = async () => ({ ok: true, status: 200, headers: { get: () => null }, text: async () => "x".repeat(300000) });
   const r7 = await safeFetchJson(big, "https://ok.example/", 500, { dns: PUBDNS });
   ok("oversized response rejected by the byte cap", /exceeds the \d+-byte limit/.test(r7.error || ""));
-  // a SAFE redirect still works end-to-end for a real verification
-  const { request, fetch: dirFetch, now, dir } = signedRequest();
-  const hop = dir + "-moved";
-  const redirectingFetch = async (u) => (u === dir ? { ok: false, status: 302, headers: { get: () => hop }, text: async () => "" } : dirFetch(u === hop ? dir : u));
+  // the profile FORBIDS following redirects during key discovery
+  const { request, now, dir } = signedRequest();
+  const redirectingFetch = async (u) => (u === dir ? { ok: false, status: 302, headers: { get: () => dir + "-moved" }, text: async () => "" } : { ok: false, status: 404, headers: { get: () => null }, text: async () => "" });
   const r8 = await inspect(request, { fetch: redirectingFetch, now, dns: PUBDNS });
-  eq("validated same-host redirect still verifies", r8.facts.find((f) => f.kind === "web-bot-auth").tier, "cryptographically-verified");
+  const w8 = r8.facts.find((f) => f.kind === "web-bot-auth");
+  ok("key-discovery redirect → claimed (redirects are not followed, per the profile)", w8.tier === "claimed" && /redirects are not followed/.test(w8.reason || ""));
 }
 
 /* --- 8b. JWKS limits --- */
@@ -296,19 +296,20 @@ import { safeFetchJson } from "../../packages/inspect/webbotauth.mjs";
 
 /* --- 9. Signature-Agent Structured Fields dictionary (current draft form) --- */
 import { sfDictMember } from "../../packages/inspect/webbotauth.mjs";
-function signedRequestDict({ now = 1_000_000, label = "agent2" } = {}) {
+function signedRequestDict({ now = 1_000_000, label = "agent2", origin = "https://agent.example" } = {}) {
   const { publicKey, privateKey } = generateKeyPairSync("ed25519");
   const jwk = publicKey.export({ format: "jwk" });
   const keyid = rfc7638ThumbprintOKP(jwk);
-  const dir = "https://agent.example/.well-known/http-message-signatures-directory";
+  const dir = origin; // dictionary members carry an ORIGIN; keys live at its well-known path
+  const keysUrl = origin + "/.well-known/http-message-signatures-directory";
   const rawInner = `("@authority" "@method" "signature-agent";key="${label}");created=${now};keyid="${keyid}";alg="ed25519";expires=${now + 300};tag="web-bot-auth"`;
   const headers = { "user-agent": "ModernAgent/1.0", "signature-agent": `${label}="${dir}"`, "signature-input": `${label}=${rawInner}` };
   const base = buildSignatureBase({ method: "GET", url: "https://shop.example/checkout", headers }, parseSignatureInput(`${label}=${rawInner}`));
   headers["signature"] = `${label}=:${edSign(null, Buffer.from(base, "utf8"), privateKey).toString("base64")}:`;
-  const fetch = async (u) => (u === dir
+  const fetch = async (u) => (u === keysUrl
     ? { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ keys: [{ ...jwk, kid: keyid }] }) }
     : { ok: false, status: 404, headers: { get: () => null }, text: async () => "" });
-  return { request: { method: "GET", url: "https://shop.example/checkout", headers }, fetch, now, keyid, dir, base, rawInner };
+  return { request: { method: "GET", url: "https://shop.example/checkout", headers }, fetch, now, keyid, dir, keysUrl, base, rawInner, jwk };
 }
 {
   // pin the dictionary-member base line exactly
@@ -332,17 +333,162 @@ function signedRequestDict({ now = 1_000_000, label = "agent2" } = {}) {
   eq("tampered dictionary member → claimed", rt.facts.find((f) => f.kind === "web-bot-auth").tier, "claimed");
 
   const multi = signedRequestDict();
-  multi.request.headers["signature-agent"] = 'other="https://other.example/d", ' + multi.request.headers["signature-agent"].replace("agent2=", "agent2=");
+  multi.request.headers["signature-agent"] = 'other="https://other.example", ' + multi.request.headers["signature-agent"];
   // label-matching member must still be selected among several
   const rm = await inspect(multi.request, { fetch: multi.fetch, now: multi.now, dns: PUBDNS });
   eq("label-matching member selected from a multi-member dictionary", rm.facts.find((f) => f.kind === "web-bot-auth").tier, "cryptographically-verified");
 
   // ambiguous: several members, none matching the signature label
   const amb = signedRequestDict();
-  amb.request.headers["signature-agent"] = 'a="https://x.example/d", b="https://y.example/d"';
+  amb.request.headers["signature-agent"] = 'a="https://x.example", b="https://y.example"';
   const ra = await inspect(amb.request, { fetch: amb.fetch, now: amb.now, dns: PUBDNS });
   const wa = ra.facts.find((f) => f.kind === "web-bot-auth");
   ok("ambiguous dictionary (no matching label) → claimed with reason", wa.tier === "claimed" && /component is absent|Signature-Agent/.test(wa.reason || ""));
+}
+
+/* --- 10. draft-ietf-webbotauth-httpsig-protocol-00 OFFICIAL TEST VECTORS --- */
+{
+  // RFC 9421 B.1.4 Ed25519 key (used by the draft's Appendix E.2 vectors).
+  const VJWK = { kty: "OKP", crv: "Ed25519", x: "JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs" };
+  const VKID = "poqkLGiymh_W0uP6PZFw-dvez3QJT5SolqXBCW38r0U";
+  eq("vector keyid IS the RFC 8037 thumbprint of the B.1.4 key", rfc7638ThumbprintOKP(VJWK), VKID);
+
+  const vecFetch = async (u) => (u === "https://signature-agent.test/.well-known/http-message-signatures-directory"
+    ? { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ keys: [VJWK] }) }
+    : { ok: false, status: 404, headers: { get: () => null }, text: async () => "" });
+
+  // E.2.1 — dictionary member form (label sig2, member key agent2).
+  const raw1 = '("@authority" "signature-agent";key="agent2");created=1735689600;keyid="' + VKID + '";alg="ed25519";expires=4889289600;nonce="n9p433xm+NJ3ph3upfBIGmsuwHw387YV7Q/F+6BSpGCVjYCqQw6rznNA8PVVLySrAWsv0hQtFioQb6E1YsauiA==";tag="web-bot-auth"';
+  const req1 = { method: "GET", url: "https://example.com/", headers: {
+    "signature-agent": 'agent2="https://signature-agent.test"',
+    "signature-input": "sig2=" + raw1,
+    "signature": "sig2=:RdNFx5Bj6au3YgAMQL/RzmUlZE8QZLIaXGRpw985hWnwPfMxT228NMk6ehRS1PSl4e8PhbNZACSanGdhEwYCCg==:",
+  } };
+  eq("E.2.1 signature base reproduced byte-exact",
+    buildSignatureBase(req1, parseSignatureInput("sig2=" + raw1)),
+    '"@authority": example.com\n"signature-agent";key="agent2": "https://signature-agent.test"\n"@signature-params": ' + raw1);
+  const v1 = await inspect(req1, { fetch: vecFetch, now: 1735700000, dns: PUBDNS });
+  const f1 = v1.facts.find((f) => f.kind === "web-bot-auth");
+  eq("E.2.1 verifies → cryptographically-verified", f1.tier, "cryptographically-verified");
+
+  // E.2.2 — legacy bare-string form (expires 2025-01-01; verified at a vector-time now).
+  const raw2 = '("@authority" "signature-agent");created=1735689600;keyid="' + VKID + '";alg="ed25519";expires=1735693200;nonce="e8N7S2MFd/qrd6T2R3tdfAuuANngKI7LFtKYI/vowzk4lAZYadIX6wW25MwG7DCT9RUKAJ0qVkU0mEeLElW1qg==";tag="web-bot-auth"';
+  const req2 = { method: "GET", url: "https://example.com/", headers: {
+    "signature-agent": '"https://signature-agent.test"',
+    "signature-input": "sig2=" + raw2,
+    "signature": "sig2=:jdq0SqOwHdyHr9+r5jw3iYZH6aNGKijYp/EstF4RQTQdi5N5YYKrD+mCT1HA1nZDsi6nJKuHxUi/5Syp3rLWBA==:",
+  } };
+  const v2 = await inspect(req2, { fetch: vecFetch, now: 1735690000, dns: PUBDNS });
+  eq("E.2.2 legacy string form verifies", v2.facts.find((f) => f.kind === "web-bot-auth").tier, "cryptographically-verified");
+  const v2late = await inspect(req2, { fetch: vecFetch, now: 1735693300, dns: PUBDNS });
+  eq("E.2.2 after expiry → claimed (EXPIRED surfaced)", v2late.facts.find((f) => f.kind === "web-bot-auth").tier, "claimed");
+}
+
+/* --- 11. profile enforcement (negatives) + type semantics + multi-signature --- */
+{
+  const mk = (over = {}, hdrOver = {}) => {
+    const d = signedRequestDict(over.gen || {});
+    Object.assign(d.request.headers, hdrOver);
+    return d;
+  };
+  // missing expires → claimed
+  {
+    const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+    const jwk = publicKey.export({ format: "jwk" });
+    const keyid = rfc7638ThumbprintOKP(jwk);
+    const raw = `("@authority" "signature-agent";key="a");created=1000;keyid="${keyid}";alg="ed25519";tag="web-bot-auth"`;
+    const headers = { "signature-agent": 'a="https://agent.example"', "signature-input": "a=" + raw };
+    headers.signature = "a=:" + edSign(null, Buffer.from(buildSignatureBase({ method: "GET", url: "https://s.example/", headers }, parseSignatureInput("a=" + raw)), "utf8"), privateKey).toString("base64") + ":";
+    const r = await inspect({ method: "GET", url: "https://s.example/", headers }, { fetch: async () => ({ ok: false, status: 404, headers: { get: () => null }, text: async () => "" }), now: 1000, dns: PUBDNS });
+    const w = r.facts.find((f) => f.kind === "web-bot-auth");
+    ok("missing expires → claimed (profile requires expires)", w.tier === "claimed" && /expires/.test(w.reason || ""));
+  }
+  // no @authority/@target-uri → claimed
+  {
+    const d = signedRequestDict();
+    const raw = d.rawInner.replace('"@authority" "@method" ', '"@method" ');
+    d.request.headers["signature-input"] = "agent2=" + raw;
+    const r = await inspect(d.request, { fetch: d.fetch, now: d.now, dns: PUBDNS });
+    const w = r.facts.find((f) => f.kind === "web-bot-auth");
+    ok("no @authority/@target-uri → claimed", w.tier === "claimed" && /@authority or @target-uri/.test(w.reason || ""));
+  }
+  // signature-agent not covered → claimed
+  {
+    const d = signedRequestDict();
+    const raw = d.rawInner.replace(' "signature-agent";key="agent2"', "");
+    d.request.headers["signature-input"] = "agent2=" + raw;
+    const r = await inspect(d.request, { fetch: d.fetch, now: d.now, dns: PUBDNS });
+    const w = r.facts.find((f) => f.kind === "web-bot-auth");
+    ok("Signature-Agent member not covered → claimed", w.tier === "claimed" && /covered by the signature/.test(w.reason || ""));
+  }
+  // kid matches but keyid is not the thumbprint → claimed
+  {
+    const d = signedRequestDict();
+    const wrong = { kty: "OKP", crv: "Ed25519", x: d.jwk.x, kid: "not-a-thumbprint" };
+    const raw = d.rawInner.replace(/keyid="[^"]*"/, 'keyid="not-a-thumbprint"');
+    d.request.headers["signature-input"] = "agent2=" + raw;
+    // re-sign over the new params
+    // (simpler: expect failure BEFORE crypto — key lookup refuses the kid match)
+    const fetchKid = async (u) => (u === d.keysUrl ? { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ keys: [wrong] }) } : { ok: false, status: 404, headers: { get: () => null }, text: async () => "" });
+    const r = await inspect(d.request, { fetch: fetchKid, now: d.now, dns: PUBDNS });
+    const w = r.facts.find((f) => f.kind === "web-bot-auth");
+    ok("kid match without thumbprint match → claimed", w.tier === "claimed" && /thumbprint/.test(w.reason || ""));
+  }
+  // type=jwks_uri → fetched directly and verifies
+  {
+    const d = signedRequestDict();
+    const jwksUrl = "https://keys.example/bot/jwks.json";
+    d.request.headers["signature-agent"] = `agent2="${jwksUrl}";type=jwks_uri`;
+    // the member (with its parameters) is covered, so re-sign
+    const raw = d.rawInner;
+    const base = buildSignatureBase(d.request, parseSignatureInput("agent2=" + raw));
+    ok("jwks_uri member base includes its parameters", /";type=jwks_uri/.test(base || ""));
+  }
+  // full jwks_uri round-trip with a fresh signature
+  {
+    const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+    const jwk = publicKey.export({ format: "jwk" });
+    const keyid = rfc7638ThumbprintOKP(jwk);
+    const jwksUrl = "https://keys.example/bot/jwks.json";
+    const raw = `("@authority" "signature-agent";key="k");created=1000;keyid="${keyid}";alg="ed25519";expires=2000;tag="web-bot-auth"`;
+    const headers = { "signature-agent": `k="${jwksUrl}";type=jwks_uri`, "signature-input": "k=" + raw };
+    headers.signature = "k=:" + edSign(null, Buffer.from(buildSignatureBase({ method: "GET", url: "https://s.example/", headers }, parseSignatureInput("k=" + raw)), "utf8"), privateKey).toString("base64") + ":";
+    const f = async (u) => (u === jwksUrl ? { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ keys: [jwk] }) } : { ok: false, status: 404, headers: { get: () => null }, text: async () => "" });
+    const r = await inspect({ method: "GET", url: "https://s.example/", headers }, { fetch: f, now: 1500, dns: PUBDNS });
+    eq("type=jwks_uri verifies end-to-end", r.facts.find((x) => x.kind === "web-bot-auth").tier, "cryptographically-verified");
+  }
+  // type=cimd and unknown types → member ignored, never inferred
+  for (const t of ["cimd", "mystery"]) {
+    const d = signedRequestDict();
+    d.request.headers["signature-agent"] = `agent2="https://agent.example";type=${t}`;
+    const r = await inspect(d.request, { fetch: d.fetch, now: d.now, dns: PUBDNS });
+    const w = r.facts.find((f) => f.kind === "web-bot-auth");
+    ok(`type=${t} → member ignored with reason (never inferred)`, w.tier === "claimed" && (new RegExp(t)).test(w.reason || ""));
+  }
+  // directory member with a path is not an origin → claimed
+  {
+    const d = signedRequestDict();
+    d.request.headers["signature-agent"] = 'agent2="https://agent.example/some/path"';
+    const r = await inspect(d.request, { fetch: d.fetch, now: d.now, dns: PUBDNS });
+    const w = r.facts.find((f) => f.kind === "web-bot-auth");
+    ok("directory member with a path → claimed (must be an origin)", w.tier === "claimed" && /origin/.test(w.reason || ""));
+  }
+  // several signatures: exactly one web-bot-auth-tagged → that one verifies
+  {
+    const d = signedRequestDict();
+    d.request.headers["signature-input"] = 'zzz=("@authority");created=1;keyid="x";alg="ed25519";expires=2;tag="other", agent2=' + d.rawInner;
+    d.request.headers["signature"] = "zzz=:AAAA:, " + d.request.headers["signature"];
+    const r = await inspect(d.request, { fetch: d.fetch, now: d.now, dns: PUBDNS });
+    eq("one wba-tagged among several signatures → verified", r.facts.find((f) => f.kind === "web-bot-auth").tier, "cryptographically-verified");
+  }
+  // two web-bot-auth-tagged signatures → explicit refusal
+  {
+    const d = signedRequestDict();
+    d.request.headers["signature-input"] = "agent2=" + d.rawInner + ", second=" + d.rawInner;
+    const r = await inspect(d.request, { fetch: d.fetch, now: d.now, dns: PUBDNS });
+    const w = r.facts.find((f) => f.kind === "web-bot-auth");
+    ok("two wba-tagged signatures → refused, never misattributed", w.tier === "claimed" && /refusing/.test(w.reason || ""));
+  }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

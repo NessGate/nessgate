@@ -54,7 +54,7 @@ Every fact is placed in exactly one tier and carries provenance:
 | Tier | Meaning |
 |---|---|
 | `claimed` | asserted by the caller, unverified (e.g. the `User-Agent`; an unverifiable or expired signature) |
-| `cryptographically-verified` | an RFC 9421 (Web Bot Auth) signature validates against the caller's published Ed25519 key, binding this request's covered components. Both `Signature-Agent` forms are read: the current Structured Fields dictionary (`label="https://directory"`, including `;key=` covered members) and the older bare string |
+| `cryptographically-verified` | an RFC 9421 signature validates per draft-ietf-webbotauth-httpsig-protocol-00 (verified against its Appendix E.2 test vectors): `Signature-Agent` as a Structured Fields dictionary with `type` semantics (`directory` origins resolved at the well-known path, `jwks_uri` direct; unsupported types ignored, never inferred), the covered `;key=` member driving discovery, keyid required to be the JWK thumbprint, `created`/`expires`/`tag="web-bot-auth"`/`@authority`-or-`@target-uri` enforced, and no redirects followed during key discovery. The legacy bare-string form is accepted for migration |
 | `network-verified` | the source IP belongs to infrastructure the operator documents for its bot, by that operator's own method — reverse-DNS + forward-confirm (Google, Bing, Apple) or published IP ranges (OpenAI, Perplexity; fetched live, bounded cache) |
 | `directory-attributed` | a public directory recognizes a declared identifier (~18 operators' published User-Agent patterns); binds nothing |
 | `unknown` | absent or indeterminate — a check that ran and did not conclude says why |
@@ -94,6 +94,6 @@ one at your fetch layer if you need it.
 
 ## Status
 
-Experimental. The Web Bot Auth and related IETF drafts are still evolving; field
+Experimental. Web Bot Auth verification implements draft-ietf-webbotauth-httpsig-protocol-00 and passes its Appendix E.2 test vectors; the WG drafts are still evolving, so field
 names may change in 0.x releases. The classification principles — tiers kept
 separate, provenance always, no decisions, no scores — will not.

@@ -40,8 +40,8 @@
     {
       "protocol": "web-bot-auth",
       "kind": "spec-draft",
-      "url": "https://datatracker.ietf.org/doc/draft-meunier-web-bot-auth-architecture/",
-      "note": "Web Bot Auth architecture draft (IETF); request-signature verification tracks it"
+      "url": "https://datatracker.ietf.org/doc/draft-ietf-webbotauth-httpsig-protocol/",
+      "note": "Web Bot Auth protocol draft (IETF webbotauth WG; supersedes the expired meunier architecture draft); the inspect verifier implements revision -00 and its Appendix E.2 vectors"
     },
     {
       "protocol": "wimse",
