@@ -118,6 +118,8 @@ Versioning: keep the npm package, `public/openapi.json` `info.version`, and the 
   (A2A `securitySchemes` depth, version-string preservation, charter read-scope note).
 - `lab/connection-plan/README.md` — the market-rate findings (readiness is
   concentrated in the modern MCP/OAuth segment; ~0% of the general web).
+- `docs/data-model.md` — the shared data model across all surfaces (axes, enums,
+  provenance forms, disclosure fields); integrations consume this one shape.
 - Integration notes: the MCP server is the framework-neutral bridge (3 tools);
   `examples/langchain` mirrors it. Fallback scans that guess are out of scope by
   charter (results are never fabricated). Usage is measured via the

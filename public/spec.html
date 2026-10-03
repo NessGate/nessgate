@@ -163,6 +163,7 @@ only, size- and redirect-capped, on-domain, and identify as <code>NessGate-Disco
     clients must ignore fields they do not recognize.</li>
 <li>The set of <code>type</code> labels is open by design and will never become a closed enum.</li>
 <li>The list of sources read (§3) may grow — that is additive and expected.</li>
+<li>A field-by-field reference for the shared response shapes — the <code>evidence</code>/<code>class</code>/readiness/connect vocabularies, provenance forms, and every disclosure field — is maintained at <a href="https://github.com/NessGate/nessgate/blob/main/docs/data-model.md" rel="noopener"><code>docs/data-model.md</code></a>.</li>
 <li>If a breaking change is ever unavoidable, it will live under a new path (e.g. <code>/v2/…</code>)
     with the v1 endpoint maintained, announced in the <a href="/changelog">changelog</a>.</li>
 </ul>
