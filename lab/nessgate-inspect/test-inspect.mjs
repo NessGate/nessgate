@@ -11,6 +11,9 @@ import { buildSignatureBase, parseSignatureInput, rfc7638ThumbprintOKP } from ".
 let pass = 0, fail = 0;
 const ok = (n, c) => { if (c) { pass++; } else { fail++; console.error("FAIL  " + n); } };
 const eq = (n, a, b) => ok(n + (a === b ? "" : `  (got ${JSON.stringify(a)}, want ${JSON.stringify(b)})`), a === b);
+// Deterministic public-DNS stub: the hardened fetch core refuses hosts whose
+// answers are private/unresolvable, so every networked mock injects this.
+const PUBDNS = { resolve4: async () => ["93.184.216.34"], resolve6: async () => [] };
 
 /* --- 0. Pin the RFC 9421 base format INDEPENDENTLY of the signer --- */
 {
@@ -46,7 +49,7 @@ function signedRequest({ now = 1_000_000, expiresIn = 300, method = "GET", url =
 /* --- 1. valid signature → cryptographically-verified --- */
 {
   const { request, fetch, now, keyid } = signedRequest();
-  const r = await inspect(request, { fetch, now });
+  const r = await inspect(request, { fetch, now, dns: PUBDNS });
   const wba = r.facts.find((f) => f.kind === "web-bot-auth");
   eq("verified signature → tier cryptographically-verified", wba && wba.tier, "cryptographically-verified");
   eq("verified → bound components recorded", JSON.stringify(wba.boundComponents), JSON.stringify(["@authority", "@method", "signature-agent"]));
@@ -59,7 +62,7 @@ function signedRequest({ now = 1_000_000, expiresIn = 300, method = "GET", url =
 {
   const { request, fetch, now } = signedRequest();
   request.method = "POST"; // the signature covered @method=GET
-  const r = await inspect(request, { fetch, now });
+  const r = await inspect(request, { fetch, now, dns: PUBDNS });
   const wba = r.facts.find((f) => f.kind === "web-bot-auth");
   eq("tampered request → tier claimed (not verified)", wba.tier, "claimed");
   ok("tampered → reason names the validation failure", /does not validate/i.test(wba.reason || ""));
@@ -69,7 +72,7 @@ function signedRequest({ now = 1_000_000, expiresIn = 300, method = "GET", url =
 /* --- 3. cryptographically valid but EXPIRED → claimed, flagged expired --- */
 {
   const { request, fetch, now } = signedRequest({ now: 1_000_000, expiresIn: 60 });
-  const r = await inspect(request, { fetch, now: 1_000_000 + 3600 }); // an hour later
+  const r = await inspect(request, { fetch, now: 1_000_000 + 3600, dns: PUBDNS }); // an hour later
   const wba = r.facts.find((f) => f.kind === "web-bot-auth");
   eq("expired signature → tier claimed", wba.tier, "claimed");
   ok("expired → statement says EXPIRED", /EXPIRED/i.test(wba.statement));
@@ -78,7 +81,7 @@ function signedRequest({ now = 1_000_000, expiresIn = 300, method = "GET", url =
 /* --- 4. directory unreachable → claimed (never verified on a failed fetch) --- */
 {
   const { request, now } = signedRequest();
-  const r = await inspect(request, { fetch: async () => ({ ok: false, status: 503, text: async () => "" }), now });
+  const r = await inspect(request, { fetch: async () => ({ ok: false, status: 503, text: async () => "" }), now, dns: PUBDNS });
   const wba = r.facts.find((f) => f.kind === "web-bot-auth");
   eq("key directory 503 → tier claimed", wba.tier, "claimed");
   ok("directory failure → reason recorded", /directory/i.test(wba.reason || ""));
@@ -110,7 +113,7 @@ for (const [ua, operator] of [["Mozilla/5.0 (compatible; GPTBot/1.2; +https://op
   const fetch = async (u) => (u === "https://agent.example/.well-known/agent-card.json"
     ? { ok: true, status: 200, url: u, text: async () => JSON.stringify(card) }
     : { ok: false, status: 404, url: u, text: async () => "" });
-  const r = await inspect({ method: "GET", url: "https://shop.example/", headers: { "signature-agent": '"https://agent.example/dir"' } }, { fetch });
+  const r = await inspect({ method: "GET", url: "https://shop.example/", headers: { "signature-agent": '"https://agent.example/dir"' } }, { fetch, dns: PUBDNS });
   const ac = r.facts.find((f) => f.kind === "agent-card");
   ok("agent card fetched from the declared host well-known", !!ac);
   eq("agent card is tier claimed (self-published doc)", ac && ac.tier, "claimed");
@@ -126,7 +129,7 @@ for (const [ua, operator] of [["Mozilla/5.0 (compatible; GPTBot/1.2; +https://op
   const fetch = async (u) => (u === "https://cards.example/card.json"
     ? { ok: true, status: 200, url: u, text: async () => JSON.stringify(card) }
     : { ok: false, status: 404, url: u, text: async () => "" });
-  const r = await inspect({ method: "GET", url: "https://shop.example/", headers: { "agent-card": "https://cards.example/card.json" } }, { fetch });
+  const r = await inspect({ method: "GET", url: "https://shop.example/", headers: { "agent-card": "https://cards.example/card.json" } }, { fetch, dns: PUBDNS });
   const ac = r.facts.find((f) => f.kind === "agent-card");
   ok("explicit Agent-Card header location fetched", !!ac);
   ok("signature presence surfaced", ac.signaturePresent === true);
@@ -177,7 +180,7 @@ const dnsGenuine = {
   eq("openai outside ranges → not verified", r.verified, false);
 }
 { // ranges unavailable → honest fallback, never a false positive
-  const r = await verifyNetworkAttribution({ userAgent: "GPTBot/1.2", sourceIp: "20.171.5.9" }, { fetch: async () => ({ ok: false, status: 503, text: async () => "" }) });
+  const r = await verifyNetworkAttribution({ userAgent: "GPTBot/1.2", sourceIp: "20.171.5.9" }, { fetch: async () => ({ ok: false, status: 503, text: async () => "" }), dns: PUBDNS });
   eq("openai ranges unavailable → not verified (honest)", r.verified, false);
   ok("unavailable reason recorded", /unavailable/i.test(r.reason || ""));
 }
@@ -239,10 +242,107 @@ const dnsGenuine = {
 /* --- 7. INVARIANT: never a trust/authorization/score decision --- */
 {
   const { request, fetch, now } = signedRequest();
-  const r = await inspect(request, { fetch, now });
+  const r = await inspect(request, { fetch, now, dns: PUBDNS });
   const s = JSON.stringify(r);
   ok("no allow/deny/trust/score/authorized field anywhere", !/"(score|trust|trusted|allow|deny|authorized|reputation|verdict)"\s*:/i.test(s));
   ok("top-level note disclaims any decision", /makes NO trust.*authorization.*decision|relying party decides/is.test(r.note));
+}
+
+/* --- 8. SSRF hardening (adversarial) --- */
+import { safeFetchJson } from "../../packages/inspect/webbotauth.mjs";
+{
+  const never = () => { throw new Error("fetch must not run"); };
+  const PRIV = { resolve4: async () => ["10.1.2.3"], resolve6: async () => [] };
+  const r1 = await safeFetchJson(never, "https://internal.corp/x", 200, { dns: PRIV });
+  ok("private-resolving host rejected BEFORE any fetch", /private or reserved/.test(r1.error || ""));
+  const NONE = { resolve4: async () => { throw new Error("x"); }, resolve6: async () => { throw new Error("x"); } };
+  const r2 = await safeFetchJson(never, "https://ghost.example/", 200, { dns: NONE });
+  ok("unresolvable host rejected before any fetch", /does not resolve/.test(r2.error || ""));
+  let calls = 0;
+  const redirPriv = async () => { calls++; return { ok: false, status: 302, headers: { get: () => "https://127.0.0.1/admin" }, text: async () => "" }; };
+  const r3 = await safeFetchJson(redirPriv, "https://ok.example/", 200, { dns: PUBDNS });
+  ok("redirect to a loopback literal rejected (one fetch only)", /host not allowed/.test(r3.error || "") && calls === 1);
+  const splitDns = { resolve4: async (h) => (h === "ok.example" ? ["93.184.216.34"] : ["192.168.0.9"]), resolve6: async () => [] };
+  const redirInner = async () => ({ ok: false, status: 302, headers: { get: () => "https://inner.example/" }, text: async () => "" });
+  const r4 = await safeFetchJson(redirInner, "https://ok.example/", 200, { dns: splitDns });
+  ok("redirect target is DNS-validated too (private target rejected)", /private or reserved/.test(r4.error || ""));
+  const redirHttp = async () => ({ ok: false, status: 301, headers: { get: () => "http://ok.example/" }, text: async () => "" });
+  const r5 = await safeFetchJson(redirHttp, "https://ok.example/", 200, { dns: PUBDNS });
+  ok("redirect downgrading to http rejected", /host not allowed/.test(r5.error || ""));
+  let loops = 0;
+  const redirLoop = async () => { loops++; return { ok: false, status: 307, headers: { get: () => "https://ok.example/again" }, text: async () => "" }; };
+  const r6 = await safeFetchJson(redirLoop, "https://ok.example/", 500, { dns: PUBDNS });
+  ok("redirect chains are hop-capped", /too many redirects/.test(r6.error || "") && loops === 4);
+  const big = async () => ({ ok: true, status: 200, headers: { get: () => null }, text: async () => "x".repeat(300000) });
+  const r7 = await safeFetchJson(big, "https://ok.example/", 500, { dns: PUBDNS });
+  ok("oversized response rejected by the byte cap", /exceeds the \d+-byte limit/.test(r7.error || ""));
+  // a SAFE redirect still works end-to-end for a real verification
+  const { request, fetch: dirFetch, now, dir } = signedRequest();
+  const hop = dir + "-moved";
+  const redirectingFetch = async (u) => (u === dir ? { ok: false, status: 302, headers: { get: () => hop }, text: async () => "" } : dirFetch(u === hop ? dir : u));
+  const r8 = await inspect(request, { fetch: redirectingFetch, now, dns: PUBDNS });
+  eq("validated same-host redirect still verifies", r8.facts.find((f) => f.kind === "web-bot-auth").tier, "cryptographically-verified");
+}
+
+/* --- 8b. JWKS limits --- */
+{
+  const { request, now, keyid, dir } = signedRequest();
+  const junk = Array.from({ length: 500 }, (_, i) => ({ kty: "OKP", crv: "Ed25519", x: "A".repeat(43), kid: "junk" + i }));
+  const flood = async (u) => (u === dir ? { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ keys: junk }) } : { ok: false, status: 404, headers: { get: () => null }, text: async () => "" });
+  const r1 = await inspect(request, { fetch: flood, now, dns: PUBDNS });
+  const w1 = r1.facts.find((f) => f.kind === "web-bot-auth");
+  ok("500-key flood with no match → claimed, limit disclosed", w1.tier === "claimed" && /32-key limit/.test(w1.reason || ""));
+}
+
+/* --- 9. Signature-Agent Structured Fields dictionary (current draft form) --- */
+import { sfDictMember } from "../../packages/inspect/webbotauth.mjs";
+function signedRequestDict({ now = 1_000_000, label = "agent2" } = {}) {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const jwk = publicKey.export({ format: "jwk" });
+  const keyid = rfc7638ThumbprintOKP(jwk);
+  const dir = "https://agent.example/.well-known/http-message-signatures-directory";
+  const rawInner = `("@authority" "@method" "signature-agent";key="${label}");created=${now};keyid="${keyid}";alg="ed25519";expires=${now + 300};tag="web-bot-auth"`;
+  const headers = { "user-agent": "ModernAgent/1.0", "signature-agent": `${label}="${dir}"`, "signature-input": `${label}=${rawInner}` };
+  const base = buildSignatureBase({ method: "GET", url: "https://shop.example/checkout", headers }, parseSignatureInput(`${label}=${rawInner}`));
+  headers["signature"] = `${label}=:${edSign(null, Buffer.from(base, "utf8"), privateKey).toString("base64")}:`;
+  const fetch = async (u) => (u === dir
+    ? { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ keys: [{ ...jwk, kid: keyid }] }) }
+    : { ok: false, status: 404, headers: { get: () => null }, text: async () => "" });
+  return { request: { method: "GET", url: "https://shop.example/checkout", headers }, fetch, now, keyid, dir, base, rawInner };
+}
+{
+  // pin the dictionary-member base line exactly
+  const req = { method: "GET", url: "https://shop.example/a", headers: { "signature-agent": 'agent2="https://signature-agent.test"' } };
+  const rawInner = '("@authority" "signature-agent";key="agent2");created=1;keyid="k";alg="ed25519";tag="web-bot-auth"';
+  const base = buildSignatureBase(req, parseSignatureInput("agent2=" + rawInner));
+  eq("dictionary-member base line is exact",
+    base,
+    '"@authority": shop.example\n"signature-agent";key="agent2": "https://signature-agent.test"\n"@signature-params": ' + rawInner);
+  eq("sfDictMember returns the raw serialized item", sfDictMember('a="x", agent2="https://d"', "agent2"), '"https://d"');
+
+  const { request, fetch, now } = signedRequestDict();
+  const r = await inspect(request, { fetch, now, dns: PUBDNS });
+  const wba = r.facts.find((f) => f.kind === "web-bot-auth");
+  eq("dictionary-form signed request verifies", wba.tier, "cryptographically-verified");
+  ok("bound components keep the ;key parameter", (wba.boundComponents || []).some((c) => c === 'signature-agent;key="agent2"'));
+
+  const tam = signedRequestDict();
+  tam.request.headers["signature-agent"] = 'agent2="https://evil.example/dir"'; // member changed after signing
+  const rt = await inspect(tam.request, { fetch: tam.fetch, now: tam.now, dns: PUBDNS });
+  eq("tampered dictionary member → claimed", rt.facts.find((f) => f.kind === "web-bot-auth").tier, "claimed");
+
+  const multi = signedRequestDict();
+  multi.request.headers["signature-agent"] = 'other="https://other.example/d", ' + multi.request.headers["signature-agent"].replace("agent2=", "agent2=");
+  // label-matching member must still be selected among several
+  const rm = await inspect(multi.request, { fetch: multi.fetch, now: multi.now, dns: PUBDNS });
+  eq("label-matching member selected from a multi-member dictionary", rm.facts.find((f) => f.kind === "web-bot-auth").tier, "cryptographically-verified");
+
+  // ambiguous: several members, none matching the signature label
+  const amb = signedRequestDict();
+  amb.request.headers["signature-agent"] = 'a="https://x.example/d", b="https://y.example/d"';
+  const ra = await inspect(amb.request, { fetch: amb.fetch, now: amb.now, dns: PUBDNS });
+  const wa = ra.facts.find((f) => f.kind === "web-bot-auth");
+  ok("ambiguous dictionary (no matching label) → claimed with reason", wa.tier === "claimed" && /component is absent|Signature-Agent/.test(wa.reason || ""));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

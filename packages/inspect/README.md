@@ -12,8 +12,9 @@ package describes what an *incoming caller* presents.
 
 No trust, reputation, authorization, allow/deny, or scoring decision — the output
 contains no `trust`, `score`, `allow`, `deny`, or `authorized` field (test-enforced).
-It reports tiered, provenanced facts; the relying party decides. It stores nothing
-and holds no credential.
+It reports tiered, provenanced facts; the relying party decides. It stores no
+request, credential, or key data (operator IP-range documents are cached in
+memory for at most ten minutes).
 
 ## Install and use
 
@@ -53,7 +54,7 @@ Every fact is placed in exactly one tier and carries provenance:
 | Tier | Meaning |
 |---|---|
 | `claimed` | asserted by the caller, unverified (e.g. the `User-Agent`; an unverifiable or expired signature) |
-| `cryptographically-verified` | an RFC 9421 (Web Bot Auth) signature validates against the caller's published Ed25519 key, binding this request's covered components |
+| `cryptographically-verified` | an RFC 9421 (Web Bot Auth) signature validates against the caller's published Ed25519 key, binding this request's covered components. Both `Signature-Agent` forms are read: the current Structured Fields dictionary (`label="https://directory"`, including `;key=` covered members) and the older bare string |
 | `network-verified` | the source IP belongs to infrastructure the operator documents for its bot, by that operator's own method — reverse-DNS + forward-confirm (Google, Bing, Apple) or published IP ranges (OpenAI, Perplexity; fetched live, bounded cache) |
 | `directory-attributed` | a public directory recognizes a declared identifier (~18 operators' published User-Agent patterns); binds nothing |
 | `unknown` | absent or indeterminate — a check that ran and did not conclude says why |
@@ -79,6 +80,17 @@ For strict hot paths, run inspection out-of-band from logs instead of inline.
 
 Shapes follow the NessGate data model
 ([`docs/data-model.md`](https://github.com/NessGate/nessgate/blob/main/docs/data-model.md)).
+
+## Fetch hardening
+
+Every URL this package fetches comes from attacker-influenceable request data,
+so the fetch core enforces: HTTPS only; hostname guards; a DNS pre-check that
+rejects hosts resolving to private, loopback, link-local, or reserved space;
+manual redirects with every hop re-validated (scheme, host, DNS); a 256 KB
+response cap; a redirect-hop cap; and a 32-key JWKS processing limit. The DNS
+pre-check narrows the DNS-rebinding window; full immunity requires a
+pinned-address dispatcher, which a portable library cannot impose — integrate
+one at your fetch layer if you need it.
 
 ## Status
 

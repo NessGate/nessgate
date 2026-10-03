@@ -67,7 +67,7 @@ export function normalizeCard(card, servedUrl, origin) {
 export async function inspectAgentCard(request, opts = {}) {
   const fetchImpl = opts.fetch || globalThis.fetch;
   for (const cand of cardCandidates(request)) {
-    const r = await safeFetchJson(fetchImpl, cand.url, opts.timeoutMs).catch(() => ({ error: "fetch error" }));
+    const r = await safeFetchJson(fetchImpl, cand.url, opts.timeoutMs, { dns: opts.dns }).catch(() => ({ error: "fetch error" }));
     if (r && r.json) {
       const fact = normalizeCard(r.json, r.finalUrl || cand.url, cand.origin);
       if (fact) return fact;

@@ -33,7 +33,7 @@ export function nessgateInspect(options = {}) {
       if (options.trustProxy && typeof headers["x-forwarded-for"] === "string" && headers["x-forwarded-for"].trim())
         sourceIp = headers["x-forwarded-for"].split(",")[0].trim();
 
-      const result = await inspect({ method: req.method, url, headers }, { sourceIp, timeoutMs: options.timeoutMs });
+      const result = await inspect({ method: req.method, url, headers }, { sourceIp, timeoutMs: options.timeoutMs, fetch: options.fetch, dns: options.dns, ranges: options.ranges });
       result.summary2 = summarize(result); // convenience: the six fields a site owner usually wants
       req[prop] = result;
       if (options.log) (options.logger || console).log(logLine(result));

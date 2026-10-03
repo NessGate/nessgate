@@ -112,8 +112,8 @@ async function rdnsForwardConfirm(dns, ip, suffixes) {
   return { verified: false, reason: "reverse DNS did not match the operator's documented host suffixes", ptrs };
 }
 
-async function fetchRanges(fetchImpl, url, timeoutMs) {
-  const r = await safeFetchJson(fetchImpl, url, timeoutMs);
+async function fetchRanges(fetchImpl, url, timeoutMs, dns) {
+  const r = await safeFetchJson(fetchImpl, url, timeoutMs, { dns });
   if (r.error) return { error: r.error };
   const doc = r.json || {};
   const prefixes = [];
@@ -142,7 +142,7 @@ async function getRanges(spec, opts) {
     const c = rangesCache.get(spec.rangesUrl);
     if (c && Date.now() - c.at < RANGES_TTL_MS) return { prefixes: c.prefixes, cached: true };
   }
-  const fetched = await fetchRanges(opts.fetch || globalThis.fetch, spec.rangesUrl, opts.timeoutMs);
+  const fetched = await fetchRanges(opts.fetch || globalThis.fetch, spec.rangesUrl, opts.timeoutMs, opts.dns);
   if (fetched.error) return fetched;
   if (useCache) {
     rangesCache.set(spec.rangesUrl, { prefixes: fetched.prefixes, at: Date.now() });
