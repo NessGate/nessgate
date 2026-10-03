@@ -43,3 +43,6 @@ lab/connection-plan/market-*.json
 # nessgate-inspect lab: transient run outputs (scripts and docs are committed)
 lab/nessgate-inspect/last-run*.json
 lab/nessgate-inspect/*.log
+
+# MCP Registry domain-verification private key (local only; the public half is served at /.well-known/mcp-registry-auth)
+.mcp-registry-key.txt

@@ -4,7 +4,7 @@
   "protocolVersions": 17,
   "adapters": 14,
   "fixtures": 34,
-  "readinessFixtures": 19,
+  "readinessFixtures": 24,
   "positiveFixtures": 24,
   "rejectFixtures": 10,
   "realWorldFixtures": 4,
