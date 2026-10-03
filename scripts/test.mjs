@@ -1038,6 +1038,61 @@ console.log("--- resolver normalization (thin, source-labelled, never invents se
   is(withGbz.resources.some((r) => r.source === "gbz-185-4" && r.provenance === "gbz-185-5-gateway"), true, "gateway ACS records merged into resources with gateway provenance");
 }
 
+console.log("--- library registry/delegation options (parity + behavior)");
+{
+  const lib = await import("../public/resolver.mjs");
+  // The explore-tier pure helpers are kept byte-identical in the library; compare
+  // behavior against the worker copies on representative inputs.
+  is(JSON.stringify(lib.parseLlmsLinks("[a](https://x/a.json) see https://y/llms.txt, end")), JSON.stringify(parseLlmsLinks("[a](https://x/a.json) see https://y/llms.txt, end")), "parseLlmsLinks library/worker parity");
+  for (const u of ["https://x/llms.txt", "https://x/llms-full.txt", "https://x/a.json", "https://x/.well-known/z", "https://x/notes.txt", "nope"]) {
+    is(lib.isLlmsPath(u), isLlmsPath(u), "isLlmsPath parity for " + u);
+    is(lib.looksMachineReadable(u), looksMachineReadable(u), "looksMachineReadable parity for " + u);
+  }
+  is(lib.domainToNamespace("sub.example.com"), domainToNamespace("sub.example.com"), "domainToNamespace parity");
+  is(lib.domainToNamespace("not a domain"), domainToNamespace("not a domain"), "domainToNamespace parity (invalid input)");
+  const regDoc = { servers: [
+    { server: { name: "com.ex/srv", remotes: [{ type: "streamable-http", url: "https://mcp.ex.com/m" }], version: "1.0" }, _meta: { "io.modelcontextprotocol.registry/official": { status: "active" } } },
+    { server: { name: "io.github.other/x", remotes: [{ url: "https://nope" }] } },
+    { server: { name: "com.ex/old" }, _meta: { "io.modelcontextprotocol.registry/official": { status: "deprecated" } } },
+  ] };
+  is(JSON.stringify(lib.mcpRegistryRecords(regDoc, "com.ex", "ex.com")), JSON.stringify(mcpRegistryRecords(regDoc, "com.ex", "ex.com")), "mcpRegistryRecords library/worker parity");
+  const bA = { hosts: new Set(), bytes: 0 }, bB = { hosts: new Set(), bytes: 0 };
+  is(lib.exploreBudgetAllows(bA, { hosts: ["a", "b"], bytes: 10 }, { maxHosts: 1, maxTotalBytes: 100 }), exploreBudgetAllows(bB, { hosts: ["a", "b"], bytes: 10 }, { maxHosts: 1, maxTotalBytes: 100 }), "exploreBudgetAllows library/worker parity");
+  const linkset = JSON.stringify({ linkset: [{ anchor: "https://a", "service-desc": [{ href: "https://a/openapi.json" }] }] });
+  is(lib.classifyJson(linkset), classifyJson(linkset), "classifyJson library/worker parity");
+
+  // Behavior: opts.registry merges namespace-verified records; a failed registry
+  // call is disclosed as federatedUnavailable, never silently empty.
+  const mkRes = (body, ok = true) => ({ ok, status: ok ? 200 : 503, url: "", headers: { get: () => null }, text: async () => body });
+  const fetchReg = async (url) => (String(url).startsWith("https://registry.modelcontextprotocol.io/") ? mkRes(JSON.stringify(regDoc)) : mkRes("nf", false));
+  const r1 = await lib.resolve("ex.com", { fetch: fetchReg, registry: true, fast: true, timeoutMs: 300, deadlineMs: 5000 });
+  is(JSON.stringify(r1.federated), JSON.stringify(["mcp-registry"]), "opts.registry labels federated");
+  is(r1.resources.some((x) => x.source === "mcp-registry" && x.evidence === "namespace-verified" && x.url === "https://mcp.ex.com/m"), true, "registry record merged with namespace-verified evidence");
+  const r2 = await lib.resolve("ex.com", { fetch: async () => mkRes("nf", false), registry: true, fast: true, timeoutMs: 200, deadlineMs: 4000 });
+  is(JSON.stringify(r2.federatedUnavailable), JSON.stringify(["mcp-registry"]), "registry failure disclosed as federatedUnavailable");
+
+  // Behavior: opts.delegate follows an llms.txt link to a classifiable JSON doc;
+  // the record carries evidence, the pointer chain, depth, and walk accounting.
+  const llmsBody = "# ex\n- [api](https://api.ex.com/openapi.json)\n";
+  const oapiBody = JSON.stringify({ openapi: "3.1.0", info: { title: "T" }, paths: {} });
+  const fetchDel = async (url) => {
+    const u = String(url);
+    if (u === "https://ex.com/llms.txt") return mkRes(llmsBody);
+    if (u === "https://api.ex.com/openapi.json") return mkRes(oapiBody);
+    return mkRes("nf", false);
+  };
+  const r3 = await lib.resolve("ex.com", { fetch: fetchDel, delegate: true, fast: true, timeoutMs: 300, deadlineMs: 6000 });
+  const dRec = r3.resources.find((x) => x.url === "https://api.ex.com/openapi.json" && x.evidence === "publisher-declared");
+  is(!!dRec, true, "delegation followed an llms.txt link into a classified record");
+  is(dRec && dRec.depth, 1, "delegated record carries depth");
+  is(!!(dRec && Array.isArray(dRec.provenance) && dRec.provenance.includes("https://ex.com/llms.txt")), true, "delegated record carries the pointer chain");
+  is(typeof (r3.delegation && r3.delegation.requests), "number", "delegation accounting is reported");
+  is(r3.delegation.truncated, false, "no truncation on a small walk");
+  // Defaults unchanged: without the options, no new fields appear.
+  const r0 = await lib.resolve("ex.com", { fetch: async () => mkRes("nf", false), fast: true, timeoutMs: 200, deadlineMs: 3000 });
+  is(r0.federated === undefined && r0.federatedUnavailable === undefined && r0.delegation === undefined, true, "output without the options is unchanged");
+}
+
 console.log("--- npm package parity (packages/resolver)");
 {
   const { readFileSync } = await import("node:fs");

@@ -1189,6 +1189,90 @@ export async function resolve(domain, opts = {}) {
     resources.push(...g.resources);
     checked.push("gbz-185-5");
   }
+  // Optional MCP Registry federation (opts.registry): one bounded request to the
+  // official registry for the domain's exact reverse-DNS namespace. Matching
+  // servers are added as records with evidence "namespace-verified", attributed
+  // to the registry. When the registry cannot be checked, the response says so
+  // (federatedUnavailable) instead of presenting absence as checked-and-empty.
+  let federated = null, federatedUnavailable = null;
+  if (opts.registry) {
+    const namespace = domainToNamespace(d);
+    federated = ["mcp-registry"];
+    if (namespace) {
+      try {
+        const r = await fetchBounded(fetchImpl, MCP_REGISTRY_API + "?search=" + encodeURIComponent(namespace) + "&limit=50", MCP_REGISTRY_TIMEOUT_MS, MCP_REGISTRY_MAX_BYTES);
+        if (r.truncated) throw new Error("oversized registry response");
+        for (const rec of mcpRegistryRecords(r.text, namespace, d)) resources.push(rec);
+      } catch { federatedUnavailable = ["mcp-registry"]; }
+    }
+  }
+
+  // Optional declared-pointer delegation (opts.delegate): follow only the
+  // machine-readable pointers the domain's own documents name (an llms.txt
+  // index's links; catalog entries pointing at other locations), within fixed
+  // depth/request/host/byte limits. Followed targets must be public HTTPS hosts
+  // (same guard as the readiness fetches). Each followed record carries evidence
+  // "publisher-declared" with the full pointer chain and depth; limits that cut
+  // the walk short are disclosed via `delegation.truncated`.
+  let delegation = null;
+  if (opts.delegate) {
+    const budget = { requests: 0, bytes: 0, hosts: new Set(), seen: new Set(), truncated: false };
+    const okTarget = (u) => { try { const x = new URL(u); return x.protocol === "https:" && !readinessBadHost(x.hostname); } catch { return false; } };
+    const fetchDoc = async (url) => {
+      if (budget.seen.has(url)) return null;
+      budget.seen.add(url);
+      if (Date.now() - startedAt > deadlineMs) { budget.truncated = true; return null; }
+      if (budget.truncated || budget.requests >= DELEGATION_LIMITS.maxRequests) { budget.truncated = true; return null; }
+      let host; try { host = new URL(url).hostname.toLowerCase(); } catch { return null; }
+      if (!budget.hosts.has(host) && budget.hosts.size >= DELEGATION_LIMITS.maxHosts) { budget.truncated = true; return null; }
+      budget.requests++;
+      try {
+        const r = await fetchBounded(fetchImpl, url, timeoutMs, maxBytes);
+        let fh = host; try { fh = new URL(r.finalUrl).hostname.toLowerCase(); } catch {}
+        exploreBudgetAllows(budget, { hosts: [host, fh], bytes: r.text.length }, DELEGATION_LIMITS);
+        budget.seen.add(r.finalUrl);
+        return { text: r.text, finalUrl: r.finalUrl };
+      } catch (e) {
+        if (!(e && e.deadlineSkip)) probes[e && e.cause && e.cause.code === "ENOTFOUND" ? "answered" : probeFailureKind(e && e.message)]++;
+        return null;
+      }
+    };
+    const ingest = (url, text, provenance, depth) => {
+      const follow = [];
+      if (isLlmsPath(url)) {
+        resources.push({ source: "llms.txt", sourceUrl: url, type: "llms.txt", url, evidence: "publisher-declared", provenance, depth });
+        for (const link of parseLlmsLinks(text).slice(0, MAX_PER_SOURCE)) if (looksMachineReadable(link)) follow.push(link);
+        return follow;
+      }
+      const t = classifyJson(text);
+      if (t) for (const rec of normalizeResources(t, "json", text, url)) {
+        resources.push({ ...rec, evidence: "publisher-declared", provenance, depth });
+        if (rec.url && rec.url !== url && looksMachineReadable(rec.url)) follow.push(rec.url);
+      }
+      return follow;
+    };
+    const walkDeclared = async (url, depth, provenance) => {
+      if (!okTarget(url)) return;
+      const doc = await fetchDoc(url);
+      if (!doc) return;
+      const prov = doc.finalUrl && doc.finalUrl !== url ? [...provenance, doc.finalUrl] : provenance;
+      const follow = ingest(doc.finalUrl, doc.text, prov, depth);
+      if (depth < DELEGATION_LIMITS.maxDepth) for (const t of follow) if (!budget.seen.has(t)) await walkDeclared(t, depth + 1, [...prov, t]);
+    };
+    const targets = [];
+    const llmsHit = discovered.find((x) => x.type === "llms.txt");
+    if (llmsHit && okTarget(llmsHit.url)) {
+      const doc = await fetchDoc(llmsHit.url);
+      if (doc) for (const link of parseLlmsLinks(doc.text).slice(0, MAX_PER_SOURCE)) if (looksMachineReadable(link)) targets.push({ url: link, chain: [doc.finalUrl, link] });
+    }
+    for (const rec of resources) if (rec.url && rec.sourceUrl && rec.url !== rec.sourceUrl && looksMachineReadable(rec.url)) targets.push({ url: rec.url, chain: [rec.sourceUrl, rec.url] });
+    for (const t of targets) {
+      if (budget.requests >= DELEGATION_LIMITS.maxRequests) { budget.truncated = true; break; }
+      await walkDeclared(t.url, 1, t.chain);
+    }
+    delegation = { requests: budget.requests, hosts: budget.hosts.size, bytes: budget.bytes, truncated: budget.truncated };
+  }
+
   // One document reachable through several channels must not multiply records.
   resources = dedupeResources(resources);
   {
@@ -1266,6 +1350,9 @@ export async function resolve(domain, opts = {}) {
   if (orgChecked) out.orgChecked = orgChecked;
   if (probes.refused) out.blockedProbes = probes.refused;
   if (opts.mcp) out.introspected = ["mcp"]; // labeled: read-only introspection ran
+  if (federated) out.federated = federated; // labeled: the registry lookup ran
+  if (federatedUnavailable) out.federatedUnavailable = federatedUnavailable;
+  if (delegation) out.delegation = delegation; // request/host/byte accounting for the pointer walk
   if (opts.fast) out.mode = "fast"; // labeled: alternate ARD locators skipped, not fully conformant
   return out;
 }
@@ -1303,6 +1390,99 @@ export function sameRegCanonicalHost(finalUrl, domain) {
   if (h === domain) return null;
   return h.endsWith("." + domain) ? h : null;
 }
+
+/* ========== Explore-tier helpers (kept byte-identical to src/worker.js) ==========
+   Pure parsing/classification used by the opt-in registry federation and
+   declared-pointer delegation below. Parity with the worker copies is enforced
+   by scripts/test.mjs. */
+
+const MCP_REGISTRY_API = "https://registry.modelcontextprotocol.io/v0.1/servers";
+const MCP_REGISTRY_TIMEOUT_MS = 5000;
+const MCP_REGISTRY_MAX_BYTES = 500_000; // registry pages are ~10-100 KB; cap defensively
+// Same limit values as the hosted /explore walk.
+const DELEGATION_LIMITS = { maxDepth: 8, maxHosts: 8, maxRequests: 24, maxTotalBytes: 6_000_000 };
+
+function parseLlmsLinks(text) {
+  if (typeof text !== "string") return [];
+  const urls = new Set();
+  for (const m of text.match(/\]\((https?:\/\/[^)\s]+)\)/g) || []) urls.add(m.slice(2, -1));
+  for (const b of text.match(/https?:\/\/[^\s)<>"'\]]+/g) || []) urls.add(b.replace(/[.,;]+$/, ""));
+  return [...urls];
+}
+
+function isLlmsPath(url) {
+  let p;
+  try { p = new URL(url).pathname.toLowerCase(); } catch { return false; }
+  return p.endsWith("/llms.txt") || p.endsWith("/llms-full.txt");
+}
+
+function looksMachineReadable(url) {
+  let p;
+  try { p = new URL(url).pathname.toLowerCase(); } catch { return false; }
+  return /\.json$/.test(p) || p.includes("/.well-known/") || isLlmsPath(url);
+}
+
+function exploreBudgetAllows(budget, meta, limits) {
+  for (const h of meta.hosts || []) budget.hosts.add(h);
+  budget.bytes = (budget.bytes || 0) + (meta.bytes || 0);
+  if (budget.hosts.size > limits.maxHosts || budget.bytes > limits.maxTotalBytes) budget.truncated = true;
+  return !budget.truncated;
+}
+
+function classifyJson(text) {
+  let obj;
+  try { obj = JSON.parse(text); } catch { return null; }
+  if (!obj || typeof obj !== "object") return null;
+  for (const t of ["ard-catalog", "api-catalog", "openapi", "anp", "ucp", "host-meta", "awp", "gbz-185-4"]) {
+    if (probeShapeOkObj(t, obj)) return t; // single parse; shape checks on the object
+  }
+  // A2A only when the doc has A2A-specific structure. A bare {name}/{url} document
+  // (e.g. an ai-info.json profile) must NOT be mislabelled as an agent card — for
+  // a followed document, missing it is far better than inventing a wrong type.
+  if (Array.isArray(obj.supportedInterfaces) || (obj.capabilities && Array.isArray(obj.skills))) return "a2a-agent-card";
+  return null;
+}
+
+function domainToNamespace(domain) {
+  if (typeof domain !== "string" || !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(domain)) return null;
+  return domain.toLowerCase().split(".").reverse().join(".");
+}
+
+function mcpRegistryRecords(json, namespace, domain) {
+  let obj = json;
+  if (typeof json === "string") { try { obj = JSON.parse(json); } catch { return []; } }
+  const servers = obj && Array.isArray(obj.servers) ? obj.servers : [];
+  const prefix = namespace + "/";
+  const src = MCP_REGISTRY_API + "?search=" + encodeURIComponent(namespace);
+  const out = [];
+  for (const entry of servers) {
+    const s = (entry && entry.server) || entry;
+    if (!s || typeof s.name !== "string" || !s.name.startsWith(prefix)) continue;
+    const meta = entry && entry._meta && entry._meta["io.modelcontextprotocol.registry/official"];
+    if (meta && meta.status && meta.status !== "active") continue;
+    const remotes = Array.isArray(s.remotes) ? s.remotes : [];
+    const remote = remotes.find((r) => r && typeof r.url === "string");
+    const url = (remote && remote.url) || (s.repository && typeof s.repository.url === "string" ? s.repository.url : null);
+    out.push({
+      source: "mcp-registry",
+      sourceUrl: src,
+      type: "mcp-server",
+      name: s.name,
+      url: url || null,
+      evidence: "namespace-verified",
+      attribution: `Listed in the official MCP Registry, which verified control of the namespace "${namespace}" (the reverse-DNS of ${domain}). NessGate did not verify this itself.`,
+      provenance: [`mcp-registry:${namespace}`, s.name],
+      depth: 0,
+      raw: {
+        version: typeof s.version === "string" ? s.version : undefined,
+        description: typeof s.description === "string" ? s.description : undefined,
+      },
+    });
+  }
+  return out;
+}
+
+export { parseLlmsLinks, isLlmsPath, looksMachineReadable, exploreBudgetAllows, classifyJson, domainToNamespace, mcpRegistryRecords };
 
 /* ============ Connection-readiness checker (opt-in, additive) ============
    Assess how ready a discovered resource is to be CONNECTED to, read purely from
@@ -1662,4 +1842,4 @@ export async function plan(domain, clientCaps, opts = {}) {
   };
 }
 
-export default { resolve, plan, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, detectOpenApiYaml, extractOpenApiCapabilities, dedupeResources, reachabilityFromStatus, classifyDenial, parseMcpMessages, mcpToolCapabilities, probeFailureKind, resolutionOutcome, fetchBounded, assessReadiness, readinessProtocol, extractProtocolVersion, assessOpenApiReadiness, assessA2aReadiness, assessMcpReadiness, assessFetchFailure, matchClient, canonClientProtocol, ADAPTERS };
+export default { resolve, plan, normalizeResources, classifyResource, normalizeDomain, validateProbeContent, probeShapeOk, probeShapeOkObj, parseLinkRel, parseAgentmap, parseAidRecord, isAcs, normalizeAcsGatewayResponse, sameRegCanonicalHost, detectOpenApi, detectOpenApiYaml, extractOpenApiCapabilities, dedupeResources, reachabilityFromStatus, classifyDenial, parseMcpMessages, mcpToolCapabilities, probeFailureKind, resolutionOutcome, fetchBounded, assessReadiness, readinessProtocol, extractProtocolVersion, assessOpenApiReadiness, assessA2aReadiness, assessMcpReadiness, assessFetchFailure, matchClient, canonClientProtocol, parseLlmsLinks, isLlmsPath, looksMachineReadable, exploreBudgetAllows, classifyJson, domainToNamespace, mcpRegistryRecords, ADAPTERS };

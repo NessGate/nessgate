@@ -25,7 +25,7 @@ All four are also MCP tools at `POST /mcp`: `discover_domain`, `connect_domain`,
 | Path | What |
 |---|---|
 | `src/worker.js` | The whole Cloudflare Worker: routing, discover/explore/connect, MCP, readiness IO, SSRF guards, metrics. |
-| `public/resolver.mjs` | The embeddable library (discover + readiness + `plan()`). **Byte-identical** to `packages/resolver/index.mjs`. |
+| `public/resolver.mjs` | The embeddable library (discover + opt-in registry federation/delegation + readiness + `plan()`). **Byte-identical** to `packages/resolver/index.mjs`. |
 | `packages/resolver/` | npm `@nessgate/resolver`; `index.mjs` is a byte-copy of `public/resolver.mjs`. Bump `package.json` version to publish. |
 | `public/` | Static site + `openapi.json` + `llms.txt` (served by the worker). |
 | `compat/` | The permanent compatibility corpus (fixtures, matrix, adapter manifests). |

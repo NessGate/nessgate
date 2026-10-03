@@ -67,6 +67,26 @@ card, `llms.txt`, RFC 9727 api-catalog, `ai-info.json`, OpenAPI, ORD, AWP, RFC 6
 UCP, the AID TXT record, and GB/Z 185.4 — one normalized list, each record carrying its `source` and
 native `sourceUrl` so you can verify against the domain directly.
 
+### Optional discovery extensions
+
+```js
+const r = await resolve("example.com", { registry: true, delegate: true });
+```
+
+- `registry: true` — one bounded request to the official MCP Registry for the
+  domain's exact reverse-DNS namespace. Matching servers are added as records
+  with evidence `namespace-verified` and an attribution naming the registry as
+  the verifying party. If the registry cannot be checked, the response carries
+  `federatedUnavailable: ["mcp-registry"]` instead of a silently empty result.
+- `delegate: true` — follows the machine-readable pointers the domain's own
+  documents name (an llms.txt index's links; catalog entries pointing at other
+  locations), within fixed depth/request/host/byte limits. Followed records carry
+  evidence `publisher-declared`, the pointer chain in `provenance`, and `depth`;
+  walk accounting (and any truncation) is reported in `delegation`.
+
+Both options default off; output without them is unchanged. `plan()` accepts the
+same options and passes them through.
+
 `resolve(domain, opts)` returns
 `{ domain, provenance, discovered, resources, checked, outcome, blockedProbes? }`.
 
