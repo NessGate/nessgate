@@ -1,6 +1,6 @@
 # NessGate
 
-> The open, neutral compatibility resolver for the agentic web. Give it a domain and NessGate reads the machine-readable resources that domain publishes at the standard discovery locations, and returns one normalized answer with a link back to each source. It reads on demand, stores nothing, and makes no ownership or safety claim. No accounts, no API keys, open CORS.
+> The open, neutral compatibility resolver for the agentic web. Give it a domain and NessGate reads the machine-readable resources that domain publishes at the standard discovery locations, and returns one normalized answer with a link back to each source. It reads on demand, stores no discovered domain or resource data, and makes no ownership or safety claim. No accounts, no API keys, open CORS.
 
 ## Resolve
 - Resolve a domain: `GET https://nessgate.com/discover/{domain}` → `{"domain", "provenance", "note", "outcome", "discovered", "resources", "checked"}`. `discovered` lists which mechanisms the domain publishes and where; `resources` is the normalized union of what those documents contain, each record carrying `source` (which mechanism it came from) and `sourceUrl` (the document it was read from — authoritative; follow it to verify against the domain). `type` is an open label — do not assume a closed set. `checked` lists every mechanism probed, so an empty `discovered` is still a successful `200` observation. `400` for an invalid domain, `429` if rate-limited. Answers are computed on demand and cached at the edge for up to 10 minutes.

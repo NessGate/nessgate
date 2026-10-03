@@ -31,6 +31,38 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h2>2026</h2>
 
+<h3 id="dual-era-2026-10-03">Dual-era MCP, library federation, inbound inspection, hardening (1.18.0 → 1.21.0)</h3>
+<ul>
+<li><strong>1.21.0</strong> — MCP-Registry federation returns one record per server name: the registry's own
+<code>isLatest</code> marker wins; without it, the deterministic fallback is the greatest version under
+numeric-aware comparison — an older version can never win by appearing first. Readiness checks of
+nessgate.com's own endpoints are answered through the in-process router (the platform refuses a worker
+fetch into its own zone), so the service no longer misreports itself unreachable. A deterministic
+offline gate (<code>npm run gate</code>) now backs CI and both package publish workflows; the live smoke
+suite stays post-deploy only. (2026-10-03)</li>
+<li><strong>1.20.0</strong> — Dual-era MCP client: protocol revision 2026-07-28 (stateless; <code>initialize</code>
+removed; <code>server/discover</code> required) is recognized in readiness and introspection alongside the
+initialize-based revisions, and the hosted <code>/mcp</code> answers the <code>server/discover</code> probe with the
+versions it actually implements. A2A v1 cards: <code>supportedInterfaces[].protocolBinding</code> with
+per-interface <code>protocolVersion</code> (0.3.x and legacy shapes keep working). A declared document larger
+than the bounded readiness read reports <code>incomplete</code> (<code>verified: "oversized"</code>), never
+<code>broken</code>. (2026-10-03)</li>
+<li><strong>1.19.0</strong> — The library gains opt-in MCP-Registry federation (<code>registry: true</code>, failures
+disclosed as <code>federatedUnavailable</code>) and bounded declared-pointer delegation (<code>delegate: true</code>,
+accounting in <code>delegation</code>). (2026-10-03)</li>
+<li><strong>@nessgate/inspect 0.1.0 / 0.1.1</strong> — experimental inbound-request inspection package: evidence
+tiers (claimed / cryptographically-verified via RFC 9421 Web Bot Auth, including the current
+Signature-Agent dictionary form / network-verified via each operator's documented method /
+directory-attributed / unknown), provenance on every fact, no decisions or scores, plus an Express
+middleware. 0.1.1 hardens every outbound fetch: per-hop redirect validation, DNS checks rejecting
+private and reserved space, response-size and JWKS key caps. (2026-10-03)</li>
+<li><strong>1.18.0–1.18.1</strong> — <code>ready</code> requires protocol-level evidence (an endpoint answering HTTP 200 is
+not an MCP server; documentation-section paths are never endpoints); registry-federation failures
+disclosed as <code>federatedUnavailable</code>; platform request-budget exhaustion disclosed as
+<code>skipped:capacity</code>. (2026-09-30)</li>
+</ul>
+
+
 <h3 id="readiness-2026-09-29">Connection readiness, connection plans, three MCP tools, and an open self-test (1.13.0 → 1.17.1)</h3>
 <ul>
 <li><strong>Connection readiness (opt-in):</strong> <code>GET /explore/{domain}?readiness=1</code>

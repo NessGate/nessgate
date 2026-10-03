@@ -1,17 +1,26 @@
 name: CI
+
+# The deterministic offline gate: parity, normalization, readiness,
+# compatibility corpus, adapter contract, official-vector conformance,
+# lab/metrics isolation, and the inbound-inspection suites. No network and no
+# live smoke here — the live smoke suite runs post-deploy, where flakiness
+# cannot block a merge or a publish.
+
 on:
   push:
     branches: [main]
   pull_request:
+
 permissions:
   contents: read
+
 jobs:
-  test:
+  gate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - run: npm ci
-      - run: npm test
+          node-version: 22
+      # The gate is dependency-free (plain node scripts over repo files).
+      - run: npm run gate

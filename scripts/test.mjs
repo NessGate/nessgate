@@ -1056,6 +1056,28 @@ console.log("--- library registry/delegation options (parity + behavior)");
     { server: { name: "com.ex/old" }, _meta: { "io.modelcontextprotocol.registry/official": { status: "deprecated" } } },
   ] };
   is(JSON.stringify(lib.mcpRegistryRecords(regDoc, "com.ex", "ex.com")), JSON.stringify(mcpRegistryRecords(regDoc, "com.ex", "ex.com")), "mcpRegistryRecords library/worker parity");
+
+  // Several ACTIVE versions of the same server: the registry's isLatest marker
+  // must win — an older version can never win just by appearing first.
+  const dupDoc = { servers: [
+    { server: { name: "com.ex/srv", version: "1.0.0", remotes: [{ type: "streamable-http", url: "https://old.ex/m" }] }, _meta: { "io.modelcontextprotocol.registry/official": { status: "active", isLatest: false } } },
+    { server: { name: "com.ex/srv", version: "2.0.0", remotes: [{ type: "streamable-http", url: "https://new.ex/m" }] }, _meta: { "io.modelcontextprotocol.registry/official": { status: "active", isLatest: true } } },
+  ] };
+  const dupRecs = lib.mcpRegistryRecords(dupDoc, "com.ex", "ex.com");
+  is(dupRecs.length, 1, "duplicate server names collapse to one record");
+  is(dupRecs[0].url, "https://new.ex/m", "isLatest entry wins over an older first-listed version");
+  is(dupRecs[0].raw.version, "2.0.0", "the winning record carries the isLatest version");
+  is(JSON.stringify(dupRecs), JSON.stringify(mcpRegistryRecords(dupDoc, "com.ex", "ex.com")), "duplicate-version selection parity");
+
+  // No isLatest marker anywhere: deterministic fallback = greatest version under
+  // numeric-aware comparison ("1.10.0" beats "1.9.9"), regardless of order.
+  const noMark = { servers: [
+    { server: { name: "com.ex/srv", version: "1.9.9", remotes: [{ url: "https://v199.ex/m" }] } },
+    { server: { name: "com.ex/srv", version: "1.10.0", remotes: [{ url: "https://v1100.ex/m" }] } },
+  ] };
+  const nm = lib.mcpRegistryRecords(noMark, "com.ex", "ex.com");
+  is(nm.length, 1, "fallback also collapses to one record");
+  is(nm[0].url, "https://v1100.ex/m", "fallback picks the numerically greatest version");
   const bA = { hosts: new Set(), bytes: 0 }, bB = { hosts: new Set(), bytes: 0 };
   is(lib.exploreBudgetAllows(bA, { hosts: ["a", "b"], bytes: 10 }, { maxHosts: 1, maxTotalBytes: 100 }), exploreBudgetAllows(bB, { hosts: ["a", "b"], bytes: 10 }, { maxHosts: 1, maxTotalBytes: 100 }), "exploreBudgetAllows library/worker parity");
   const linkset = JSON.stringify({ linkset: [{ anchor: "https://a", "service-desc": [{ href: "https://a/openapi.json" }] }] });

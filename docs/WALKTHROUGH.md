@@ -101,6 +101,7 @@ Query via the `nessgate_discovery_v1` Analytics Engine dataset (`scripts/mcp-met
 ```bash
 npm test                 # offline regression (parity, normalization, SSRF, …)
 npm run test:readiness   # readiness/connect: parity + outcomes + MCP OAuth chain + neutrality
+npm run gate             # the deterministic offline gate (CI + both publish workflows run this)
 npm run check            # full offline suite + live smoke + npm parity
 npm run deploy           # HARD pre-deploy gate (offline suite incl. test:readiness) → wrangler deploy (stamps BUILD_ID=git SHA)
 npm run smoke            # post-deploy: prod health + /connect + readiness e2e (self-tested against nessgate.com)

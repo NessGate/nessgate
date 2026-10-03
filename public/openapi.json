@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "NessGate API",
-    "version": "1.20.0",
-    "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads whatever that domain already publishes across the standard machine-discovery locations (llms.txt, ARD / ai-catalog.json, A2A agent card, RFC 9727 API catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP manifest, RFC 6415 host-meta) and returns one normalized answer, each record carrying a sourceUrl back to the domain. NessGate stores nothing, never crawls or indexes, and makes no ownership or safety claim. Read endpoints are public, unauthenticated, and CORS-open. The response contract is stable and additive: new optional fields may appear; clients must ignore unknown fields.",
+    "version": "1.21.0",
+    "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads whatever that domain already publishes across the standard machine-discovery locations (llms.txt, ARD / ai-catalog.json, A2A agent card, RFC 9727 API catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP manifest, RFC 6415 host-meta) and returns one normalized answer, each record carrying a sourceUrl back to the domain. NessGate stores no discovered domain or resource data, never crawls or indexes, and makes no ownership or safety claim. Read endpoints are public, unauthenticated, and CORS-open. The response contract is stable and additive: new optional fields may appear; clients must ignore unknown fields.",
     "contact": { "email": "contact@nessgate.com", "url": "https://nessgate.com/contact" },
     "termsOfService": "https://nessgate.com/terms",
     "license": { "name": "Apache-2.0", "url": "https://www.apache.org/licenses/LICENSE-2.0" }
@@ -35,7 +35,7 @@
             "name": "mcp",
             "in": "query",
             "required": false,
-            "description": "Set to 1 to introspect DECLARED MCP endpoints read-only via the protocol's own handshake (initialize + tools/list only — never tools/call, no credentials, POSTs never follow redirects). HTTPS endpoints on the queried registrable domain only, max 3 per resolution, 256 KB response cap. Declared tools land verbatim in the resource's capabilities; the response is labeled introspected:[\"mcp\"]. Default (omit ?mcp) never introspects.",
+            "description": "Set to 1 to introspect DECLARED MCP endpoints read-only via the protocol's own read-only methods (legacy initialize, or server/discover for revision-2026-07-28 stateless servers, then tools/list — never tools/call, no credentials, POSTs never follow redirects). HTTPS endpoints on the queried registrable domain only, max 3 per resolution, 256 KB response cap. Declared tools land verbatim in the resource's capabilities; the response is labeled introspected:[\"mcp\"]. Default (omit ?mcp) never introspects.",
             "schema": { "type": "string", "enum": ["1"], "example": "1" }
           },
           {
@@ -302,7 +302,7 @@
           "capabilitiesTruncated": { "type": "boolean", "description": "True when the publisher declared more capabilities than the cap; the list is a labeled prefix, never a silent truncation." },
           "introspection": {
             "type": "object",
-            "description": "Only with ?mcp=1, on declared MCP endpoint resources: the result of the read-only MCP handshake (initialize + tools/list only — no tool execution, no credentials). ok:true carries the negotiated protocolVersion and the server's own serverInfo; ok:false carries status: auth-required | legacy-transport | error. Declared tools land verbatim in capabilities."
+            "description": "Only with ?mcp=1, on declared MCP endpoint resources: the result of the read-only MCP exchange (legacy initialize or 2026-07-28 server/discover, then tools/list — no tool execution, no credentials). ok:true carries the negotiated protocolVersion and the server's own serverInfo; ok:false carries status: auth-required | legacy-transport | error. Declared tools land verbatim in capabilities."
           },
           "security": {
             "type": "array",

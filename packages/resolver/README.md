@@ -24,7 +24,7 @@ p.connection;   // { protocol, endpoint, transport, version, auth:{ type, tokenE
 p.unmatched;    // what the service offered that your client can't use, and vice-versa
 ```
 
-Four honest outcomes, never a guess. `plan()` discovers the domain, matches it against your client's
+Five honest outcomes, never a guess. `plan()` discovers the domain, matches it against your client's
 declared capabilities (deterministic intersection — no scores), and resolves each protocol's real
 connection details from the service's own published metadata (OpenAPI `servers`+`securitySchemes`,
 A2A cards, the MCP OAuth chain RFC 9728 → RFC 8414). Read-only; credentials stay with you.

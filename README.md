@@ -28,9 +28,10 @@ curl -sX POST https://nessgate.com/connect/supabase.com \
 //   (which never touch NessGate). No scores; each field links back to its source.
 ```
 
-Four honest outcomes, never a guess: **ready** (connect now, no credentials), **credentials-required**
+Five honest outcomes, never a guess: **ready** (connect now, no credentials), **credentials-required**
 (everything's known — bring your own secret), **incomplete** (the service under-published — NessGate
-names the exact missing field), **no-compatible-method** (nothing your client speaks). Prefer the
+names the exact missing field), **broken** (the declared location answers and contradicts its own
+declaration), **no-compatible-method** (nothing your client speaks). Prefer the
 per-resource view? Add `?readiness=1` to `/explore`. Prefer the raw list of what a domain publishes?
 That's the original resolver, `GET /discover/{domain}` — unchanged and still here.
 
@@ -41,9 +42,15 @@ to read and track every discovery standard (ARD, A2A, `llms.txt`, api-catalog, O
 ANP, UCP, AID, MCP, GB/Z 185.4…), follow each one's auth story (OpenAPI security schemes, the MCP OAuth
 metadata chain RFC 9728 → RFC 8414, A2A card schemes), handle server quirks, timeouts, redirects, and
 SSRF safety on every hop, normalize it all into one shape, and keep doing that as the protocols change.
-NessGate does exactly that, reads on demand, stores nothing, and stays neutral — so you write your
+NessGate does exactly that, reads on demand, stores no discovered domain or resource data, and stays neutral — so you write your
 agent, not a compatibility layer. It's free, open (Apache-2.0), and independently implementable; if
 nessgate.com vanished, every domain's files would still stand on the domain itself.
+
+The reverse direction — describing what an *incoming* automated caller declares and can prove —
+is the experimental package [`@nessgate/inspect`](https://www.npmjs.com/package/@nessgate/inspect)
+(0.x): tiered, provenanced facts (claimed / cryptographically-verified / network-verified /
+directory-attributed), no decisions, no scores. See
+[`docs/integrations.md`](docs/integrations.md) §5.
 
 **Publishing a service? Test yourself before agents do:**
 

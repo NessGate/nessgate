@@ -2,7 +2,8 @@
 
 One reference for the shapes shared by `GET /discover`, `GET /explore` (including
 `?readiness=1`), `POST /connect`, the `@nessgate/resolver` library, and the
-experimental inbound-inspection module under `lab/nessgate-inspect/`. Frameworks
+experimental inbound-inspection package in `packages/inspect/` (published as
+`@nessgate/inspect`; validation harnesses under `lab/nessgate-inspect/`). Frameworks
 that consume NessGate should read this once and handle every surface the same way.
 
 Three contract rules hold everywhere:
@@ -92,7 +93,7 @@ declared and a broad default was used.
 
 ## The caller side (experimental)
 
-The inbound-inspection module (`lab/nessgate-inspect/`) applies the same anatomy
+The inbound-inspection package (`packages/inspect/`, published as `@nessgate/inspect`) applies the same anatomy
 to what an incoming caller presents. Each fact carries one tier:
 
 | tier | meaning | resolver-side analogue |

@@ -65,6 +65,19 @@ await check("explore?readiness=1 is additive and attaches well-formed readiness 
   }
 });
 
+await check("self-readiness: nessgate.com's own endpoints assess in-process, never 'unreachable'", async () => {
+  const j = await (await get("/explore/nessgate.com?readiness=1")).json();
+  const rs = (j.resources || []).filter((r) => r.readiness);
+  const oa = rs.find((r) => /nessgate\.com\/openapi\.json/.test(r.url));
+  if (!oa) throw new Error("own openapi.json not among assessed resources");
+  if (oa.readiness.outcome !== "ready") throw new Error("own openapi.json readiness: " + JSON.stringify(oa.readiness));
+  const mcp = rs.find((r) => r.readiness.protocol === "mcp" && /nessgate\.com\/mcp/.test(r.readiness.endpoint || r.url));
+  if (!mcp) throw new Error("own /mcp not among assessed resources");
+  if (!["ready", "credentials-required"].includes(mcp.readiness.outcome)) throw new Error("own /mcp readiness: " + JSON.stringify(mcp.readiness));
+  const falseUnreach = rs.filter((r) => /nessgate\.com/.test(r.url) && /unreachable|fetch failed from this vantage/.test((r.readiness.missing || []).join(" ")));
+  if (falseUnreach.length) throw new Error("self endpoints misreported unreachable: " + falseUnreach.map((r) => r.url).join(", "));
+});
+
 await check("plain /explore is UNCHANGED by the readiness feature (no leak without the flag)", async () => {
   const d = await (await get("/explore/nessgate.com")).json();
   if (d.readinessNote) throw new Error("plain /explore leaked readinessNote");

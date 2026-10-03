@@ -34,12 +34,10 @@ jobs:
       - name: Update npm
         run: npm install -g npm@latest
 
-      # Gate: the module's full deterministic test suite must pass.
-      - name: Run inspect test suites
+      # The full deterministic gate must pass before anything is published.
+      - name: Run the deterministic gate
         working-directory: .
-        run: |
-          node lab/nessgate-inspect/test-inspect.mjs
-          node lab/nessgate-inspect/integrations/test-integration.mjs
+        run: npm run gate
 
       - name: Publish (provenance, public, tokenless via OIDC)
         run: npm publish --provenance --access public

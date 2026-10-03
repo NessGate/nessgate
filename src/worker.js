@@ -359,6 +359,29 @@ async function selfProbe(path, env, ctx) {
   return res.text();
 }
 
+// The platform refuses a worker fetch into its own zone, so readiness checks of
+// NessGate's OWN endpoints dispatch through the in-process router instead of
+// the network: same handlers, same bytes — a self assessment rather than a
+// false "unreachable".
+function isSelfHost(url) {
+  try { const h = new URL(url).hostname.toLowerCase().replace(/^www\./, ""); return h === SELF_DOMAIN; } catch { return false; }
+}
+async function selfJson(url, env, ctx) {
+  try {
+    const u = new URL(url);
+    const res = await route(new Request(`https://${SELF_DOMAIN}${u.pathname}${u.search}`, { headers: { accept: "application/json" } }), env, ctx);
+    if (res.status !== 200) return { status: res.status || 0, json: null };
+    try { return { status: 200, json: JSON.parse(await res.text()) }; } catch { return { status: 200, json: null }; }
+  } catch { return { status: 0, json: null }; }
+}
+async function selfMcpPost(url, body, extraHeaders, env, ctx) {
+  try {
+    const u = new URL(url);
+    const res = await route(new Request(`https://${SELF_DOMAIN}${u.pathname}${u.search}`, { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...(extraHeaders || {}) }, body }), env, ctx);
+    return { status: res.status, text: await res.text(), wwwAuthenticate: res.headers.get("www-authenticate") || null };
+  } catch { return { status: 0, text: "", wwwAuthenticate: null }; }
+}
+
 /* --- Pure parsers for the non-well-known channels (parity-tested) --- */
 
 // Extract href values from <link rel="..."> tags whose rel matches any of `rels`.
@@ -1712,12 +1735,35 @@ function mcpRegistryRecords(json, namespace, domain) {
   const servers = obj && Array.isArray(obj.servers) ? obj.servers : [];
   const prefix = namespace + "/";
   const src = MCP_REGISTRY_API + "?search=" + encodeURIComponent(namespace);
-  const out = [];
+  // The registry can return several versions of the same server name. One record
+  // per name: the entry the registry itself marks isLatest wins; when no entry
+  // carries that marker the fallback is deterministic and documented — the
+  // greatest `version` under numeric-aware segment comparison, ties keeping the
+  // earlier entry. An older version can never win merely by appearing first.
+  const vcmp = (a, b) => {
+    const as = String(a || "").split(/[.-]/), bs = String(b || "").split(/[.-]/);
+    for (let i = 0; i < Math.max(as.length, bs.length); i++) {
+      const x = as[i] === undefined ? "" : as[i], y = bs[i] === undefined ? "" : bs[i];
+      const nx = /^\d+$/.test(x), ny = /^\d+$/.test(y);
+      if (nx && ny) { if (+x !== +y) return +x - +y; }
+      else if (x !== y) return x < y ? -1 : 1;
+    }
+    return 0;
+  };
+  const byName = new Map();
   for (const entry of servers) {
     const s = (entry && entry.server) || entry;
     if (!s || typeof s.name !== "string" || !s.name.startsWith(prefix)) continue;
     const meta = entry && entry._meta && entry._meta["io.modelcontextprotocol.registry/official"];
     if (meta && meta.status && meta.status !== "active") continue;
+    const isLatest = !!(meta && meta.isLatest === true);
+    const prev = byName.get(s.name);
+    if (!prev) { byName.set(s.name, { s, isLatest }); continue; }
+    if (isLatest !== prev.isLatest) { if (isLatest) byName.set(s.name, { s, isLatest }); continue; }
+    if (vcmp(s.version, prev.s.version) > 0) byName.set(s.name, { s, isLatest });
+  }
+  const out = [];
+  for (const { s } of byName.values()) {
     const remotes = Array.isArray(s.remotes) ? s.remotes : [];
     const remote = remotes.find((r) => r && typeof r.url === "string");
     const url = (remote && remote.url) || (s.repository && typeof s.repository.url === "string" ? s.repository.url : null);
@@ -2130,7 +2176,7 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
   // runs only under the flag, so default /explore output is unchanged.
   if (readiness) {
     const pool = resources.concat(relatedOut ? relatedOut.flatMap((g) => (g && Array.isArray(g.resources) ? g.resources : [])) : []);
-    try { await attachReadiness(pool); } catch { /* readiness must never break discovery */ }
+    try { await attachReadiness(pool, env, ctx); } catch { /* readiness must never break discovery */ }
     // Anonymous aggregate usage signal: ONE categorical label (the best readiness
     // outcome across connectable resources), no domain / payload / IP — emitted via
     // the single metrics site (recordDiscovery), preserving the privacy invariant.
@@ -2456,10 +2502,11 @@ async function readinessReadBounded(res, max) {
 // (manual) — a metadata endpoint that redirects reads as unavailable, which is safe.
 // Returns { status, json } — status is kept so failures can be honestly classified
 // (assessFetchFailure): an answered 404 is evidence, a network failure is not.
-async function readinessFetchJson(url, deadline) {
+async function readinessFetchJson(url, deadline, env, ctx) {
   if (deadline && Date.now() > deadline) return { status: 0, json: null };
   let u; try { u = new URL(url); } catch { return { status: 0, json: null }; }
   if (u.protocol !== "https:") return { status: 0, json: null };
+  if (env && isSelfHost(url)) return selfJson(url, env, ctx);
   const host = u.hostname.toLowerCase().replace(/\.+$/, "");
   if (isForbiddenHost(host)) return { status: 0, json: null };
   try { await assertPublicDns(host); } catch { return { status: 0, json: null }; }
@@ -2475,14 +2522,18 @@ async function readinessFetchJson(url, deadline) {
 }
 // Read-only MCP initialize (no tools/call, no credentials). Returns status even on
 // 401/403 (the auth signal), plus the RFC 9728 pointer and negotiated version.
-async function readinessMcpInit(url, deadline) {
+async function readinessMcpInit(url, deadline, env, ctx) {
   if (deadline && Date.now() > deadline) return { ok: false, status: 0 };
   let u; try { u = new URL(url); } catch { return { ok: false, status: 0 }; }
   if (u.protocol !== "https:") return { ok: false, status: 0 };
+  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "NessGate-Readiness", version: "1.0" } } });
+  if (env && isSelfHost(url)) {
+    const r = await selfMcpPost(url, body, null, env, ctx);
+    return { ok: r.status === 200, status: r.status, wwwAuthenticate: r.wwwAuthenticate, protocolVersion: extractProtocolVersion(r.text) };
+  }
   const host = u.hostname.toLowerCase().replace(/\.+$/, "");
   if (isForbiddenHost(host)) return { ok: false, status: 0 };
   try { await assertPublicDns(host); } catch { return { ok: false, status: 0 }; }
-  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "NessGate-Readiness", version: "1.0" } } });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), READINESS_FETCH_TIMEOUT_MS);
   try {
@@ -2494,15 +2545,19 @@ async function readinessMcpInit(url, deadline) {
 // Modern (2026-07-28) probe: POST the revision's REQUIRED server/discover with
 // per-request _meta and the required Streamable HTTP headers. Returns the parsed
 // DiscoverResult info, or null when the endpoint does not answer as one.
-async function readinessMcpDiscover(url, deadline) {
+async function readinessMcpDiscover(url, deadline, env, ctx) {
   if (deadline && Date.now() > deadline) return null;
   let u; try { u = new URL(url); } catch { return null; }
   if (u.protocol !== "https:") return null;
+  const meta = { "io.modelcontextprotocol/protocolVersion": MCP_MODERN_PROTOCOL_VERSION, "io.modelcontextprotocol/clientInfo": { name: "NessGate-Readiness", version: "1.0" }, "io.modelcontextprotocol/clientCapabilities": {} };
+  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "server/discover", params: { _meta: meta } });
+  if (env && isSelfHost(url)) {
+    const r = await selfMcpPost(url, body, { "MCP-Protocol-Version": MCP_MODERN_PROTOCOL_VERSION, "Mcp-Method": "server/discover" }, env, ctx);
+    return r.status === 200 ? extractDiscoverInfo(r.text) : null;
+  }
   const host = u.hostname.toLowerCase().replace(/\.+$/, "");
   if (isForbiddenHost(host)) return null;
   try { await assertPublicDns(host); } catch { return null; }
-  const meta = { "io.modelcontextprotocol/protocolVersion": MCP_MODERN_PROTOCOL_VERSION, "io.modelcontextprotocol/clientInfo": { name: "NessGate-Readiness", version: "1.0" }, "io.modelcontextprotocol/clientCapabilities": {} };
-  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "server/discover", params: { _meta: meta } });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), READINESS_FETCH_TIMEOUT_MS);
   try {
@@ -2511,20 +2566,20 @@ async function readinessMcpDiscover(url, deadline) {
     return extractDiscoverInfo(await readinessReadBounded(res, 65536));
   } catch { return null; } finally { clearTimeout(timer); }
 }
-async function readinessFillMcp(endpoint, deadline) {
+async function readinessFillMcp(endpoint, deadline, env, ctx) {
   if (/\.json(\?|$)/i.test(endpoint) || /server-card|agent-card/i.test(endpoint)) {
-    const card = (await readinessFetchJson(endpoint, deadline)).json;
+    const card = (await readinessFetchJson(endpoint, deadline, env, ctx)).json;
     const inner = card && (card.url || card.endpoint || card.serverUrl || card.mcpUrl || (card.server && card.server.url));
     if (typeof inner === "string" && /^https:\/\//i.test(inner)) endpoint = inner;
   }
-  const init = await readinessMcpInit(endpoint, deadline);
+  const init = await readinessMcpInit(endpoint, deadline, env, ctx);
   // Dual-era: 2026-07-28 removed initialize. When the attempt yields no
   // protocol-level evidence in a shape a modern stateless server produces (200
   // without an initialize result, or 400/405/406), ask server/discover before
   // judging. Auth statuses (401/403) keep their own path below.
   let discover = null;
   if (!init.protocolVersion && (init.ok || init.status === 400 || init.status === 405 || init.status === 406)) {
-    discover = await readinessMcpDiscover(endpoint, deadline);
+    discover = await readinessMcpDiscover(endpoint, deadline, env, ctx);
   }
   let prm = null, as = null;
   if (init.status === 401 || init.status === 403) {
@@ -2532,12 +2587,12 @@ async function readinessFillMcp(endpoint, deadline) {
     const m = init.wwwAuthenticate && init.wwwAuthenticate.match(/resource_metadata="?([^",\s]+)"?/i);
     if (m) prmUrl = m[1];
     else { try { prmUrl = new URL("/.well-known/oauth-protected-resource", endpoint).toString(); } catch {} }
-    if (prmUrl) prm = (await readinessFetchJson(prmUrl, deadline)).json;
+    if (prmUrl) prm = (await readinessFetchJson(prmUrl, deadline, env, ctx)).json;
     const asBase = prm && Array.isArray(prm.authorization_servers) && prm.authorization_servers[0];
     if (asBase) {
       for (const path of ["/.well-known/oauth-authorization-server", "/.well-known/openid-configuration"]) {
         let asUrl; try { asUrl = new URL(path, asBase).toString(); } catch { continue; }
-        const doc = (await readinessFetchJson(asUrl, deadline)).json;
+        const doc = (await readinessFetchJson(asUrl, deadline, env, ctx)).json;
         if (doc && doc.token_endpoint) { as = doc; break; }
       }
     }
@@ -2549,31 +2604,31 @@ async function readinessFillMcp(endpoint, deadline) {
   return { ...assessMcpReadiness({ init, prm, as, discover }), endpoint };
 }
 // IO: assess one connectable resource (worker vantage). Read-only, no credentials.
-async function readinessForResource(resource, deadline) {
+async function readinessForResource(resource, deadline, env, ctx) {
   const proto = readinessProtocol(resource);
   if (!proto) return null;
   const stamp = (a) => ({ ...a, endpoint: a.endpoint || resource.url });
   const capacity = (protocol) => stamp({ protocol, outcome: "incomplete", verified: "skipped:capacity", missing: [READINESS_CAPACITY_MSG] });
   if (proto === "openapi") {
-    const r = await readinessFetchJson(resource.url, deadline);
+    const r = await readinessFetchJson(resource.url, deadline, env, ctx);
     if (r.status === -1) return capacity("openapi");
     if (!r.json && r.truncated) return stamp({ ...assessOversizedDocument("openapi", "OpenAPI document", READINESS_BYTES), transport: "https" });
     return stamp(r.json ? assessOpenApiReadiness(r.json) : { ...assessFetchFailure("openapi", r.status, "OpenAPI document"), transport: "https" });
   }
   if (proto === "a2a-agent-card") {
-    const r = await readinessFetchJson(resource.sourceUrl || resource.url, deadline);
+    const r = await readinessFetchJson(resource.sourceUrl || resource.url, deadline, env, ctx);
     if (r.status === -1) return capacity("a2a-agent-card");
     if (!r.json && r.truncated) return stamp(assessOversizedDocument("a2a-agent-card", "A2A agent card", READINESS_BYTES));
     return stamp(r.json ? assessA2aReadiness(r.json) : assessFetchFailure("a2a-agent-card", r.status, "A2A agent card"));
   }
-  if (proto === "mcp") return stamp(await readinessFillMcp(resource.url, deadline));
+  if (proto === "mcp") return stamp(await readinessFillMcp(resource.url, deadline, env, ctx));
   return stamp({ protocol: proto, outcome: "incomplete", missing: [`no readiness resolver implemented for "${proto}" yet`] });
 }
 // Attach `readiness` to each connectable resource (bounded by BOTH a count budget
 // and a total wall-clock deadline). Assesses each UNIQUE endpoint URL once (so a URL
 // /explore surfaces from several channels does not spend the budget twice) and shares
 // the result with every occurrence. Mutates in place.
-async function attachReadiness(resources) {
+async function attachReadiness(resources, env, ctx) {
   const byUrl = new Map();
   const deadline = Date.now() + READINESS_DEADLINE_MS;
   let budget = READINESS_MAX;
@@ -2583,7 +2638,7 @@ async function attachReadiness(resources) {
     if (!byUrl.has(r.url)) {
       if (budget <= 0 || Date.now() > deadline) continue; // out of budget/time — leave later resources unassessed
       budget--;
-      try { byUrl.set(r.url, await readinessForResource(r, deadline)); }
+      try { byUrl.set(r.url, await readinessForResource(r, deadline, env, ctx)); }
       catch { byUrl.set(r.url, { protocol: proto, outcome: "incomplete", missing: ["readiness check failed"] }); }
     }
     if (byUrl.has(r.url)) r.readiness = byUrl.get(r.url);
@@ -2645,7 +2700,7 @@ async function connectData(raw, env, ctx, request, clientCaps) {
     if (budget <= 0 || Date.now() > deadline) continue;
     budget--;
     let readiness;
-    try { readiness = await readinessForResource(r, deadline); } catch { continue; }
+    try { readiness = await readinessForResource(r, deadline, env, ctx); } catch { continue; }
     if (!readiness) continue;
     const m = matchClient(readiness, entry);
     if (!m.compatible) { rejected.push({ protocol: proto, endpoint: r.url, reason: m.reason }); continue; }
@@ -2696,7 +2751,7 @@ async function apiConnect(raw, env, ctx, request, clientCaps) {
 // (the tool dispatches to the same handler).
 
 const MCP_SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26"];
-const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.20.0" };
+const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.21.0" };
 const MCP_INSTRUCTIONS =
   "Three read-only tools. discover_domain: what a domain publishes (the raw normalized list). " +
   "connect_domain: given a domain AND your client's capabilities, HOW to connect — one outcome " +

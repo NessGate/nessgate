@@ -34,10 +34,10 @@ jobs:
       - name: Update npm
         run: npm install -g npm@latest
 
-      # Parity guard: the published file must match the served resolver exactly.
-      - name: Verify resolver parity
+      # The full deterministic gate must pass before anything is published.
+      - name: Run the deterministic gate
         working-directory: .
-        run: node scripts/test.mjs
+        run: npm run gate
 
       - name: Publish (provenance, public, tokenless via OIDC)
         run: npm publish --provenance --access public

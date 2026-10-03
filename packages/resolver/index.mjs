@@ -1487,12 +1487,35 @@ function mcpRegistryRecords(json, namespace, domain) {
   const servers = obj && Array.isArray(obj.servers) ? obj.servers : [];
   const prefix = namespace + "/";
   const src = MCP_REGISTRY_API + "?search=" + encodeURIComponent(namespace);
-  const out = [];
+  // The registry can return several versions of the same server name. One record
+  // per name: the entry the registry itself marks isLatest wins; when no entry
+  // carries that marker the fallback is deterministic and documented — the
+  // greatest `version` under numeric-aware segment comparison, ties keeping the
+  // earlier entry. An older version can never win merely by appearing first.
+  const vcmp = (a, b) => {
+    const as = String(a || "").split(/[.-]/), bs = String(b || "").split(/[.-]/);
+    for (let i = 0; i < Math.max(as.length, bs.length); i++) {
+      const x = as[i] === undefined ? "" : as[i], y = bs[i] === undefined ? "" : bs[i];
+      const nx = /^\d+$/.test(x), ny = /^\d+$/.test(y);
+      if (nx && ny) { if (+x !== +y) return +x - +y; }
+      else if (x !== y) return x < y ? -1 : 1;
+    }
+    return 0;
+  };
+  const byName = new Map();
   for (const entry of servers) {
     const s = (entry && entry.server) || entry;
     if (!s || typeof s.name !== "string" || !s.name.startsWith(prefix)) continue;
     const meta = entry && entry._meta && entry._meta["io.modelcontextprotocol.registry/official"];
     if (meta && meta.status && meta.status !== "active") continue;
+    const isLatest = !!(meta && meta.isLatest === true);
+    const prev = byName.get(s.name);
+    if (!prev) { byName.set(s.name, { s, isLatest }); continue; }
+    if (isLatest !== prev.isLatest) { if (isLatest) byName.set(s.name, { s, isLatest }); continue; }
+    if (vcmp(s.version, prev.s.version) > 0) byName.set(s.name, { s, isLatest });
+  }
+  const out = [];
+  for (const { s } of byName.values()) {
     const remotes = Array.isArray(s.remotes) ? s.remotes : [];
     const remote = remotes.find((r) => r && typeof r.url === "string");
     const url = (remote && remote.url) || (s.repository && typeof s.repository.url === "string" ? s.repository.url : null);
