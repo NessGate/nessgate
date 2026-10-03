@@ -28,7 +28,7 @@
 <h1>API Documentation</h1>
 <p>Base URL: <code>https://nessgate.com</code>. Every endpoint is a public read — no
 authentication, no API keys, CORS enabled (<code>Access-Control-Allow-Origin: *</code>).
-Responses are JSON unless noted. NessGate stores nothing; every answer is read on demand from the
+Responses are JSON unless noted. NessGate stores no discovered domain or resource data; every answer is read on demand from the
 target domain and cached at the edge for up to 10 minutes.</p>
 
 <h2>Resolve a domain</h2>
@@ -149,7 +149,7 @@ the same via <code>resolve(domain, {verify: true})</code>.</p>
 <p class="note"><strong>MCP introspection (opt-in: <code>?mcp=1</code>).</strong> When a domain <em>declares</em>
 an MCP endpoint (via AWP, an AID record, a catalog entry — never a guessed path), NessGate can ask
 that server what <em>it</em> declares, using the protocol's own read-only handshake:
-<code>initialize</code> and <code>tools/list</code> — nothing else, ever. No tool is executed, no
+<code>initialize</code> (or, for revision-2026-07-28 stateless servers, the revision's required <code>server/discover</code>) and <code>tools/list</code> — nothing else, ever. No tool is executed, no
 credentials are sent (an auth wall is reported as <code>introspection.status: "auth-required"</code>,
 not retried), POSTs never follow redirects, and only HTTPS endpoints on the queried domain qualify
 (max&nbsp;3 per resolution, 256&nbsp;KB response cap each). The server's declared tools — verbatim
@@ -215,7 +215,7 @@ limitation.</p>
 <code>{"candidates":["https://…", …]}</code> lets your own AI/search <em>suggest</em> resource URLs;
 NessGate fetches each (bounded, SSRF-checked), verifies it is genuinely machine-readable, and returns
 only those, labelled <code>evidence:"candidate"</code> with <code>["ai-candidate", url]</code>
-provenance. <strong>NessGate runs no AI and stores nothing</strong> — the principle is <em>AI
+provenance. <strong>NessGate runs no AI and stores no discovered domain or resource data</strong> — the principle is <em>AI
 suggests, NessGate verifies</em>; NessGate never decides ownership. Up to 10 candidates per request;
 these responses are never cached. The plain <code>GET</code> stays fully deterministic.</p>
 <p>Response adds <code>federated</code>, per-record <code>evidence</code>/<code>provenance</code>/<code>depth</code>,
@@ -223,7 +223,7 @@ and <code>stats</code> (counts, requests, hosts, bytes, <code>truncated</code>).
 bounded — ≤8 hosts, ≤24 requests, a global byte cap and deadline (declaration chains are followed
 to arbitrary depth within those budgets; a depth backstop only guards against runaways), and the
 same SSRF checks on
-every cross-host hop — and, like <code>/discover</code>, stores nothing, crawls nothing, guesses no
+every cross-host hop — and, like <code>/discover</code>, stores no discovered domain or resource data, crawls nothing, guesses no
 subdomains, runs no AI, and makes no ownership claim. <code>/discover</code> is unchanged for
 existing integrations.</p>
 

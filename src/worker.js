@@ -275,7 +275,7 @@ const MAX_CAPABILITIES = 40; // cap on verbatim declared capabilities per resour
 // MCP endpoint declares about itself via the protocol's own handshake.
 const MCP_INTROSPECT_MAX_ENDPOINTS = 3; // endpoints introspected per resolution
 const MCP_INTROSPECT_MAX_BYTES = 262144; // response cap per POST (tool lists are small)
-const MCP_PROTOCOL_VERSION = "2025-06-18"; // newest initialize-based version this client implements
+const MCP_PROTOCOL_VERSION = "2025-11-25"; // newest initialize-based revision this client implements (servers negotiate down)
 // 2026-07-28 ("modern") revision: stateless, no initialize; every request carries
 // its protocol version in _meta and the Streamable HTTP headers.
 const MCP_MODERN_PROTOCOL_VERSION = "2026-07-28";
@@ -2526,7 +2526,7 @@ async function readinessMcpInit(url, deadline, env, ctx) {
   if (deadline && Date.now() > deadline) return { ok: false, status: 0 };
   let u; try { u = new URL(url); } catch { return { ok: false, status: 0 }; }
   if (u.protocol !== "https:") return { ok: false, status: 0 };
-  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "NessGate-Readiness", version: "1.0" } } });
+  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "NessGate-Readiness", version: "1.0" } } });
   if (env && isSelfHost(url)) {
     const r = await selfMcpPost(url, body, null, env, ctx);
     return { ok: r.status === 200, status: r.status, wwwAuthenticate: r.wwwAuthenticate, protocolVersion: extractProtocolVersion(r.text) };
@@ -2750,8 +2750,8 @@ async function apiConnect(raw, env, ctx, request, clientCaps) {
 // instead of scraping it. Same rate limits and caches as the REST endpoint
 // (the tool dispatches to the same handler).
 
-const MCP_SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26"];
-const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.21.0" };
+const MCP_SUPPORTED_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26"];
+const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.22.0" };
 const MCP_INSTRUCTIONS =
   "Three read-only tools. discover_domain: what a domain publishes (the raw normalized list). " +
   "connect_domain: given a domain AND your client's capabilities, HOW to connect — one outcome " +

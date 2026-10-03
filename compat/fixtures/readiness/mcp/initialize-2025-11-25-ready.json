@@ -1,0 +1,21 @@
+{
+  "id": "readiness/mcp/initialize-2025-11-25-ready",
+  "check": "readiness",
+  "assessor": "mcp",
+  "origin": "reference-impl",
+  "provenance": "MCP 2025-11-25 is the newest initialize-based revision (the 2026-07-28 changelog names it as its predecessor); handshake semantics unchanged",
+  "input": {
+    "init": {
+      "ok": true,
+      "status": 200,
+      "protocolVersion": "2025-11-25"
+    }
+  },
+  "expect": {
+    "outcome": "ready",
+    "transport": "streamable-http",
+    "version": "2025-11-25",
+    "verified": "ok"
+  },
+  "notes": "An initialize result negotiating 2025-11-25 is protocol-level evidence exactly like earlier initialize-era revisions; the modern 2026-07-28 path is unaffected."
+}

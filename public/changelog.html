@@ -31,8 +31,19 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h2>2026</h2>
 
-<h3 id="dual-era-2026-10-03">Dual-era MCP, library federation, inbound inspection, hardening (1.18.0 → 1.21.0)</h3>
+<h3 id="dual-era-2026-10-03">Dual-era MCP, library federation, inbound inspection, hardening (1.18.0 → 1.22.0)</h3>
 <ul>
+<li><strong>1.22.0 / @nessgate/inspect 0.1.2</strong> — Web Bot Auth verification now implements the IETF
+WG protocol draft (draft-ietf-webbotauth-httpsig-protocol-00) and passes its Appendix E.2 test
+vectors byte-exact: <code>Signature-Agent</code> parsed as a Structured Fields dictionary with
+<code>type</code> semantics (<code>directory</code> origins at the well-known path, <code>jwks_uri</code>;
+unsupported types ignored, never inferred), the covered <code>;key=</code> member drives key discovery,
+<code>keyid</code> must be the JWK thumbprint, <code>created</code>/<code>expires</code>/<code>tag</code>/
+<code>@authority</code>-or-<code>@target-uri</code> enforced before any verified verdict, redirects never
+followed during discovery, multiple signatures handled without misattribution. MCP initialize-era
+support extends to revision 2025-11-25. Package release triggers separated (a release can no longer
+publish the other package as a side effect); an IP-level lab measurement retired in favor of the
+privacy policy's stronger wording. (2026-10-03)</li>
 <li><strong>1.21.0</strong> — MCP-Registry federation returns one record per server name: the registry's own
 <code>isLatest</code> marker wins; without it, the deterministic fallback is the greatest version under
 numeric-aware comparison — an older version can never win by appearing first. Readiness checks of

@@ -60,7 +60,7 @@ const MAX_CAPABILITIES = 40; // cap on verbatim declared capabilities per resour
 // endpoint declares about itself via the protocol's own handshake.
 const MCP_INTROSPECT_MAX_ENDPOINTS = 3; // endpoints introspected per resolution
 const MCP_INTROSPECT_MAX_BYTES = 262144; // response cap per POST (tool lists are small)
-const MCP_PROTOCOL_VERSION = "2025-06-18"; // newest version this client implements
+const MCP_PROTOCOL_VERSION = "2025-11-25"; // newest initialize-based revision this client implements (servers negotiate down)
 // The COMPLETE set of JSON-RPC methods introspection may ever send. Read-only
 // metadata enumeration only — tools/call and every other method are
 // structurally absent (behaviorally negative-tested).
@@ -1782,7 +1782,7 @@ async function readinessGetJson(fetchImpl, url, timeoutMs, maxBytes) {
 async function readinessMcpInitialize(fetchImpl, url, timeoutMs) {
   let u; try { u = new URL(url); } catch { return { ok: false, status: 0 }; }
   if (u.protocol !== "https:" || readinessBadHost(u.hostname)) return { ok: false, status: 0 };
-  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "NessGate-Readiness", version: "1.0" } } });
+  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "NessGate-Readiness", version: "1.0" } } });
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), timeoutMs);
   try {
