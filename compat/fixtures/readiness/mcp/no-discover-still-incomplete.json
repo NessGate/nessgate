@@ -1,0 +1,23 @@
+{
+  "id": "readiness/mcp/no-discover-still-incomplete",
+  "check": "readiness",
+  "assessor": "mcp",
+  "origin": "real-world",
+  "provenance": "replicate.com /docs/reference/mcp class of endpoints: HTTP 200 without any MCP evidence, and no server/discover answer either",
+  "input": {
+    "init": {
+      "ok": true,
+      "status": 200,
+      "protocolVersion": null
+    },
+    "discover": null
+  },
+  "expect": {
+    "outcome": "incomplete",
+    "verified": "http-200-not-mcp",
+    "missingContains": [
+      "protocol-level evidence"
+    ]
+  },
+  "notes": "When neither era produces protocol-level evidence the verdict stays incomplete; dual-era support must not loosen the ready rule."
+}

@@ -3,7 +3,7 @@
   "name": "com.nessgate/nessgate",
   "title": "NessGate",
   "description": "Universal resolver for the agentic web: give a domain, get one normalized discovery answer, a per-endpoint readiness assessment, or a client-matched connection plan.",
-  "version": "1.19.0",
+  "version": "1.20.0",
   "repository": {
     "url": "https://github.com/NessGate/nessgate",
     "source": "github"

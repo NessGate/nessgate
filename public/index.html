@@ -102,7 +102,7 @@
 
 resources = requests.get(
   "https://nessgate.com/discover/example.com").json()["resources"]</code></pre>
-    <p class="hint">Prefer MCP? The same lookup is a tool (<code>discover_domain</code>) at
+    <p class="hint">Prefer MCP? The same lookups are tools (<code>discover_domain</code>, <code>connect_domain</code>, <code>check_readiness</code>) at
       <code>/mcp</code>. Or run the resolver yourself — an embeddable, dependency-free library
       (preview) that fetches domains directly with no dependency on nessgate.com:</p>
     <pre class="snippet"><code>import { resolve } from "https://nessgate.com/resolver.mjs";

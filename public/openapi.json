@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "NessGate API",
-    "version": "1.19.0",
+    "version": "1.20.0",
     "description": "The open, neutral compatibility resolver for the agentic web. Given a domain, NessGate reads whatever that domain already publishes across the standard machine-discovery locations (llms.txt, ARD / ai-catalog.json, A2A agent card, RFC 9727 API catalog, ai-info.json, OpenAPI, Open Resource Discovery, AWP manifest, RFC 6415 host-meta) and returns one normalized answer, each record carrying a sourceUrl back to the domain. NessGate stores nothing, never crawls or indexes, and makes no ownership or safety claim. Read endpoints are public, unauthenticated, and CORS-open. The response contract is stable and additive: new optional fields may appear; clients must ignore unknown fields.",
     "contact": { "email": "contact@nessgate.com", "url": "https://nessgate.com/contact" },
     "termsOfService": "https://nessgate.com/terms",
@@ -126,7 +126,7 @@
             "name": "readiness",
             "in": "query",
             "required": false,
-            "description": "Set to 1 for connection-readiness: attach a readiness block to each connectable resource, assessed from the service's own published metadata (OpenAPI servers+securitySchemes, A2A card, MCP OAuth chain RFC 9728 -> RFC 8414). Outcomes: ready | credentials-required | incomplete (under-published; missing[] names the field) | broken (declared but demonstrably fails: the location answered 404/410/5xx or an unparseable document). ready requires protocol-level evidence appropriate to the transport (e.g. a valid MCP initialize result), never HTTP success alone. Read-only, no scores, credentials never touch NessGate. Bounded + SSRF-guarded. Default /explore (no flag) is unchanged.",
+            "description": "Set to 1 for connection-readiness: attach a readiness block to each connectable resource, assessed from the service's own published metadata (OpenAPI servers+securitySchemes, A2A card, MCP OAuth chain RFC 9728 -> RFC 8414). Outcomes: ready | credentials-required | incomplete (under-published; missing[] names the field) | broken (declared but demonstrably fails: the location answered 404/410/5xx or an unparseable document). ready requires protocol-level evidence appropriate to the transport (a valid MCP initialize result, or for revision-2026-07-28 stateless servers - which have no initialize - the revision required server/discover response), never HTTP success alone. A document larger than the bounded readiness read is reported incomplete (verified: oversized), never broken. Read-only, no scores, credentials never touch NessGate. Bounded + SSRF-guarded. Default /explore (no flag) is unchanged.",
             "schema": { "type": "string", "enum": ["1"] }
           }
         ],
@@ -251,7 +251,7 @@
       "post": {
         "operationId": "mcp",
         "summary": "Model Context Protocol server (Streamable HTTP)",
-        "description": "JSON-RPC 2.0 over the MCP Streamable HTTP transport. Stateless, no authentication. Exposes one read-only tool, discover_domain, which returns the same normalized answer as GET /discover/{domain}.",
+        "description": "JSON-RPC 2.0 over the MCP Streamable HTTP transport. Stateless, no authentication. Exposes three read-only tools: discover_domain (same answer as GET /discover/{domain}), connect_domain (same as POST /connect/{domain}; client capabilities ride in arguments.client), and check_readiness (same as GET /explore/{domain}?readiness=1). Also answers the protocol-revision-2026-07-28 server/discover probe with the initialize-based protocol versions this server actually implements.",
         "requestBody": {
           "required": true,
           "content": {

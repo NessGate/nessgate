@@ -1,0 +1,21 @@
+{
+  "id": "readiness/mcp/legacy-initialize-still-ready",
+  "check": "readiness",
+  "assessor": "mcp",
+  "origin": "real-world",
+  "provenance": "every currently deployed initialize-based MCP server (e.g. mcp.supabase.com during 2026-09 runs); regression guard for the 2026-07-28 support",
+  "input": {
+    "init": {
+      "ok": true,
+      "status": 200,
+      "protocolVersion": "2025-06-18"
+    }
+  },
+  "expect": {
+    "outcome": "ready",
+    "transport": "streamable-http",
+    "version": "2025-06-18",
+    "verified": "ok"
+  },
+  "notes": "The legacy handshake path is unchanged by dual-era support: a parseable initialize result still proves the endpoint."
+}

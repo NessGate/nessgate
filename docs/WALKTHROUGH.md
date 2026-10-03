@@ -42,9 +42,10 @@ Normalization + the readiness assessors + the client matcher exist **twice** —
 **byte-identical per function**. Enforced by:
 
 - `scripts/test.mjs` — compares each pure function `lib.fn` vs the worker's `fn`.
-- `scripts/test-readiness-checker.mjs` — parity for the 7 readiness/match pure fns
-  (`extractProtocolVersion`, `readinessProtocol`, `assessOpenApiReadiness`,
-  `assessA2aReadiness`, `assessMcpReadiness`, `matchClient`, `canonClientProtocol`).
+- `scripts/test-readiness-checker.mjs` — parity for the readiness/match pure fns
+  (`extractProtocolVersion`, `extractDiscoverInfo`, `readinessProtocol`,
+  `assessOpenApiReadiness`, `assessA2aReadiness`, `assessMcpReadiness`,
+  `assessFetchFailure`, `assessOversizedDocument`, `matchClient`, `canonClientProtocol`).
 - `packages/resolver/index.mjs` must be a byte-for-byte copy of `public/resolver.mjs`.
 
 **Workflow when you change shared logic:** edit `public/resolver.mjs`, copy the SAME

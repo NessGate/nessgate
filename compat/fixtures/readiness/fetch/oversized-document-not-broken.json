@@ -1,0 +1,21 @@
+{
+  "id": "readiness/fetch/oversized-document-not-broken",
+  "check": "readiness",
+  "assessor": "oversized",
+  "origin": "real-world",
+  "provenance": "large valid OpenAPI documents (>262144-byte readiness read cap) parsed fine at discovery but failed the truncated readiness parse; previously misreported as broken",
+  "input": {
+    "protocol": "openapi",
+    "what": "OpenAPI document",
+    "capBytes": 262144
+  },
+  "expect": {
+    "outcome": "incomplete",
+    "verified": "oversized",
+    "missingContains": [
+      "read cap",
+      "not judged"
+    ]
+  },
+  "notes": "A parse failure caused by OUR byte cap is a limit of the check, not evidence about the service; broken requires positive evidence from the service itself."
+}

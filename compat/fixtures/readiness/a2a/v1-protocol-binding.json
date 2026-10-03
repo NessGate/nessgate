@@ -1,0 +1,34 @@
+{
+  "id": "readiness/a2a/v1-protocol-binding",
+  "check": "readiness",
+  "assessor": "a2a",
+  "origin": "reference-impl",
+  "provenance": "A2A v1 a2a.proto: AgentInterface{url(1,REQUIRED), protocol_binding(2,REQUIRED: JSONRPC|GRPC|HTTP+JSON, open set), protocol_version(4,REQUIRED)}; AgentCard.supported_interfaces(3,REQUIRED)",
+  "input": {
+    "card": {
+      "supportedInterfaces": [
+        {
+          "url": "https://api.example.com/a2a/v1",
+          "protocolBinding": "JSONRPC",
+          "protocolVersion": "1.0"
+        }
+      ],
+      "securitySchemes": {
+        "oauth": {
+          "type": "oauth2"
+        }
+      }
+    }
+  },
+  "expect": {
+    "outcome": "credentials-required",
+    "transport": "jsonrpc",
+    "version": "1.0",
+    "endpoint": "https://api.example.com/a2a/v1",
+    "auth": {
+      "required": true,
+      "type": "oauth2"
+    }
+  },
+  "notes": "v1 names the binding protocolBinding and carries protocolVersion per interface; the selected interface's own version wins over card-level fields."
+}

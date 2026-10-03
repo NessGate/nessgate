@@ -1,0 +1,30 @@
+{
+  "id": "readiness/mcp/modern-stateless-server-discover",
+  "check": "readiness",
+  "assessor": "mcp",
+  "origin": "reference-impl",
+  "provenance": "MCP revision 2026-07-28 changelog: the initialize handshake is removed; servers MUST implement server/discover (DiscoverResult.supportedVersions)",
+  "input": {
+    "init": {
+      "ok": true,
+      "status": 200,
+      "protocolVersion": null
+    },
+    "discover": {
+      "ok": true,
+      "versions": [
+        "2026-07-28"
+      ],
+      "serverInfo": {
+        "name": "ModernServer"
+      }
+    }
+  },
+  "expect": {
+    "outcome": "ready",
+    "transport": "streamable-http",
+    "version": "2026-07-28",
+    "verified": "ok:server-discover"
+  },
+  "notes": "A modern stateless server has no initialize method; its REQUIRED server/discover response is equivalent protocol-level evidence, so ready is earned, not assumed."
+}

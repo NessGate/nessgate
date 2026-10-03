@@ -275,11 +275,14 @@ const MAX_CAPABILITIES = 40; // cap on verbatim declared capabilities per resour
 // MCP endpoint declares about itself via the protocol's own handshake.
 const MCP_INTROSPECT_MAX_ENDPOINTS = 3; // endpoints introspected per resolution
 const MCP_INTROSPECT_MAX_BYTES = 262144; // response cap per POST (tool lists are small)
-const MCP_PROTOCOL_VERSION = "2025-06-18"; // newest version this client implements
+const MCP_PROTOCOL_VERSION = "2025-06-18"; // newest initialize-based version this client implements
+// 2026-07-28 ("modern") revision: stateless, no initialize; every request carries
+// its protocol version in _meta and the Streamable HTTP headers.
+const MCP_MODERN_PROTOCOL_VERSION = "2026-07-28";
 // The COMPLETE set of JSON-RPC methods introspection may ever send. Read-only
 // metadata enumeration only — tools/call and every other method are
 // structurally absent (behaviorally negative-tested).
-const MCP_INTROSPECTION_METHODS = ["initialize", "notifications/initialized", "tools/list"];
+const MCP_INTROSPECTION_METHODS = ["initialize", "notifications/initialized", "tools/list", "server/discover"];
 // Resource type labels that declare an MCP endpoint (the sources' own labels:
 // AWP protocol key / AID p=mcp / self-declared "mcp"; ARD's community media
 // type for server cards). No path guessing — only declared resources qualify.
@@ -1043,6 +1046,28 @@ async function mcpPostWorker(url, frame, extraHeaders, env, ctx, domain) {
 // execution, no credentials — an auth wall is an honest observation
 // ("auth-required"), never retried with secrets. Failures collapse to labeled
 // statuses; nothing is guessed. Same flow as the library.
+// Modern (2026-07-28) stateless introspection: server/discover (the revision's
+// REQUIRED discovery RPC), then a stateless tools/list, each request carrying its
+// protocol version in _meta plus the required Streamable HTTP headers. Returns
+// null when the server does not answer as a modern server — the caller keeps the
+// legacy verdict. Read-only; same method budget discipline as the legacy path.
+async function introspectMcpModernWorker(url, env, ctx, domain) {
+  const meta = { "io.modelcontextprotocol/protocolVersion": MCP_MODERN_PROTOCOL_VERSION, "io.modelcontextprotocol/clientInfo": { name: "NessGate-Introspect", version: "1.0" }, "io.modelcontextprotocol/clientCapabilities": {} };
+  const hdr = (method) => ({ "MCP-Protocol-Version": MCP_MODERN_PROTOCOL_VERSION, "Mcp-Method": method });
+  try {
+    const d = await mcpPostWorker(url, { jsonrpc: "2.0", id: 1, method: "server/discover", params: { _meta: meta } }, hdr("server/discover"), env, ctx, domain);
+    if (d.status < 200 || d.status >= 300) return null;
+    const info = extractDiscoverInfo(d.text);
+    if (!info) return null;
+    const introspection = { ok: true, protocolVersion: info.versions[0], serverInfo: info.serverInfo || undefined };
+    let lst = null;
+    try { lst = await mcpPostWorker(url, { jsonrpc: "2.0", id: 2, method: "tools/list", params: { _meta: meta } }, hdr("tools/list"), env, ctx, domain); } catch {}
+    if (!lst || lst.status < 200 || lst.status >= 300) return { introspection };
+    const lstMsg = parseMcpMessages(lst.text, lst.contentType).find((m) => m.id === 2);
+    if (!lstMsg || !lstMsg.result || typeof lstMsg.result !== "object") return { introspection };
+    return { introspection, ...(mcpToolCapabilities(lstMsg.result) || {}) };
+  } catch { return null; }
+}
 async function introspectMcpEndpoint(url, env, ctx, domain) {
   const fail = (status) => ({ introspection: { ok: false, status } });
   try {
@@ -1051,10 +1076,18 @@ async function introspectMcpEndpoint(url, env, ctx, domain) {
       params: { protocolVersion: MCP_PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: "NessGate-Introspect", version: "1.0" } },
     }, null, env, ctx, domain);
     if (init.status === 401 || init.status === 403) return fail("auth-required");
-    if (init.status === 405) return fail("legacy-transport"); // pre-2025 HTTP+SSE servers reject POST at the SSE URL
-    if (init.status < 200 || init.status >= 300) return fail("error");
-    const initMsg = parseMcpMessages(init.text, init.contentType).find((m) => m.id === 1);
-    if (!initMsg || !initMsg.result || typeof initMsg.result !== "object") return fail("error");
+    const initMsg = init.status >= 200 && init.status < 300 ? parseMcpMessages(init.text, init.contentType).find((m) => m.id === 1) : null;
+    if (!initMsg || !initMsg.result || typeof initMsg.result !== "object") {
+      // Dual-era: a modern (2026-07-28+) stateless server has no initialize
+      // method. Where the failure shape allows one (2xx without an initialize
+      // result, or 400/405/406), probe server/discover and list tools statelessly.
+      if (init.status === 400 || init.status === 405 || init.status === 406 || (init.status >= 200 && init.status < 300)) {
+        const modern = await introspectMcpModernWorker(url, env, ctx, domain);
+        if (modern) return modern;
+      }
+      if (init.status === 405) return fail("legacy-transport"); // pre-2025 HTTP+SSE servers reject POST at the SSE URL
+      return fail("error");
+    }
     const session = init.headers && typeof init.headers.get === "function" ? init.headers.get("mcp-session-id") : null;
     const negotiated = typeof initMsg.result.protocolVersion === "string" ? initMsg.result.protocolVersion : undefined;
     const extra = { ...(session ? { "Mcp-Session-Id": session } : {}), ...(negotiated ? { "MCP-Protocol-Version": negotiated } : {}) };
@@ -1296,7 +1329,7 @@ async function discoverData(raw, env, ctx, request) {
     }
   }
   let note = fast ? DISCOVER_NOTE + " (fast mode: the optional alternate ARD locators — rel=\"ard\" link and robots Agentmap — were skipped for speed; a catalog advertised only via those may be missed. Omit ?fast for complete, ARD-conformant discovery.)" : DISCOVER_NOTE;
-  if (mcp) note += " (mcp introspection: declared MCP endpoints on this domain were queried READ-ONLY — initialize and tools/list only, no tool execution, no credentials; results are the servers' own declarations.)";
+  if (mcp) note += " (mcp introspection: declared MCP endpoints on this domain were queried READ-ONLY — initialize/server-discover and tools/list only, no tool execution, no credentials; results are the servers' own declarations.)";
   const body = {
     domain,
     provenance: "self-published",
@@ -2178,6 +2211,31 @@ export function extractProtocolVersion(text) {
   return null;
 }
 
+// Pure: a 2026-07-28 server/discover result (plain JSON or SSE data frames). The
+// stateless revision removed the initialize handshake, so a DiscoverResult — its
+// REQUIRED supportedVersions — is the equivalent protocol-level evidence that an
+// endpoint really speaks MCP.
+export function extractDiscoverInfo(text) {
+  const tryParse = (s) => { try { return JSON.parse(s); } catch { return null; } };
+  const pick = (j) => {
+    const r = j && j.result;
+    if (!r || typeof r !== "object" || !Array.isArray(r.supportedVersions)) return null;
+    const versions = r.supportedVersions.filter((v) => typeof v === "string");
+    if (!versions.length) return null;
+    const si = r._meta && r._meta["io.modelcontextprotocol/serverInfo"];
+    return {
+      ok: true,
+      versions,
+      capabilities: r.capabilities && typeof r.capabilities === "object" ? r.capabilities : null,
+      serverInfo: si && typeof si === "object" ? { name: typeof si.name === "string" ? si.name : undefined, version: typeof si.version === "string" ? si.version : undefined } : null,
+    };
+  };
+  let v = pick(tryParse(text));
+  if (v) return v;
+  for (const m of String(text || "").matchAll(/^data:\s*(.+)$/gm)) { v = pick(tryParse(m[1])); if (v) return v; }
+  return null;
+}
+
 // Pure: which connectable protocol a discovered resource represents, or null for a
 // pointer/catalog surface (llms.txt, api-catalog, host-meta, …). Reuses each
 // source's OWN labels — invents no taxonomy.
@@ -2246,12 +2304,22 @@ export function assessA2aReadiness(card) {
     ...(Array.isArray(card.additionalInterfaces) ? card.additionalInterfaces : []),
     ...(Array.isArray(card.supportedInterfaces) ? card.supportedInterfaces : []),
   ].filter((i) => i && typeof i === "object");
-  let transport = null, endpoint = typeof card.url === "string" ? card.url : undefined;
+  let transport = null, endpoint = typeof card.url === "string" ? card.url : undefined, ifaceUsed = null;
   if (typeof card.preferredTransport === "string") transport = card.preferredTransport.toLowerCase();
-  else if (ifaces.length && ifaces[0].transport) { transport = String(ifaces[0].transport).toLowerCase(); endpoint = ifaces[0].url || endpoint; }
+  else if (ifaces.length && (ifaces[0].protocolBinding || ifaces[0].transport)) {
+    // A2A v1 names the binding protocolBinding (JSONRPC / GRPC / HTTP+JSON, open
+    // set); earlier revisions used transport. Both are the interface's own label.
+    ifaceUsed = ifaces[0];
+    transport = String(ifaces[0].protocolBinding || ifaces[0].transport).toLowerCase();
+    endpoint = ifaces[0].url || endpoint;
+  }
   else if (typeof card.url === "string" && !/\.json(\?|$)/i.test(card.url)) transport = "jsonrpc";
   out.transport = transport; if (endpoint) out.endpoint = endpoint;
-  out.version = typeof card.protocolVersion === "string" ? card.protocolVersion : typeof card.version === "string" ? card.version : null;
+  // v1 carries protocolVersion PER INTERFACE (required there); the version of the
+  // interface actually selected wins, with the card-level fields as fallback.
+  out.version =
+    (ifaceUsed && typeof ifaceUsed.protocolVersion === "string" ? ifaceUsed.protocolVersion : null) ||
+    (typeof card.protocolVersion === "string" ? card.protocolVersion : typeof card.version === "string" ? card.version : null);
   const schemes = card.securitySchemes && typeof card.securitySchemes === "object" ? card.securitySchemes : null;
   const requiredList = Array.isArray(card.security) && card.security.length ? card.security : null;
   const missing = [];
@@ -2276,10 +2344,18 @@ export function assessFetchFailure(protocol, status, what) {
   return { protocol, outcome: "incomplete", missing: [`a reachable ${what} (fetch failed from this vantage)`] };
 }
 
+// Pure: a declared document whose body exceeded OUR bounded readiness read. The
+// read was cut by the observer, so the content was never actually judged — a
+// truncated parse failure is a limit of the check, never positive evidence of
+// breakage (so it can never be broken).
+export function assessOversizedDocument(protocol, what, capBytes) {
+  return { protocol, outcome: "incomplete", verified: "oversized", missing: [`an assessable ${what} — the document exceeds the ${capBytes}-byte readiness read cap, so it was not judged (not evidence of breakage)`] };
+}
+
 // Pure: MCP readiness from an initialize result plus an OPTIONAL OAuth metadata
 // chain (RFC 9728 protected-resource metadata → RFC 8414 authorization-server
 // metadata). A bare 403 is undetermined (auth OR bot/WAF), never a false OAuth wall.
-export function assessMcpReadiness({ init, prm, as }) {
+export function assessMcpReadiness({ init, prm, as, discover }) {
   const transport = init && init.status === 405 ? "sse-legacy" : "streamable-http";
   const version = (init && init.protocolVersion) || null;
   const base = { protocol: "mcp", transport, version };
@@ -2287,6 +2363,13 @@ export function assessMcpReadiness({ init, prm, as }) {
   // page answers HTTP 200 to a POST too. Only a parseable JSON-RPC initialize
   // result (its REQUIRED protocolVersion) proves an MCP endpoint.
   if (init && init.ok && init.protocolVersion) return { ...base, outcome: "ready", auth: { required: false }, verified: "ok", missing: [] };
+  // A modern (2026-07-28+) stateless server has no initialize method at all; its
+  // REQUIRED server/discover response (supportedVersions) is the equivalent
+  // protocol-level evidence. Auth walls are still read from the transport
+  // statuses above/below, which are revision-independent.
+  if (discover && discover.ok && Array.isArray(discover.versions) && discover.versions.length) {
+    return { ...base, transport: "streamable-http", version: discover.versions[0], outcome: "ready", auth: { required: false }, verified: "ok:server-discover", missing: [] };
+  }
   if (init && init.ok) return { ...base, outcome: "incomplete", verified: "http-200-not-mcp", missing: ["a valid MCP initialize response — the endpoint answered HTTP 200 but not with a JSON-RPC initialize result (a documentation page can do that); protocol-level evidence is required for ready"] };
   const authWall = init && (init.status === 401 || (init.status === 403 && init.wwwAuthenticate));
   if (authWall) {
@@ -2385,7 +2468,9 @@ async function readinessFetchJson(url, deadline) {
   try {
     const res = await fetch(u.toString(), { method: "GET", redirect: "manual", signal: controller.signal, headers: { "User-Agent": "NessGate-Readiness/1.0 (+https://nessgate.com)", Accept: "application/json" }, cf: { cacheTtl: 0 } });
     if (res.status !== 200) { try { await res.body?.cancel(); } catch {} return { status: res.status || 0, json: null }; }
-    try { return { status: 200, json: JSON.parse(await readinessReadBounded(res, READINESS_BYTES)) }; } catch { return { status: 200, json: null }; }
+    const bodyText = await readinessReadBounded(res, READINESS_BYTES);
+    const truncated = bodyText.length >= READINESS_BYTES; // cut by OUR cap, not the server
+    try { return { status: 200, json: JSON.parse(bodyText), truncated }; } catch { return { status: 200, json: null, truncated }; }
   } catch (e) { return { status: String(e && e.message || "").includes("Too many subrequests") ? -1 : 0, json: null }; } finally { clearTimeout(timer); }
 }
 // Read-only MCP initialize (no tools/call, no credentials). Returns status even on
@@ -2406,6 +2491,26 @@ async function readinessMcpInit(url, deadline) {
     return { ok: res.status === 200, status: res.status, wwwAuthenticate: res.headers.get("www-authenticate") || null, protocolVersion: extractProtocolVersion(text) };
   } catch (e) { return { ok: false, status: String(e && e.message || "").includes("Too many subrequests") ? -1 : 0 }; } finally { clearTimeout(timer); }
 }
+// Modern (2026-07-28) probe: POST the revision's REQUIRED server/discover with
+// per-request _meta and the required Streamable HTTP headers. Returns the parsed
+// DiscoverResult info, or null when the endpoint does not answer as one.
+async function readinessMcpDiscover(url, deadline) {
+  if (deadline && Date.now() > deadline) return null;
+  let u; try { u = new URL(url); } catch { return null; }
+  if (u.protocol !== "https:") return null;
+  const host = u.hostname.toLowerCase().replace(/\.+$/, "");
+  if (isForbiddenHost(host)) return null;
+  try { await assertPublicDns(host); } catch { return null; }
+  const meta = { "io.modelcontextprotocol/protocolVersion": MCP_MODERN_PROTOCOL_VERSION, "io.modelcontextprotocol/clientInfo": { name: "NessGate-Readiness", version: "1.0" }, "io.modelcontextprotocol/clientCapabilities": {} };
+  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "server/discover", params: { _meta: meta } });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), READINESS_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(u.toString(), { method: "POST", redirect: "manual", signal: controller.signal, headers: { "content-type": "application/json", accept: "application/json, text/event-stream", "MCP-Protocol-Version": MCP_MODERN_PROTOCOL_VERSION, "Mcp-Method": "server/discover", "User-Agent": "NessGate-Readiness/1.0 (+https://nessgate.com)" }, cf: { cacheTtl: 0 }, body });
+    if (res.status !== 200) { try { await res.body?.cancel(); } catch {} return null; }
+    return extractDiscoverInfo(await readinessReadBounded(res, 65536));
+  } catch { return null; } finally { clearTimeout(timer); }
+}
 async function readinessFillMcp(endpoint, deadline) {
   if (/\.json(\?|$)/i.test(endpoint) || /server-card|agent-card/i.test(endpoint)) {
     const card = (await readinessFetchJson(endpoint, deadline)).json;
@@ -2413,6 +2518,14 @@ async function readinessFillMcp(endpoint, deadline) {
     if (typeof inner === "string" && /^https:\/\//i.test(inner)) endpoint = inner;
   }
   const init = await readinessMcpInit(endpoint, deadline);
+  // Dual-era: 2026-07-28 removed initialize. When the attempt yields no
+  // protocol-level evidence in a shape a modern stateless server produces (200
+  // without an initialize result, or 400/405/406), ask server/discover before
+  // judging. Auth statuses (401/403) keep their own path below.
+  let discover = null;
+  if (!init.protocolVersion && (init.ok || init.status === 400 || init.status === 405 || init.status === 406)) {
+    discover = await readinessMcpDiscover(endpoint, deadline);
+  }
   let prm = null, as = null;
   if (init.status === 401 || init.status === 403) {
     let prmUrl = null;
@@ -2433,7 +2546,7 @@ async function readinessFillMcp(endpoint, deadline) {
   // it explicitly — this is a capacity condition of THIS request, not a fact
   // about the service (never reported as if the service were assessed).
   if (init.status === -1) return { protocol: "mcp", outcome: "incomplete", verified: "skipped:capacity", missing: [READINESS_CAPACITY_MSG], endpoint };
-  return { ...assessMcpReadiness({ init, prm, as }), endpoint };
+  return { ...assessMcpReadiness({ init, prm, as, discover }), endpoint };
 }
 // IO: assess one connectable resource (worker vantage). Read-only, no credentials.
 async function readinessForResource(resource, deadline) {
@@ -2444,11 +2557,13 @@ async function readinessForResource(resource, deadline) {
   if (proto === "openapi") {
     const r = await readinessFetchJson(resource.url, deadline);
     if (r.status === -1) return capacity("openapi");
+    if (!r.json && r.truncated) return stamp({ ...assessOversizedDocument("openapi", "OpenAPI document", READINESS_BYTES), transport: "https" });
     return stamp(r.json ? assessOpenApiReadiness(r.json) : { ...assessFetchFailure("openapi", r.status, "OpenAPI document"), transport: "https" });
   }
   if (proto === "a2a-agent-card") {
     const r = await readinessFetchJson(resource.sourceUrl || resource.url, deadline);
     if (r.status === -1) return capacity("a2a-agent-card");
+    if (!r.json && r.truncated) return stamp(assessOversizedDocument("a2a-agent-card", "A2A agent card", READINESS_BYTES));
     return stamp(r.json ? assessA2aReadiness(r.json) : assessFetchFailure("a2a-agent-card", r.status, "A2A agent card"));
   }
   if (proto === "mcp") return stamp(await readinessFillMcp(resource.url, deadline));
@@ -2581,7 +2696,7 @@ async function apiConnect(raw, env, ctx, request, clientCaps) {
 // (the tool dispatches to the same handler).
 
 const MCP_SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26"];
-const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.19.0" };
+const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.20.0" };
 const MCP_INSTRUCTIONS =
   "Three read-only tools. discover_domain: what a domain publishes (the raw normalized list). " +
   "connect_domain: given a domain AND your client's capabilities, HOW to connect — one outcome " +
@@ -2716,6 +2831,13 @@ async function mcpEndpoint(request, env, ctx) {
     );
   }
   if (msg.method === "ping") return json(rpcResult(msg.id, {}), 200, headers);
+  if (msg.method === "server/discover") {
+    // 2026-07-28 discovery probe. This server speaks the initialize-based
+    // revisions listed in MCP_SUPPORTED_VERSIONS; answering the probe with the
+    // versions it ACTUALLY implements lets modern clients fail deterministically
+    // or fall back to initialize instead of guessing.
+    return json(rpcResult(msg.id, { resultType: "complete", supportedVersions: MCP_SUPPORTED_VERSIONS, capabilities: { tools: { listChanged: false } }, _meta: { "io.modelcontextprotocol/serverInfo": MCP_SERVER_INFO }, instructions: MCP_INSTRUCTIONS }), 200, headers);
+  }
   if (msg.method === "tools/list") return json(rpcResult(msg.id, { tools: MCP_TOOLS }), 200, headers);
   if (msg.method === "tools/call") {
     const name = msg.params && msg.params.name;

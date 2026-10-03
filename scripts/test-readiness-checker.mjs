@@ -17,7 +17,7 @@ const eq = (name, got, want) => { const ok = JSON.stringify(got) === JSON.string
 const ok_ = (name, cond) => { if (cond) pass++; else { fail++; console.error(`FAIL  ${name}`); } };
 
 /* (1) worker/library parity on the pure assessors + matcher -------------- */
-const PURE = ["extractProtocolVersion", "readinessProtocol", "assessOpenApiReadiness", "assessA2aReadiness", "assessMcpReadiness", "assessFetchFailure", "matchClient", "canonClientProtocol"];
+const PURE = ["extractProtocolVersion", "extractDiscoverInfo", "readinessProtocol", "assessOpenApiReadiness", "assessA2aReadiness", "assessMcpReadiness", "assessFetchFailure", "assessOversizedDocument", "matchClient", "canonClientProtocol"];
 for (const fn of PURE) ok_(`worker & library both export ${fn}`, typeof worker[fn] === "function" && typeof lib[fn] === "function");
 
 const parityCases = [
@@ -219,6 +219,72 @@ function mockFetch(routes) {
 {
   const s = JSON.stringify(lib.assessMcpReadiness({ init: { ok: false, status: 401 }, prm: {}, as: { authorization_endpoint: "https://a/az", token_endpoint: "https://a/tok" } }));
   ok_("neutrality → no score/confidence/rank field", !/"(score|confidence|rank|rating)"\s*:/i.test(s));
+}
+
+/* --- MCP 2026-07-28 (stateless, server/discover) + A2A v1 + oversized cap --- */
+{
+  // extractDiscoverInfo: JSON, SSE, and rejection of non-DiscoverResult bodies.
+  const dres = '{"jsonrpc":"2.0","id":1,"result":{"resultType":"complete","supportedVersions":["2026-07-28","2025-11-25"],"capabilities":{"tools":{}},"_meta":{"io.modelcontextprotocol/serverInfo":{"name":"S","version":"2"}}}}';
+  const d1 = lib.extractDiscoverInfo(dres);
+  ok_("extractDiscoverInfo parses a DiscoverResult", d1 && d1.ok && d1.versions[0] === "2026-07-28" && d1.serverInfo.name === "S");
+  const d2 = lib.extractDiscoverInfo("event: message\ndata: " + dres + "\n\n");
+  ok_("extractDiscoverInfo parses SSE data frames", d2 && d2.ok && d2.versions.length === 2);
+  ok_("extractDiscoverInfo rejects a non-discover body", lib.extractDiscoverInfo('{"result":{"protocolVersion":"2025-06-18"}}') === null);
+  ok_("extractDiscoverInfo rejects empty supportedVersions", lib.extractDiscoverInfo('{"result":{"supportedVersions":[]}}') === null);
+
+  // assessMcpReadiness: modern evidence, and the rule staying strict without it.
+  const modern = lib.assessMcpReadiness({ init: { ok: true, status: 200, protocolVersion: null }, discover: { ok: true, versions: ["2026-07-28"] } });
+  ok_("modern server (discover ok) -> ready ok:server-discover", modern.outcome === "ready" && modern.verified === "ok:server-discover" && modern.version === "2026-07-28");
+  const noDisc = lib.assessMcpReadiness({ init: { ok: true, status: 200, protocolVersion: null }, discover: null });
+  ok_("200 with NO discover evidence stays incomplete (http-200-not-mcp)", noDisc.outcome === "incomplete" && noDisc.verified === "http-200-not-mcp");
+  const legacy = lib.assessMcpReadiness({ init: { ok: true, status: 200, protocolVersion: "2025-06-18" } });
+  ok_("legacy initialize path unchanged", legacy.outcome === "ready" && legacy.verified === "ok" && legacy.version === "2025-06-18");
+  const m405 = lib.assessMcpReadiness({ init: { ok: false, status: 405 }, discover: null });
+  ok_("405 without discover keeps the sse-legacy incomplete verdict", m405.outcome === "incomplete" && m405.transport === "sse-legacy");
+  const m405d = lib.assessMcpReadiness({ init: { ok: false, status: 405 }, discover: { ok: true, versions: ["2026-07-28"] } });
+  ok_("405 WITH a discover answer -> ready (modern server rejecting legacy POST shape)", m405d.outcome === "ready" && m405d.verified === "ok:server-discover");
+
+  // assessA2aReadiness: v1 protocolBinding + per-interface protocolVersion.
+  const v1 = lib.assessA2aReadiness({ supportedInterfaces: [{ url: "https://a.ex/a2a/v1", protocolBinding: "JSONRPC", protocolVersion: "1.0" }] });
+  ok_("A2A v1 binding+version -> ready jsonrpc 1.0", v1.outcome === "ready" && v1.transport === "jsonrpc" && v1.version === "1.0" && v1.endpoint === "https://a.ex/a2a/v1");
+  const grpc = lib.assessA2aReadiness({ supportedInterfaces: [{ url: "grpc.ex:443", protocolBinding: "GRPC", protocolVersion: "1.0" }] });
+  ok_("A2A v1 GRPC binding lowercased", grpc.transport === "grpc");
+  const prec = lib.assessA2aReadiness({ protocolVersion: "0.3.0", supportedInterfaces: [{ url: "https://a.ex/v1", protocolBinding: "HTTP+JSON", protocolVersion: "1.0" }] });
+  ok_("per-interface protocolVersion wins over card-level", prec.version === "1.0" && prec.transport === "http+json");
+  const legacyIface = lib.assessA2aReadiness({ protocolVersion: "0.2.0", supportedInterfaces: [{ url: "https://a.ex/x", transport: "JSONRPC" }] });
+  ok_("legacy interface transport field still accepted, card version fallback", legacyIface.transport === "jsonrpc" && legacyIface.version === "0.2.0");
+  const modernCard = lib.assessA2aReadiness({ protocolVersion: "0.3.0", preferredTransport: "JSONRPC", url: "https://a.ex/rpc" });
+  ok_("0.3.x preferredTransport card unchanged", modernCard.outcome === "ready" && modernCard.transport === "jsonrpc");
+
+  // assessOversizedDocument shape.
+  const ov = lib.assessOversizedDocument("openapi", "OpenAPI document", 262144);
+  ok_("oversized -> incomplete, never broken", ov.outcome === "incomplete" && ov.verified === "oversized" && /read cap/.test(ov.missing[0]) && /not judged/.test(ov.missing[0]));
+
+  // Library IO: a VALID OpenAPI document larger than the read cap must come back
+  // incomplete/oversized, never broken.
+  const bigJson = '{"openapi":"3.0.0","info":{"title":"Big"},"paths":{},"x":"' + "a".repeat(1_000_100) + '"}';
+  const mkRes = (body, status = 200) => ({ ok: status === 200, status, url: "", headers: { get: () => null }, text: async () => body, arrayBuffer: async () => new TextEncoder().encode(body).buffer });
+  const rBig = await lib.assessReadiness({ source: "openapi", type: "openapi", url: "https://ex.com/openapi.json" }, { fetch: async () => mkRes(bigJson), timeoutMs: 300 });
+  ok_("IO: >cap valid OpenAPI -> incomplete oversized (NOT broken)", rBig.outcome === "incomplete" && rBig.verified === "oversized");
+  const rGarbage = await lib.assessReadiness({ source: "openapi", type: "openapi", url: "https://ex.com/openapi.json" }, { fetch: async () => mkRes("<html>nope"), timeoutMs: 300 });
+  ok_("IO: small unparseable 200 still broken (positive evidence unchanged)", rGarbage.outcome === "broken");
+
+  // Library IO: modern MCP server end-to-end — initialize 400, server/discover 200.
+  const discBody = '{"jsonrpc":"2.0","id":1,"result":{"resultType":"complete","supportedVersions":["2026-07-28"],"capabilities":{"tools":{}},"_meta":{"io.modelcontextprotocol/serverInfo":{"name":"Modern"}}}}';
+  const modernFetch = async (url, init2) => {
+    const body = String((init2 && init2.body) || "");
+    if (body.includes('"server/discover"')) return mkRes(discBody);
+    return mkRes('{"error":"missing required headers"}', 400);
+  };
+  const rModern = await lib.assessReadiness({ source: "mcp", type: "mcp-server", url: "https://ex.com/mcp" }, { fetch: modernFetch, timeoutMs: 300 });
+  ok_("IO: modern stateless MCP server -> ready via server/discover", rModern.outcome === "ready" && rModern.verified === "ok:server-discover" && rModern.version === "2026-07-28");
+  const legacyFetch = async (url, init2) => {
+    const body = String((init2 && init2.body) || "");
+    if (body.includes('"initialize"')) return mkRes('{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{},"serverInfo":{"name":"L"}}}');
+    return mkRes("nf", 404);
+  };
+  const rLegacy = await lib.assessReadiness({ source: "mcp", type: "mcp-server", url: "https://ex.com/mcp" }, { fetch: legacyFetch, timeoutMs: 300 });
+  ok_("IO: legacy server unchanged -> ready via initialize, no discover call needed", rLegacy.outcome === "ready" && rLegacy.verified === "ok");
 }
 
 console.log(fail ? `\nreadiness-checker: ${pass} passed, ${fail} FAILED` : `\nreadiness-checker: all ${pass} checks passed (parity + outcomes + IO + neutrality)`);
