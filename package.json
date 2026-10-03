@@ -16,6 +16,7 @@
     "watch:specs": "node lab/watch-specs.mjs",
     "check": "node scripts/test.mjs && node scripts/test-v2.mjs && node scripts/test-readiness-checker.mjs && node lab/nessgate-inspect/test-inspect.mjs && node lab/nessgate-inspect/integrations/test-integration.mjs && node scripts/test-compat.mjs && node scripts/test-openapi.mjs && node scripts/test-conformance.mjs && node scripts/test-contract.mjs && node scripts/test-lab-isolation.mjs && node scripts/test-metrics-isolation.mjs && node scripts/compat-matrix.mjs && node scripts/smoke.mjs && node scripts/check-npm-parity.mjs",
     "check:npm": "node scripts/check-npm-parity.mjs",
+    "check:inspect-npm": "node scripts/check-inspect-npm.mjs",
     "rollback": "wrangler rollback",
     "test:contract": "node scripts/test-contract.mjs",
     "test:readiness": "node scripts/test-readiness-checker.mjs",
