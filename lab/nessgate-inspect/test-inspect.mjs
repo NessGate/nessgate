@@ -186,6 +186,36 @@ const dnsGenuine = {
   ok("unwired operator → attempted, no method, not verified", r.attempted === true && r.verified === false && /no documented network-verification method/i.test(r.reason));
 }
 
+// Perplexity: wired via official per-bot IP-range JSON (injected ranges = deterministic).
+{
+  const r = await verifyNetworkAttribution({ userAgent: "PerplexityBot/1.0", sourceIp: "107.22.1.5" }, { ranges: ["107.22.0.0/16"] });
+  ok("PerplexityBot in published range → verified", r.verified === true && r.operator === "Perplexity");
+  eq("PerplexityBot evidence names matched CIDR", r.evidence.matchedCidr, "107.22.0.0/16");
+}
+{
+  const r = await verifyNetworkAttribution({ userAgent: "Perplexity-User/1.0", sourceIp: "3.3.3.3" }, { ranges: ["3.0.0.0/8"] });
+  ok("Perplexity-User distinct method also wired → verified", r.verified === true && /Perplexity/.test(r.operator));
+}
+{ // SPOOF: correct Perplexity UA, wrong IP → must NOT verify
+  const r = await verifyNetworkAttribution({ userAgent: "PerplexityBot/1.0", sourceIp: "203.0.113.7" }, { ranges: ["107.22.0.0/16"] });
+  eq("spoofed PerplexityBot (wrong IP) → not verified", r.verified, false);
+  ok("spoof reason = not in published ranges", /not in the operator's published ranges/i.test(r.reason));
+}
+
+// Anthropic: NO official IP ranges exist → Inspect must ABSTAIN (never fabricate).
+{
+  for (const ua of ["ClaudeBot/1.0 (+claudebot@anthropic.com)", "Claude-User/1.0", "anthropic-ai/1.0"]) {
+    const r = await verifyNetworkAttribution({ userAgent: ua, sourceIp: "160.79.104.10" }, {});
+    eq(`Anthropic (${ua.split("/")[0]}) → not network-verified (abstain)`, r.verified, false);
+    ok(`Anthropic (${ua.split("/")[0]}) → reason is 'no documented method', not a failed check`, /no documented network-verification method/i.test(r.reason));
+  }
+  // End-to-end: ClaudeBot from any IP stays directory-attributed, no network-verified fact.
+  const r = await inspect({ method: "GET", url: "https://site.example/", headers: { "user-agent": "Mozilla/5.0 (compatible; ClaudeBot/1.0; +claudebot@anthropic.com)" } }, { sourceIp: "160.79.104.10" });
+  eq("ClaudeBot e2e → network-verified 0 (honest abstention)", r.summary["network-verified"], 0);
+  eq("ClaudeBot e2e → still directory-attributed (Anthropic)", r.summary["directory-attributed"], 1);
+  ok("ClaudeBot e2e → network fact (if any) is tier unknown, reason 'no documented method'", r.facts.filter((f) => f.kind === "network-attribution").every((f) => f.tier === "unknown"));
+}
+
 // End-to-end through inspect(): genuine Googlebot IP → network-verified fact; the
 // SAME UA from a non-Google IP → directory-attributed only (spoof differentiator).
 {

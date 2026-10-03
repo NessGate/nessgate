@@ -60,7 +60,11 @@ attribution, not trust/authorization.
   belongs to infrastructure the operator officially attributes to its bot, using *that
   operator's documented method*: reverse-DNS + forward-confirm for **Google / Bing / Apple**
   (PTR ends with the documented host suffix AND forward-resolves back to the source IP);
-  membership in **OpenAI's** officially published IP/CIDR ranges (`gptbot.json` etc.). A match
+  membership in **OpenAI's** and **Perplexity's** officially published IP/CIDR ranges
+  (`gptbot.json`; Perplexity's separate per-bot `perplexitybot.json` / `perplexity-user.json`),
+  fetched dynamically with bounded TTL caching (nothing hardcoded). **Anthropic is deliberately
+  NOT wired** — its official docs state it does not publish bot IP ranges, so ClaudeBot/Claude-User
+  stay `directory-attributed` rather than fabricate a method. A match
   ⇒ `network-verified`; it means **only** "originated from operator X's infrastructure," never
   trusted/authorized/safe/allowed. The **source IP must be the real connection peer** —
   `X-Forwarded-For` and other forwarded headers are **never trusted** (Inspect reads only a

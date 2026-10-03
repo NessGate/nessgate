@@ -131,6 +131,28 @@ try {
   console.log("Google live rDNS check skipped:", e && e.message);
 }
 
+// (3) Perplexity, live: fetch the official per-bot ranges, verify an in-range IP; spoof.
+for (const [label, ua, url] of [["PerplexityBot", "PerplexityBot/1.0", "https://www.perplexity.ai/perplexitybot.json"], ["Perplexity-User", "Perplexity-User/1.0", "https://www.perplexity.ai/perplexity-user.json"]]) {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!res.ok) { console.log(`Perplexity ${label}: official ranges ${url} returned HTTP ${res.status} → stays directory-attributed (honest, no fake)`); continue; }
+    const doc = await res.json();
+    const prefixes = (doc.prefixes || []).map((p) => p.ipv4Prefix || p.ipv6Prefix).filter(Boolean);
+    const cidr = prefixes.find((c) => !c.includes(":")) || prefixes[0];
+    const inRangeIp = cidr.split("/")[0];
+    const r = await inspect({ method: "GET", url: "https://site.example/", headers: { "user-agent": ua } }, { sourceIp: inRangeIp });
+    const spoof = await inspect({ method: "GET", url: "https://site.example/", headers: { "user-agent": ua } }, { sourceIp: "203.0.113.5" });
+    console.log(`Perplexity ${label}, genuine (IP ${inRangeIp} from live ${prefixes.length}-prefix JSON): network-verified=${r.summary["network-verified"]}  | spoofed IP: network-verified=${spoof.summary["network-verified"]}`);
+  } catch (e) { console.log(`Perplexity ${label}: ranges check skipped (${e && e.message}) → stays directory-attributed`); }
+}
+
+// (4) Anthropic: NO official ranges → must stay directory-attributed (abstain).
+{
+  const r = await inspect({ method: "GET", url: "https://site.example/", headers: { "user-agent": "Mozilla/5.0 (compatible; ClaudeBot/1.0; +claudebot@anthropic.com)" } }, { sourceIp: "160.79.104.10" });
+  const nf = r.facts.find((f) => f.kind === "network-attribution");
+  console.log(`Anthropic ClaudeBot (IP 160.79.104.10): network-verified=${r.summary["network-verified"]}, directory-attributed=${r.summary["directory-attributed"]}  (${nf ? nf.reason : "no network fact"})`);
+}
+
 // Coverage: which known agents have a wired verification method TODAY.
 const knownRows = rows.filter((r) => !r.label.includes("[control]"));
 const wired = knownRows.filter((r) => networkMethodFor(r.ua));

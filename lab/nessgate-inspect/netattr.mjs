@@ -30,6 +30,13 @@ export const NETWORK_METHODS = [
   { match: /GPTBot/i, operator: "OpenAI", method: "ip-ranges", rangesUrl: "https://openai.com/gptbot.json", doc: "https://platform.openai.com/docs/bots" },
   { match: /OAI-SearchBot/i, operator: "OpenAI", method: "ip-ranges", rangesUrl: "https://openai.com/searchbot.json", doc: "https://platform.openai.com/docs/bots" },
   { match: /ChatGPT-User/i, operator: "OpenAI", method: "ip-ranges", rangesUrl: "https://openai.com/chatgpt-user.json", doc: "https://platform.openai.com/docs/bots" },
+  // Perplexity publishes per-bot IP-range JSON (same prefixes schema). PerplexityBot
+  // and Perplexity-User have SEPARATE official endpoints.
+  { match: /PerplexityBot/i, operator: "Perplexity", method: "ip-ranges", rangesUrl: "https://www.perplexity.ai/perplexitybot.json", doc: "https://docs.perplexity.ai/guides/bots" },
+  { match: /Perplexity-User/i, operator: "Perplexity (user-triggered)", method: "ip-ranges", rangesUrl: "https://www.perplexity.ai/perplexity-user.json", doc: "https://docs.perplexity.ai/guides/bots" },
+  // NOTE: Anthropic (ClaudeBot / Claude-User) is DELIBERATELY absent — Anthropic's
+  // official documentation states it does not publish bot IP ranges, so there is no
+  // verifiable network method. Those UAs stay directory-attributed, honestly.
 ];
 
 export function networkMethodFor(userAgent) {
@@ -119,6 +126,31 @@ async function fetchRanges(fetchImpl, url, timeoutMs) {
   return { prefixes };
 }
 
+// Bounded, time-limited cache of fetched ranges — dynamic (nothing hardcoded), so
+// a per-request verify does not re-fetch each operator's JSON every time, and a
+// stale list cannot linger. Only REAL fetches (global fetch) are cached; injected
+// fetch/ranges (tests) always bypass it.
+const RANGES_TTL_MS = 10 * 60 * 1000;
+const RANGES_CACHE_MAX = 32;
+const rangesCache = new Map(); // url -> { prefixes, at }
+export function clearRangesCache() { rangesCache.clear(); }
+
+async function getRanges(spec, opts) {
+  if (opts.ranges) return { prefixes: opts.ranges };
+  const useCache = !opts.fetch; // only the real global-fetch path is cached
+  if (useCache) {
+    const c = rangesCache.get(spec.rangesUrl);
+    if (c && Date.now() - c.at < RANGES_TTL_MS) return { prefixes: c.prefixes, cached: true };
+  }
+  const fetched = await fetchRanges(opts.fetch || globalThis.fetch, spec.rangesUrl, opts.timeoutMs);
+  if (fetched.error) return fetched;
+  if (useCache) {
+    rangesCache.set(spec.rangesUrl, { prefixes: fetched.prefixes, at: Date.now() });
+    if (rangesCache.size > RANGES_CACHE_MAX) rangesCache.delete(rangesCache.keys().next().value);
+  }
+  return fetched;
+}
+
 // Verify. Returns a structured result; never throws. opts.dns / opts.fetch /
 // opts.ranges are injectable for testing; defaults use node:dns + global fetch.
 export async function verifyNetworkAttribution({ userAgent, sourceIp }, opts = {}) {
@@ -135,12 +167,11 @@ export async function verifyNetworkAttribution({ userAgent, sourceIp }, opts = {
       : { ...base, verified: false, reason: res.reason, observedReverseDns: res.ptrs };
   }
   if (spec.method === "ip-ranges") {
-    const fetchImpl = opts.fetch || globalThis.fetch;
-    const ranges = opts.ranges ? { prefixes: opts.ranges } : await fetchRanges(fetchImpl, spec.rangesUrl, opts.timeoutMs);
+    const ranges = await getRanges(spec, opts);
     if (ranges.error) return { ...base, verified: false, reason: "published ranges unavailable: " + ranges.error, rangesUrl: spec.rangesUrl };
     const hit = ranges.prefixes.find((c) => ipInCidr(sourceIp, c));
     return hit
-      ? { ...base, verified: true, evidence: { matchedCidr: hit, rangesUrl: spec.rangesUrl, prefixesChecked: ranges.prefixes.length } }
+      ? { ...base, verified: true, evidence: { matchedCidr: hit, rangesUrl: spec.rangesUrl, prefixesChecked: ranges.prefixes.length, ...(ranges.cached ? { rangesCached: true } : {}) } }
       : { ...base, verified: false, reason: "source IP is not in the operator's published ranges", rangesUrl: spec.rangesUrl, prefixesChecked: ranges.prefixes.length };
   }
   return { ...base, verified: false, reason: "unsupported method" };
