@@ -120,6 +120,15 @@ only show that a `Signature` header *is present*. Inspect adds:
 | `demo.mjs` | Reproducible exposure-delta demonstration (signed request vs GPTBot UA). |
 | `serve.mjs` | Standalone `node:http` demo server (`node serve.mjs`) — run Inspect over REAL inbound requests. Not the production worker; `src/` is untouched. |
 
+## Packaging mechanics (recorded; not published)
+
+If this module is ever published as a package, the mechanics are: it is already
+self-contained (Node built-ins `node:crypto` and `node:dns/promises` plus sibling files;
+zero dependencies); `files` would be the six modules plus README/LICENSE; no bin. A new npm
+package name requires maintainer-side registry setup for tokenless publishing (the same
+OIDC trusted-publishing arrangement the resolver package uses) before a workflow can publish
+it. Until a publication decision is made it remains lab-only, imported by path.
+
 ## Status & next
 
 First cut; interop validated against self-generated signatures, real robot UA strings,
