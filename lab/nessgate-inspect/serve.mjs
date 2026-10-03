@@ -22,10 +22,19 @@ const server = createServer(async (req, res) => {
   for (const [k, v] of Object.entries(req.headers)) headers[k] = Array.isArray(v) ? v.join(", ") : v;
   const authority = headers.host || "localhost";
   const request = { method: req.method, url: `http://${authority}${req.url}`, headers };
+  // Source IP for Verified Network Attribution = the REAL connection peer.
+  // X-Forwarded-For and friends are NOT trusted (they are caller-settable). If you
+  // run behind a trusted proxy, set TRUST_PROXY=1 and the proxy's own XFF handling
+  // must be relied on instead — off by default here, by design.
+  let sourceIp = req.socket && req.socket.remoteAddress ? req.socket.remoteAddress : undefined;
+  if (process.env.TRUST_PROXY === "1") {
+    const xff = headers["x-forwarded-for"];
+    if (typeof xff === "string" && xff.trim()) sourceIp = xff.split(",")[0].trim();
+  }
   // Inspect needs the request's own authority; for Web Bot Auth the signed
   // @authority must match, so we present the Host the caller sent.
   try {
-    const result = await inspect(request, {});
+    const result = await inspect(request, { sourceIp });
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
     res.end(JSON.stringify(result, null, 2));
   } catch (e) {

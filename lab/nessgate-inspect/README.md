@@ -25,8 +25,14 @@ Every fact is placed in exactly one tier, and each fact carries **provenance**:
 |---|---|---|
 | `claimed` | Asserted by the caller, unverified | the `User-Agent` string; an unverifiable signature header |
 | `cryptographically-verified` | A signature/key cryptographically bound to **this** request | a validated RFC 9421 Web Bot Auth signature |
+| `network-verified` | The request's **origin infrastructure** is the operator's, via the operator's own documented method | source IP forward-confirms to `*.googlebot.com`, or is in OpenAI's published ranges |
 | `directory-attributed` | A public directory recognizes a **declared** identifier | the `User-Agent` matches a published operator pattern |
-| `unknown` | Absent / indeterminate | no signature, no recognized identifier |
+| `unknown` | Absent / indeterminate | no signature, no recognized identifier; a network check that didn't confirm |
+
+The two verified tiers verify **different things** and neither dominates: `network-verified`
+attributes the *origin* (which defeats User-Agent spoofing); `cryptographically-verified`
+attributes *this exact request* to a key holder. Both carry the explicit limit that they are
+attribution, not trust/authorization.
 
 ## Signals, first cut
 
@@ -49,6 +55,18 @@ Every fact is placed in exactly one tier, and each fact carries **provenance**:
   asserted verified — the A2A signed-card profile is still evolving, and Inspect does not
   claim a verification it did not actually perform. Only locations the caller itself named
   are fetched; no card path is guessed.
+
+- **Verified Network Attribution (`netattr.mjs`)** — confirms a request's **source IP**
+  belongs to infrastructure the operator officially attributes to its bot, using *that
+  operator's documented method*: reverse-DNS + forward-confirm for **Google / Bing / Apple**
+  (PTR ends with the documented host suffix AND forward-resolves back to the source IP);
+  membership in **OpenAI's** officially published IP/CIDR ranges (`gptbot.json` etc.). A match
+  ⇒ `network-verified`; it means **only** "originated from operator X's infrastructure," never
+  trusted/authorized/safe/allowed. The **source IP must be the real connection peer** —
+  `X-Forwarded-For` and other forwarded headers are **never trusted** (Inspect reads only a
+  caller-supplied `opts.sourceIp`; the integrator sets it from the socket or an explicitly
+  trusted proxy). A non-match or unavailable check falls back honestly to
+  `directory-attributed`/`claimed` and is **never** asserted as proof of spoofing.
 
 Standards are **reused, not invented**: RFC 9421, RFC 7638, the Web Bot Auth profile,
 and operators' own published UA documentation. There is no NessGate identity standard.
@@ -91,6 +109,8 @@ only show that a `Signature` header *is present*. Inspect adds:
 | `inspect.mjs` | `inspect(request, opts)` → the normalized description. Orchestration only. |
 | `webbotauth.mjs` | RFC 9421 parse + signature-base reconstruction + Ed25519 verification against the directory. |
 | `agents.mjs` | Public operator UA directory + `matchUserAgent`. |
+| `netattr.mjs` | Verified Network Attribution — rDNS forward-confirm (Google/Bing/Apple) + published IP ranges (OpenAI); CIDR math; connection-IP only. |
+| `validate-agents.mjs` | Real-world cohort (~22 agents + controls) + live network-attribution validation. |
 | `agentcard.mjs` | Fetch + normalize a caller-declared A2A agent card (served → `claimed`; signature-presence surfaced, not asserted verified). |
 | `test-inspect.mjs` | 43 deterministic checks: pinned base, real Ed25519 round-trip, tamper, expiry, directory failure, served/signed agent cards, real robots, invariants. |
 | `demo.mjs` | Reproducible exposure-delta demonstration (signed request vs GPTBot UA). |

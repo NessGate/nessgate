@@ -27,8 +27,12 @@
 import { verifyWebBotAuth } from "./webbotauth.mjs";
 import { matchUserAgent } from "./agents.mjs";
 import { inspectAgentCard } from "./agentcard.mjs";
+import { verifyNetworkAttribution } from "./netattr.mjs";
 
-const TIERS = ["claimed", "cryptographically-verified", "directory-attributed", "unknown"];
+// Two "verified" tiers verify DIFFERENT things and neither dominates the other:
+//   network-verified          — this request's ORIGIN infrastructure is the operator's
+//   cryptographically-verified — THIS request was signed by the holder of a key
+const TIERS = ["claimed", "cryptographically-verified", "network-verified", "directory-attributed", "unknown"];
 
 const header = (headers, name) => {
   for (const k in headers || {}) if (k.toLowerCase() === name.toLowerCase()) return headers[k];
@@ -115,6 +119,40 @@ export async function inspect(request, opts = {}) {
   /* --- 4. Agent Card / published metadata (self-published → claimed) --- */
   const card = await inspectAgentCard(request, opts).catch(() => null);
   if (card) add(card);
+
+  /* --- 5. Verified Network Attribution (origin infrastructure) --- */
+  // Runs only when the caller passes opts.sourceIp — the REAL connection peer.
+  // Inspect never reads X-Forwarded-For or any forwarded header; deciding the
+  // trustworthy source IP (direct socket, or an explicitly trusted proxy) is the
+  // integrator's responsibility (see serve.mjs).
+  if (opts.sourceIp) {
+    const na = await verifyNetworkAttribution({ userAgent: ua, sourceIp: opts.sourceIp }, opts).catch((e) => ({ attempted: true, verified: false, reason: "inspect error: " + (e && e.message) }));
+    if (na.attempted && na.verified) {
+      add({
+        kind: "network-attribution",
+        tier: "network-verified",
+        statement: `the source IP ${na.sourceIp} is within infrastructure ${na.operator} officially attributes to its bot (method: ${na.method})`,
+        operator: na.operator,
+        method: na.method,
+        provenance: [
+          { source: "connection", sourceIp: na.sourceIp, note: "the real connection peer; forwarded headers were NOT trusted" },
+          na.method === "rdns-forward-confirm"
+            ? { source: "reverse-dns-forward-confirmed", hostname: na.evidence.reverseDns, documentation: na.documentation }
+            : { source: "operator-published-ip-ranges", url: na.evidence.rangesUrl, matchedCidr: na.evidence.matchedCidr, documentation: na.documentation },
+        ],
+        note: `means ONLY that this request originated from ${na.operator}'s documented infrastructure — it does NOT mean the caller is trusted, authorized, safe, or allowed. That decision is the relying party's.`,
+      });
+    } else if (na.attempted) {
+      add({
+        kind: "network-attribution",
+        tier: "unknown",
+        statement: `network origin did NOT confirm ${na.operator || "the claimed operator"}${na.method ? ` (method: ${na.method})` : ""}`,
+        reason: na.reason,
+        provenance: [{ source: "connection", sourceIp: na.sourceIp }],
+        note: "the stronger network-verified tier is withheld. This is NOT proof of spoofing — a new, proxied, or newly-rotated IP can also fail — so attribution falls back to whatever the directory/claimed tiers established.",
+      });
+    }
+  }
 
   const summary = Object.fromEntries(TIERS.map((t) => [t, facts.filter((f) => f.tier === t).length]));
   return {

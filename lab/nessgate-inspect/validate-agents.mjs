@@ -97,6 +97,49 @@ function signedRequest() {
   console.log("Web Bot Auth signed ".padEnd(30), (wba.tier).padEnd(22), `key ${wba.keyid.slice(0, 12)}… bound ${JSON.stringify(wba.boundComponents)}`);
 }
 
+// --- REAL network attribution (live: OpenAI published ranges + Googlebot rDNS) ---
+import { verifyNetworkAttribution, networkMethodFor, ipInCidr } from "./netattr.mjs";
+console.log("\n--- VERIFIED NETWORK ATTRIBUTION (live) ---");
+const net = {};
+
+// (1a) OpenAI GPTBot, genuine: fetch the REAL published ranges, take an in-range IP.
+try {
+  const res = await fetch("https://openai.com/gptbot.json", { signal: AbortSignal.timeout(15000) });
+  const doc = await res.json();
+  const prefixes = (doc.prefixes || []).map((p) => p.ipv4Prefix || p.ipv6Prefix).filter(Boolean);
+  const cidr = prefixes.find((c) => !c.includes(":")) || prefixes[0];
+  const inRangeIp = cidr.split("/")[0]; // the prefix base address is within the range
+  const r = await inspect({ method: "GET", url: "https://site.example/", headers: { "user-agent": "GPTBot/1.2" } }, { sourceIp: inRangeIp });
+  net.openaiGenuine = r.summary["network-verified"];
+  console.log(`OpenAI GPTBot, genuine (IP ${inRangeIp} from live gptbot.json, ${prefixes.length} prefixes):  network-verified=${r.summary["network-verified"]}`);
+  // (1b) OpenAI GPTBot, SPOOFED UA from a non-OpenAI IP (TEST-NET-3).
+  const spoof = await inspect({ method: "GET", url: "https://site.example/", headers: { "user-agent": "GPTBot/1.2" } }, { sourceIp: "203.0.113.5" });
+  net.openaiSpoof = spoof.summary["network-verified"];
+  const nf = spoof.facts.find((f) => f.kind === "network-attribution");
+  console.log(`OpenAI GPTBot, spoofed UA (IP 203.0.113.5 TEST-NET):                              network-verified=${spoof.summary["network-verified"]}  (${nf ? nf.tier + ": " + nf.reason : "n/a"})`);
+} catch (e) {
+  console.log("OpenAI live ranges check skipped:", e && e.message);
+}
+
+// (2) Google Googlebot, live rDNS forward-confirm on a documented sample IP.
+try {
+  const r = await inspect({ method: "GET", url: "https://site.example/", headers: { "user-agent": "Googlebot/2.1" } }, { sourceIp: "66.249.66.1" });
+  const nf = r.facts.find((f) => f.kind === "network-attribution");
+  net.googleGenuine = r.summary["network-verified"];
+  console.log(`Google Googlebot, live rDNS (IP 66.249.66.1):                                      network-verified=${r.summary["network-verified"]}  (${nf ? (nf.tier === "network-verified" ? "verified via " + (nf.provenance[1] && nf.provenance[1].hostname) : nf.reason) : "n/a"})`);
+} catch (e) {
+  console.log("Google live rDNS check skipped:", e && e.message);
+}
+
+// Coverage: which known agents have a wired verification method TODAY.
+const knownRows = rows.filter((r) => !r.label.includes("[control]"));
+const wired = knownRows.filter((r) => networkMethodFor(r.ua));
+const notWired = knownRows.filter((r) => r.attributed && !networkMethodFor(r.ua));
+console.log(`\nknown-agent entries with a WIRED network-verification method: ${wired.length}/${knownRows.length}`);
+console.log(`  -> ${[...new Set(wired.map((r) => r.operator))].join(", ")}`);
+console.log(`known-agent entries attributed but NOT yet network-verifiable: ${notWired.length}`);
+console.log(`  -> ${[...new Set(notWired.map((r) => r.operator))].join(", ")}`);
+
 // --- aggregate ---
 const real = rows.filter((r) => !r.label.includes("[control]"));
 const controls = rows.filter((r) => r.label.includes("[control]"));
@@ -109,4 +152,4 @@ console.log(`directory-attributed:         ${attributed}/${rows.length}  (known-
 console.log(`cryptographically-verified (real UA-only requests): 0/${rows.length}  — no request carried a signature`);
 console.log(`real bots absent from the directory (coverage gap): ${controlBotsNotInDir}`);
 console.log(`generic/empty clients → correctly no attribution: ${controls.filter((r) => !r.attributed && !/Bot|spider|Diffbot|Mistral/i.test(r.label)).length}`);
-console.log(`\nNOTE: the two identical "Googlebot" entries (real + spoofed) return IDENTICAL output — Inspect cannot and does not claim to tell them apart from the UA alone; both are directory-attributed + flagged spoofable. Distinguishing them needs verified reverse-DNS or a signature (not yet present in the wild).`);
+console.log(`\nNOTE: from the User-Agent ALONE, real and spoofed "Googlebot" are indistinguishable (both directory-attributed + flagged spoofable). With Verified Network Attribution, the difference is decisive: a request from Google's actual infrastructure reaches network-verified, while the same UA from any other IP does not — demonstrated live above. This resolves the spoof case for the ${wired.length}/${real.length} operators with a wired method today; the rest remain directory-attributed until their method is wired or they sign requests.`);

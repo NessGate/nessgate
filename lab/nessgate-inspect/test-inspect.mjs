@@ -135,6 +135,77 @@ for (const [ua, operator] of [["Mozilla/5.0 (compatible; GPTBot/1.2; +https://op
   eq("no cryptographically-verified fact from an unverified card", r.summary["cryptographically-verified"], 0);
 }
 
+/* --- 6d. Verified Network Attribution (injected DNS + ranges = deterministic) --- */
+import { ipInCidr, verifyNetworkAttribution } from "./netattr.mjs";
+// CIDR math
+eq("CIDR v4 in-range", ipInCidr("20.171.5.9", "20.171.0.0/16"), true);
+eq("CIDR v4 out-of-range", ipInCidr("8.8.8.8", "20.171.0.0/16"), false);
+eq("CIDR v4-mapped v6 normalizes for v4 range", ipInCidr("::ffff:20.171.5.9", "20.171.0.0/16"), true);
+eq("CIDR v6 in-range", ipInCidr("2600:1f00:abcd::1", "2600:1f00::/32"), true);
+eq("CIDR v6 out-of-range", ipInCidr("2a03:2880::1", "2600:1f00::/32"), false);
+
+// Google-style rDNS + forward-confirm, with an injected resolver.
+const dnsGenuine = {
+  reverse: async () => ["crawl-66-249-66-1.googlebot.com"],
+  resolve4: async () => ["66.249.66.1"],
+  resolve6: async () => [],
+};
+{
+  const r = await verifyNetworkAttribution({ userAgent: "Googlebot/2.1", sourceIp: "66.249.66.1" }, { dns: dnsGenuine });
+  ok("google rDNS genuine → verified", r.verified === true && r.operator === "Google");
+  ok("google rDNS genuine → forward-confirmed evidence", r.evidence && r.evidence.forwardConfirmed === true);
+}
+{ // PTR matches suffix but forward-confirm points elsewhere → not verified
+  const dnsSpoofPtr = { reverse: async () => ["crawl.googlebot.com"], resolve4: async () => ["1.2.3.4"], resolve6: async () => [] };
+  const r = await verifyNetworkAttribution({ userAgent: "Googlebot/2.1", sourceIp: "203.0.113.9" }, { dns: dnsSpoofPtr });
+  eq("google forward-confirm mismatch → not verified", r.verified, false);
+  ok("mismatch reason recorded", /forward-confirm/i.test(r.reason || ""));
+}
+{ // no PTR at all → not verified, honest reason
+  const dnsNone = { reverse: async () => { throw Object.assign(new Error("x"), { code: "ENOTFOUND" }); }, resolve4: async () => [], resolve6: async () => [] };
+  const r = await verifyNetworkAttribution({ userAgent: "bingbot/2.0", sourceIp: "203.0.113.1" }, { dns: dnsNone });
+  eq("bing no-PTR → not verified", r.verified, false);
+}
+// OpenAI-style published ranges, injected.
+{
+  const r = await verifyNetworkAttribution({ userAgent: "GPTBot/1.2", sourceIp: "20.171.5.9" }, { ranges: ["20.171.0.0/16", "172.203.190.0/24"] });
+  ok("openai in published range → verified", r.verified === true && r.operator === "OpenAI");
+  eq("openai evidence names the matched CIDR", r.evidence.matchedCidr, "20.171.0.0/16");
+}
+{
+  const r = await verifyNetworkAttribution({ userAgent: "GPTBot/1.2", sourceIp: "8.8.8.8" }, { ranges: ["20.171.0.0/16"] });
+  eq("openai outside ranges → not verified", r.verified, false);
+}
+{ // ranges unavailable → honest fallback, never a false positive
+  const r = await verifyNetworkAttribution({ userAgent: "GPTBot/1.2", sourceIp: "20.171.5.9" }, { fetch: async () => ({ ok: false, status: 503, text: async () => "" }) });
+  eq("openai ranges unavailable → not verified (honest)", r.verified, false);
+  ok("unavailable reason recorded", /unavailable/i.test(r.reason || ""));
+}
+{ // an operator with no wired method → attempted but no method
+  const r = await verifyNetworkAttribution({ userAgent: "ClaudeBot/1.0", sourceIp: "1.2.3.4" }, {});
+  ok("unwired operator → attempted, no method, not verified", r.attempted === true && r.verified === false && /no documented network-verification method/i.test(r.reason));
+}
+
+// End-to-end through inspect(): genuine Googlebot IP → network-verified fact; the
+// SAME UA from a non-Google IP → directory-attributed only (spoof differentiator).
+{
+  const genuine = await inspect({ method: "GET", url: "https://site.example/", headers: { "user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" } }, { sourceIp: "66.249.66.1", dns: dnsGenuine });
+  eq("inspect genuine Googlebot → network-verified present", genuine.summary["network-verified"], 1);
+  const spoofDns = { reverse: async () => { throw Object.assign(new Error("x"), { code: "ENOTFOUND" }); }, resolve4: async () => [], resolve6: async () => [] };
+  const spoof = await inspect({ method: "GET", url: "https://site.example/", headers: { "user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" } }, { sourceIp: "203.0.113.9", dns: spoofDns });
+  eq("inspect spoofed Googlebot → NOT network-verified", spoof.summary["network-verified"], 0);
+  ok("spoofed Googlebot → still directory-attributed (UA)", spoof.summary["directory-attributed"] === 1);
+  ok("spoofed Googlebot → network fact is tier unknown with a reason, not a spoof accusation", spoof.facts.some((f) => f.kind === "network-attribution" && f.tier === "unknown"));
+}
+
+/* --- 6e. Inspect NEVER reads X-Forwarded-For (only opts.sourceIp) --- */
+{
+  // XFF claims a Google IP, but no opts.sourceIp is provided → no network check runs.
+  const r = await inspect({ method: "GET", url: "https://site.example/", headers: { "user-agent": "Googlebot/2.1", "x-forwarded-for": "66.249.66.1" } }, { dns: dnsGenuine });
+  eq("no opts.sourceIp → network attribution not attempted (XFF ignored)", r.summary["network-verified"], 0);
+  ok("no network-attribution fact emitted without a real source IP", !r.facts.some((f) => f.kind === "network-attribution"));
+}
+
 /* --- 7. INVARIANT: never a trust/authorization/score decision --- */
 {
   const { request, fetch, now } = signedRequest();
