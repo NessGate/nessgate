@@ -138,9 +138,9 @@ endpoints (path 2) are a few lines in any language.
 ## 5. Inbound requests — inspecting callers (experimental)
 
 The reverse direction — describing what an *incoming* automated caller declares and can
-prove — is the experimental package
-[`@nessgate/inspect`](https://www.npmjs.com/package/@nessgate/inspect) (0.x; source in
-[`packages/inspect/`](../packages/inspect/), validation harnesses in
+prove — is the experimental package (source in
+[`packages/inspect/`](../packages/inspect/), distributed as `@nessgate/inspect` once its
+first registry release lands — until then import it by path; validation harnesses in
 [`lab/nessgate-inspect/`](../lab/nessgate-inspect/)). It observes only (no allow/deny, no
 scores) and returns tiered, provenanced facts.
 

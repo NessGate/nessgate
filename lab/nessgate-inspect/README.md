@@ -130,7 +130,7 @@ only show that a `Signature` header *is present*. Inspect adds:
 
 ## Packaging
 
-Published as `@nessgate/inspect` (0.x, experimental) from `packages/inspect/` via
+Prepared as `@nessgate/inspect` (0.x, experimental; first registry release pending) in `packages/inspect/` via
 `.github/workflows/publish-inspect.yml` (OIDC trusted publishing, same arrangement as the
 resolver package). Zero dependencies; exports `.` (inspect) and `./middleware`. The 0.x
 version signals that field names may change while the underlying drafts evolve; the
