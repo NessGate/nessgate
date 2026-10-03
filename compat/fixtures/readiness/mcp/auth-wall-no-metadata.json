@@ -1,0 +1,22 @@
+{
+  "id": "readiness/mcp/auth-wall-no-metadata",
+  "check": "readiness",
+  "assessor": "mcp",
+  "origin": "real-world",
+  "provenance": "observed on 401-answering MCP endpoints that publish no RFC 9728 document (multiple cohort domains, 2026-09)",
+  "input": {
+    "init": {
+      "ok": false,
+      "status": 401,
+      "wwwAuthenticate": null
+    }
+  },
+  "expect": {
+    "outcome": "incomplete",
+    "verified": "auth-required",
+    "missingContains": [
+      "RFC 9728"
+    ]
+  },
+  "notes": "Auth is required but the metadata needed to set it up is not published; the missing document is named."
+}

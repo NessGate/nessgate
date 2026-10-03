@@ -1,0 +1,30 @@
+{
+  "id": "readiness/a2a/modern-card-secured",
+  "check": "readiness",
+  "assessor": "a2a",
+  "origin": "reference-impl",
+  "provenance": "current A2A card shape: protocolVersion + preferredTransport + url + securitySchemes",
+  "input": {
+    "card": {
+      "protocolVersion": "0.3.0",
+      "preferredTransport": "JSONRPC",
+      "url": "https://agent.example/rpc",
+      "securitySchemes": {
+        "oauth": {
+          "type": "oauth2"
+        }
+      }
+    }
+  },
+  "expect": {
+    "outcome": "credentials-required",
+    "transport": "jsonrpc",
+    "version": "0.3.0",
+    "endpoint": "https://agent.example/rpc",
+    "auth": {
+      "required": true,
+      "type": "oauth2"
+    }
+  },
+  "notes": "A complete modern card with declared security yields credentials-required with the declared scheme type."
+}

@@ -1,0 +1,31 @@
+{
+  "id": "readiness/a2a/site-card-without-transport",
+  "check": "readiness",
+  "assessor": "a2a",
+  "origin": "real-world",
+  "provenance": "www.cloudflare.com/.well-known/agent.json: name/description/url(self)/capabilities/skills but no transport and no protocolVersion; cohort runs 2026-09-29..30",
+  "input": {
+    "card": {
+      "name": "Cloudflare Site Agent",
+      "url": "https://www.cloudflare.com/.well-known/agent.json",
+      "capabilities": {
+        "streaming": false
+      },
+      "skills": [
+        {
+          "id": "site-context",
+          "name": "Site Context"
+        }
+      ]
+    }
+  },
+  "expect": {
+    "outcome": "incomplete",
+    "transport": null,
+    "missingContains": [
+      "transport",
+      "protocolVersion"
+    ]
+  },
+  "notes": "A card whose url is the card file itself declares no usable transport; both missing fields are named. The fields to publish are preferredTransport (or interfaces) and protocolVersion."
+}

@@ -1,0 +1,18 @@
+{
+  "id": "readiness/protocol/docs-path-not-endpoint",
+  "check": "readiness",
+  "assessor": "protocol",
+  "origin": "real-world",
+  "provenance": "replicate.com/docs/reference/mcp surfaced via llms.txt and initially treated as an MCP endpoint; external test 2026-09-30",
+  "input": {
+    "resource": {
+      "source": "llms.txt",
+      "type": "llms.txt",
+      "url": "https://replicate.com/docs/reference/mcp"
+    }
+  },
+  "expect": {
+    "protocol": null
+  },
+  "notes": "Documentation-section paths (/docs/, /blog/, /reference/, ...) are pages about a protocol, not endpoints; the fuzzy path heuristics never fire on them."
+}

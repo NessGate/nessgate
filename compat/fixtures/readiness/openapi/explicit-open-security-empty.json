@@ -1,0 +1,28 @@
+{
+  "id": "readiness/openapi/explicit-open-security-empty",
+  "check": "readiness",
+  "assessor": "openapi",
+  "origin": "real-world",
+  "provenance": "nessgate.com/openapi.json declares top-level security: [] (an unauthenticated API); 2026-09-29",
+  "input": {
+    "spec": {
+      "openapi": "3.0.3",
+      "servers": [
+        {
+          "url": "https://nessgate.com"
+        }
+      ],
+      "security": [],
+      "paths": {}
+    }
+  },
+  "expect": {
+    "outcome": "ready",
+    "version": "3.0.3",
+    "endpoint": "https://nessgate.com",
+    "auth": {
+      "required": false
+    }
+  },
+  "notes": "An explicit empty top-level security array is the specification's own way to declare no auth; absent securitySchemes alone is not."
+}

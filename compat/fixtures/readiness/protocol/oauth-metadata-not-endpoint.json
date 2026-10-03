@@ -1,0 +1,18 @@
+{
+  "id": "readiness/protocol/oauth-metadata-not-endpoint",
+  "check": "readiness",
+  "assessor": "protocol",
+  "origin": "real-world",
+  "provenance": "api.supabase.com/.well-known/oauth-protected-resource/mcp surfaced as a catalog entry; hosted runs 2026-09-29",
+  "input": {
+    "resource": {
+      "source": "ard-catalog",
+      "type": "application/json",
+      "url": "https://api.supabase.com/.well-known/oauth-protected-resource/mcp"
+    }
+  },
+  "expect": {
+    "protocol": null
+  },
+  "notes": "OAuth/OpenID metadata documents are fetched by the MCP assessor itself and are never handshaked as endpoints."
+}

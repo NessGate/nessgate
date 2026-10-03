@@ -1,0 +1,38 @@
+{
+  "id": "readiness/mcp/oauth-chain-complete",
+  "check": "readiness",
+  "assessor": "mcp",
+  "origin": "real-world",
+  "provenance": "mcp.supabase.com/mcp via api.supabase.com RFC 9728 protected-resource + RFC 8414 authorization-server metadata; captured 2026-09-27..30 (shape reproduced; endpoint URLs as observed)",
+  "input": {
+    "init": {
+      "ok": false,
+      "status": 401,
+      "wwwAuthenticate": "Bearer resource_metadata=\"https://api.supabase.com/.well-known/oauth-protected-resource/mcp\""
+    },
+    "prm": {
+      "authorization_servers": [
+        "https://api.supabase.com"
+      ]
+    },
+    "as": {
+      "authorization_endpoint": "https://api.supabase.com/v1/oauth/authorize",
+      "token_endpoint": "https://api.supabase.com/v1/oauth/token",
+      "registration_endpoint": "https://api.supabase.com/v1/oauth/register"
+    }
+  },
+  "expect": {
+    "outcome": "credentials-required",
+    "transport": "streamable-http",
+    "verified": "auth-required",
+    "auth": {
+      "required": true,
+      "type": "oauth2",
+      "authorizationEndpoint": "https://api.supabase.com/v1/oauth/authorize",
+      "tokenEndpoint": "https://api.supabase.com/v1/oauth/token",
+      "dynamicClientRegistration": true,
+      "registrationEndpoint": "https://api.supabase.com/v1/oauth/register"
+    }
+  },
+  "notes": "An auth challenge whose published metadata chain resolves to authorization + token endpoints yields credentials-required with the endpoints carried verbatim."
+}

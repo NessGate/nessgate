@@ -1,0 +1,18 @@
+{
+  "id": "readiness/protocol/mcp-host-root",
+  "check": "readiness",
+  "assessor": "protocol",
+  "origin": "real-world",
+  "provenance": "mcp.supabase.com/mcp declared via catalog and registry; hosted + library runs 2026-09",
+  "input": {
+    "resource": {
+      "source": "ard-catalog",
+      "type": "application/json",
+      "url": "https://mcp.supabase.com/mcp"
+    }
+  },
+  "expect": {
+    "protocol": "mcp"
+  },
+  "notes": "A bounded /mcp path segment on a declared resource is a connectable candidate."
+}

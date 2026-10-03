@@ -52,6 +52,40 @@ into a fixture here, and add a fresh unseen domain to the holdout — never tune
 ```
 For a `reject` fixture, use `"expect": { "reject": true }`.
 
+## Readiness fixtures (`check: "readiness"`)
+
+A second fixture layer under `fixtures/readiness/<assessor>/` pins the
+connection-readiness classification (how an already-fetched observation is
+classified), separate from document normalization. Format:
+
+```json
+{
+  "id": "readiness/mcp/http-200-not-mcp",
+  "check": "readiness",
+  "assessor": "mcp | openapi | a2a | fetchFailure | protocol",
+  "origin": "real-world | reference-impl | synthetic",
+  "provenance": "where this case was observed (domain, date, run)",
+  "input":  { "…assessor input…": true },
+  "expect": { "outcome": "…", "missingContains": ["substring pinned in missing[]"] },
+  "notes": "why this case exists"
+}
+```
+
+`input` is the assessor's own argument shape (`{init, prm?, as?}` for `mcp`,
+`{spec}` for `openapi`, `{card}` for `a2a`, `{protocol, status, what}` for
+`fetchFailure`, `{resource}` for `protocol` detection). `expect` fields are
+compared exactly; `missingContains` matches substrings against the joined
+`missing[]` so message wording can gain detail without weakening the pin.
+
+These fixtures run in `npm run test:compat` and are excluded from the
+adapter/matrix chain (they are not document fixtures). `contract.mjs` enforces
+their own coverage rule: every assessor family keeps at least one fixture, and
+the `mcp`/`openapi`/`a2a` assessors each cover a success outcome and a
+non-success outcome.
+
+**The same rule applies as for document fixtures:** a readiness-classification
+fix without a fixture here fails review.
+
 ## Running
 
 - `npm run test:compat` — run every fixture (layer 2: real-world compatibility).

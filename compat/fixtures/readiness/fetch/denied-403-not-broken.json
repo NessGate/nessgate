@@ -1,0 +1,19 @@
+{
+  "id": "readiness/fetch/denied-403-not-broken",
+  "check": "readiness",
+  "assessor": "fetchFailure",
+  "origin": "real-world",
+  "provenance": "card/spec fetches denied with 403 by bot protection (e.g. www.cloudflare.com agent.json from some vantages); stability runs 2026-09-27",
+  "input": {
+    "protocol": "a2a-agent-card",
+    "status": 403,
+    "what": "A2A agent card"
+  },
+  "expect": {
+    "outcome": "incomplete",
+    "missingContains": [
+      "requires authorization or is walled"
+    ]
+  },
+  "notes": "A denial can be authorization or a bot wall; it can block verification but can never establish broken."
+}

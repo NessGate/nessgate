@@ -2,26 +2,66 @@
   "openapi:https://raw.githubusercontent.com/OAI/learn.openapis.org/main/examples/v3.0/petstore.json": {
     "hash": "d27ff28ca7d7795f",
     "bytes": 4140,
-    "seen": "2026-09-16"
+    "seen": "2026-10-03"
   },
   "api-catalog:https://www.rfc-editor.org/rfc/rfc9727.txt": {
     "hash": "0443a555bae6a2dc",
     "bytes": 33090,
-    "seen": "2026-09-16"
+    "seen": "2026-10-03"
   },
   "host-meta:https://www.rfc-editor.org/rfc/rfc6415.txt": {
     "hash": "6844be94c0281ba9",
     "bytes": 32018,
-    "seen": "2026-09-16"
+    "seen": "2026-10-03"
   },
   "ard-catalog:https://agenticresourcediscovery.org/ai_catalog_spec/": {
     "hash": "0706ba0a563ae999",
     "bytes": 462,
-    "seen": "2026-09-16"
+    "seen": "2026-10-03"
   },
   "a2a-agent-card:https://a2a-protocol.org/latest/specification/": {
-    "hash": "4805254c10d8cbde",
-    "bytes": 617177,
-    "seen": "2026-09-16"
+    "hash": "0e6a4625fb6a4958",
+    "bytes": 617292,
+    "seen": "2026-10-03"
+  },
+  "mcp:https://modelcontextprotocol.io/specification/latest": {
+    "hash": "3d257ea31b1555bd",
+    "bytes": 319496,
+    "seen": "2026-10-03"
+  },
+  "web-bot-auth:https://datatracker.ietf.org/doc/draft-meunier-web-bot-auth-architecture/": {
+    "hash": "5c6308a8a8f9462d",
+    "bytes": 42708,
+    "seen": "2026-10-03"
+  },
+  "wimse:https://datatracker.ietf.org/doc/draft-ietf-wimse-arch/": {
+    "hash": "e075527df6fed493",
+    "bytes": 128198,
+    "seen": "2026-10-03"
+  },
+  "openai-bot-ranges:https://openai.com/gptbot.json": {
+    "hash": "a24d1fa34f094d30",
+    "bytes": 977,
+    "seen": "2026-10-03"
+  },
+  "openai-bot-ranges:https://openai.com/searchbot.json": {
+    "hash": "81806b1665e9bbbc",
+    "bytes": 2080,
+    "seen": "2026-10-03"
+  },
+  "openai-bot-ranges:https://openai.com/chatgpt-user.json": {
+    "hash": "457798dfbea98bc0",
+    "bytes": 8322,
+    "seen": "2026-10-03"
+  },
+  "perplexity-bot-ranges:https://www.perplexity.ai/perplexitybot.json": {
+    "hash": "2688b50802b42611",
+    "bytes": 482,
+    "seen": "2026-10-03"
+  },
+  "perplexity-bot-ranges:https://www.perplexity.ai/perplexity-user.json": {
+    "hash": "23e55350c44ac51a",
+    "bytes": 276,
+    "seen": "2026-10-03"
   }
 }

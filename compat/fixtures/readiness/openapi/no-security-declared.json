@@ -1,0 +1,25 @@
+{
+  "id": "readiness/openapi/no-security-declared",
+  "check": "readiness",
+  "assessor": "openapi",
+  "origin": "real-world",
+  "provenance": "common across cohort specs (e.g. supabase.com/openapi.json 2026-09-27): servers + version but no securitySchemes and no explicit empty security",
+  "input": {
+    "spec": {
+      "openapi": "3.0.0",
+      "servers": [
+        {
+          "url": "https://a.example"
+        }
+      ],
+      "paths": {}
+    }
+  },
+  "expect": {
+    "outcome": "incomplete",
+    "missingContains": [
+      "securitySchemes"
+    ]
+  },
+  "notes": "Not declaring auth is ambiguous (unauthenticated vs undocumented); the missing declaration is named instead of guessing."
+}

@@ -1,0 +1,19 @@
+{
+  "id": "readiness/fetch/unparseable-at-declared-location",
+  "check": "readiness",
+  "assessor": "fetchFailure",
+  "origin": "real-world",
+  "provenance": "api.supabase.com/api/v1-json: declared OpenAPI location answers 200 with an unparseable body; library run 2026-09-30",
+  "input": {
+    "protocol": "openapi",
+    "status": 200,
+    "what": "OpenAPI document"
+  },
+  "expect": {
+    "outcome": "broken",
+    "missingContains": [
+      "not parseable"
+    ]
+  },
+  "notes": "The location answered and the answer contradicts the declaration: broken on positive evidence."
+}

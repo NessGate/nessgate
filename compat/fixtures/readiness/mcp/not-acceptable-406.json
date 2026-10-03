@@ -1,0 +1,18 @@
+{
+  "id": "readiness/mcp/not-acceptable-406",
+  "check": "readiness",
+  "assessor": "mcp",
+  "origin": "real-world",
+  "provenance": "www.pinecone.io /mcp/ answered 406 to a POST initialize; checked 2026-09-30",
+  "input": {
+    "init": {
+      "ok": false,
+      "status": 406
+    }
+  },
+  "expect": {
+    "outcome": "incomplete",
+    "verified": "error:406"
+  },
+  "notes": "A content-negotiation rejection is a method/representation condition, not evidence the declaration is wrong: incomplete, never broken."
+}

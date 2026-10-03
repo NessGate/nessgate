@@ -35,7 +35,7 @@ spec change  OR  resolution anomaly / benchmark miss
 - **`node lab/watch-specs.mjs`** — fetches the watched spec/schema/vendor sources in `sources.json`,
   hashes each, and compares to the frozen `spec-snapshots.json`. New/changed/removed sources emit a
   drift proposal (review the vendored copy, add/adjust a conformance vector, re-freeze the snapshot).
-  Never updates the snapshot automatically. Requires network; non-deterministic → excluded from CI.
+  Never updates the snapshot automatically. Requires network; non-deterministic → excluded from CI. Run it (`npm run watch:specs`) at least before every release and monthly in between; review any NEW/CHG lines, update vectors/fixtures as needed, then `node lab/watch-specs.mjs --freeze`. The watch list includes the protocol specifications, the IETF drafts relevant to request signatures and workload identity, and the operator-published bot IP-range documents that network attribution reads.
 - **`node lab/analyze-failures.mjs <results.jsonl>`** — reads an unseen-benchmark (or discover-
   failure) result file, clusters anomalies (recall misses by protocol, false associations, parser
   failures, unreachable clusters), and emits one proposal per cluster with a **fixture skeleton** and

@@ -13,7 +13,9 @@ function walk(dir) { const o = []; for (const e of readdirSync(dir)) { const p =
 
 const matrix = readJson(base + "matrix.json");
 const manifests = Object.fromEntries(readdirSync(base + "adapters").filter((f) => f.endsWith(".json")).map((f) => [f.replace(/\.json$/, ""), readJson(base + "adapters/" + f)]));
-const fixtures = walk(base + "fixtures").filter((p) => p.endsWith(".json")).map((p) => readJson(p));
+const allFixtures = walk(base + "fixtures").filter((p) => p.endsWith(".json")).map((p) => readJson(p));
+const readinessFixtures = allFixtures.filter((f) => f.check === "readiness");
+const fixtures = allFixtures.filter((f) => f.check !== "readiness");
 const vendorRels = new Set(walk(base + "vendor").map((p) => p.slice((base + "vendor/").length)));
 
 // Protocols whose documents get a real JSON shape check (probeShapeOk) — these
@@ -21,9 +23,9 @@ const vendorRels = new Set(walk(base + "vendor").map((p) => p.slice((base + "ven
 // within the a2a surface and is exercised via a2a fixtures, so it's excluded here.
 const jsonShapeProtocols = new Set(["ard-catalog", "a2a-agent-card", "api-catalog", "awp", "host-meta", "openapi", "anp", "ucp"]);
 
-const violations = validateContract({ ADAPTERS, manifests, matrix, fixtures, vendorRels, levelFor, jsonShapeProtocols });
+const violations = validateContract({ ADAPTERS, manifests, matrix, fixtures, vendorRels, levelFor, jsonShapeProtocols, readinessFixtures });
 
-console.log(`--- adapter contract (${ADAPTERS.length} adapters, ${Object.keys(manifests).length} manifests, ${fixtures.length} fixtures, ${vendorRels.size} vendored files)`);
+console.log(`--- adapter contract (${ADAPTERS.length} adapters, ${Object.keys(manifests).length} manifests, ${fixtures.length} document fixtures, ${readinessFixtures.length} readiness fixtures, ${vendorRels.size} vendored files)`);
 if (violations.length === 0) {
   console.log("  ok  adapter ↔ manifest ↔ matrix ↔ fixtures ↔ official vectors all consistent");
   console.log("  ok  surfaces, channels, authority↔level, provenance, and conformance coverage enforced");

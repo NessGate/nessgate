@@ -18,7 +18,11 @@ const manifests = Object.fromEntries(adapterFiles.map((f) => [f.replace(/\.json$
 function walk(dir) { const o = []; for (const e of readdirSync(dir)) { const p = dir + "/" + e; if (statSync(p).isDirectory()) o.push(...walk(p)); else if (e.endsWith(".json")) o.push(p); } return o; }
 const fixtureFiles = walk(base + "fixtures");
 const fixtureIds = new Set(fixtureFiles.map((p) => p.slice((base + "fixtures/").length).replace(/\.json$/, "")));
-const fixtures = fixtureFiles.map((p) => JSON.parse(readFileSync(p, "utf8")));
+const allFixtures = fixtureFiles.map((p) => JSON.parse(readFileSync(p, "utf8")));
+// Readiness-classification fixtures (check:"readiness") are a separate layer run
+// by test-compat; the matrix/adapter chain below covers document fixtures only.
+const readinessFixtures = allFixtures.filter((f) => f.check === "readiness");
+const fixtures = allFixtures.filter((f) => f.check !== "readiness");
 
 console.log("--- matrix / adapter / fixture consistency");
 
@@ -74,6 +78,7 @@ const metrics = {
   protocolVersions: Object.values(matrix).reduce((n, v) => n + Object.keys(v).length, 0),
   adapters: Object.keys(manifests).length,
   fixtures: fixtures.length,
+  readinessFixtures: readinessFixtures.length,
   positiveFixtures: positive.length,
   rejectFixtures: reject.length,
   realWorldFixtures: realWorld.length,

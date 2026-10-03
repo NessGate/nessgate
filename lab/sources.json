@@ -1,10 +1,83 @@
 {
   "note": "Spec/schema/vendor sources the Lab watches for drift. Adding a protocol here means we intend to track its upstream and keep a conformance vector current. Not exhaustive of the ecosystem — only what we vendor or intend to.",
   "sources": [
-    { "protocol": "openapi", "kind": "vendored-source", "url": "https://raw.githubusercontent.com/OAI/learn.openapis.org/main/examples/v3.0/petstore.json", "note": "OAI petstore — our vendored openapi 3.0 vector" },
-    { "protocol": "api-catalog", "kind": "spec", "url": "https://www.rfc-editor.org/rfc/rfc9727.txt", "note": "RFC 9727 (api-catalog); stable" },
-    { "protocol": "host-meta", "kind": "spec", "url": "https://www.rfc-editor.org/rfc/rfc6415.txt", "note": "RFC 6415 (host-meta); stable" },
-    { "protocol": "ard-catalog", "kind": "spec", "url": "https://agenticresourcediscovery.org/ai_catalog_spec/", "note": "ARD ai-catalog spec (draft; expect churn)" },
-    { "protocol": "a2a-agent-card", "kind": "spec", "url": "https://a2a-protocol.org/latest/specification/", "note": "A2A protocol spec (Linux Foundation)" }
+    {
+      "protocol": "openapi",
+      "kind": "vendored-source",
+      "url": "https://raw.githubusercontent.com/OAI/learn.openapis.org/main/examples/v3.0/petstore.json",
+      "note": "OAI petstore — our vendored openapi 3.0 vector"
+    },
+    {
+      "protocol": "api-catalog",
+      "kind": "spec",
+      "url": "https://www.rfc-editor.org/rfc/rfc9727.txt",
+      "note": "RFC 9727 (api-catalog); stable"
+    },
+    {
+      "protocol": "host-meta",
+      "kind": "spec",
+      "url": "https://www.rfc-editor.org/rfc/rfc6415.txt",
+      "note": "RFC 6415 (host-meta); stable"
+    },
+    {
+      "protocol": "ard-catalog",
+      "kind": "spec",
+      "url": "https://agenticresourcediscovery.org/ai_catalog_spec/",
+      "note": "ARD ai-catalog spec (draft; expect churn)"
+    },
+    {
+      "protocol": "a2a-agent-card",
+      "kind": "spec",
+      "url": "https://a2a-protocol.org/latest/specification/",
+      "note": "A2A protocol spec (Linux Foundation)"
+    },
+    {
+      "protocol": "mcp",
+      "kind": "spec",
+      "url": "https://modelcontextprotocol.io/specification/latest",
+      "note": "MCP specification, latest; readiness/introspection and the registry federation depend on it"
+    },
+    {
+      "protocol": "web-bot-auth",
+      "kind": "spec-draft",
+      "url": "https://datatracker.ietf.org/doc/draft-meunier-web-bot-auth-architecture/",
+      "note": "Web Bot Auth architecture draft (IETF); request-signature verification tracks it"
+    },
+    {
+      "protocol": "wimse",
+      "kind": "spec-draft",
+      "url": "https://datatracker.ietf.org/doc/draft-ietf-wimse-arch/",
+      "note": "WIMSE architecture draft (IETF); workload/agent credential landscape"
+    },
+    {
+      "protocol": "openai-bot-ranges",
+      "kind": "operator-ranges",
+      "url": "https://openai.com/gptbot.json",
+      "note": "GPTBot published IP ranges; network attribution depends on it"
+    },
+    {
+      "protocol": "openai-bot-ranges",
+      "kind": "operator-ranges",
+      "url": "https://openai.com/searchbot.json",
+      "note": "OAI-SearchBot published IP ranges"
+    },
+    {
+      "protocol": "openai-bot-ranges",
+      "kind": "operator-ranges",
+      "url": "https://openai.com/chatgpt-user.json",
+      "note": "ChatGPT-User published IP ranges"
+    },
+    {
+      "protocol": "perplexity-bot-ranges",
+      "kind": "operator-ranges",
+      "url": "https://www.perplexity.ai/perplexitybot.json",
+      "note": "PerplexityBot published IP ranges"
+    },
+    {
+      "protocol": "perplexity-bot-ranges",
+      "kind": "operator-ranges",
+      "url": "https://www.perplexity.ai/perplexity-user.json",
+      "note": "Perplexity-User published IP ranges"
+    }
   ]
 }

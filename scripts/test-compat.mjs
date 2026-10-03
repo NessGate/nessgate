@@ -5,7 +5,7 @@
 // Run with `npm run test:compat`. (Layer 1, official schemas/vectors, arrives in M2.)
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { validateProbeContent, probeShapeOk, normalizeResources, detectOpenApi, detectOpenApiYaml } from "../packages/resolver/index.mjs";
+import { validateProbeContent, probeShapeOk, normalizeResources, detectOpenApi, detectOpenApiYaml, assessMcpReadiness, assessOpenApiReadiness, assessA2aReadiness, assessFetchFailure, readinessProtocol } from "../packages/resolver/index.mjs";
 import { levelFor } from "../packages/resolver/v2.mjs";
 
 let failed = 0, ran = 0;
@@ -29,6 +29,34 @@ for (const file of files) {
   let fx;
   try { fx = JSON.parse(readFileSync(file, "utf8")); } catch { failed++; console.error(`FAIL  ${file}: unreadable`); continue; }
   const { id, protocol, kind, input, expect } = fx;
+
+  // Readiness-classification fixtures (check:"readiness"): run the input through
+  // the named assessor and compare each expected field. "missingContains" matches
+  // substrings against the joined missing[] list so messages can evolve in detail
+  // without weakening what the fixture pins.
+  if (fx.check === "readiness") {
+    const compare = (exp, got) => {
+      for (const [k, val] of Object.entries(exp)) {
+        if (k === "missingContains") {
+          const joined = (got.missing || []).join(" | ");
+          for (const frag of val) if (!joined.includes(frag)) return `missing[] lacks "${frag}" (got: ${joined})`;
+        } else if (JSON.stringify(got[k]) !== JSON.stringify(val)) {
+          return `field '${k}' = ${JSON.stringify(got[k])}, expected ${JSON.stringify(val)}`;
+        }
+      }
+      return null;
+    };
+    let got;
+    if (fx.assessor === "mcp") got = assessMcpReadiness(input);
+    else if (fx.assessor === "openapi") got = assessOpenApiReadiness(input.spec);
+    else if (fx.assessor === "a2a") got = assessA2aReadiness(input.card);
+    else if (fx.assessor === "fetchFailure") got = assessFetchFailure(input.protocol, input.status, input.what);
+    else if (fx.assessor === "protocol") got = { protocol: readinessProtocol(input.resource) };
+    else { failed++; ran++; console.error(`FAIL  ${id}: unknown assessor '${fx.assessor}'`); continue; }
+    const err = compare(expect, got);
+    ok(!err, `${id}: ${err || "readiness classification matches"} (${fx.notes || ""})`);
+    continue;
+  }
 
   // Detector fixtures (e.g. OpenAPI bounded-prefix detection). `truncated`
   // states whether WE cut the body at the cap (vs a body that completed).

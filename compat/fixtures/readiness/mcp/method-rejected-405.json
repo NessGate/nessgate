@@ -1,0 +1,19 @@
+{
+  "id": "readiness/mcp/method-rejected-405",
+  "check": "readiness",
+  "assessor": "mcp",
+  "origin": "real-world",
+  "provenance": "endpoints rejecting POST initialize with 405 (pre-streamable-HTTP transports and method-restricted hosts); stability runs 2026-09-27",
+  "input": {
+    "init": {
+      "ok": false,
+      "status": 405
+    }
+  },
+  "expect": {
+    "outcome": "incomplete",
+    "transport": "sse-legacy",
+    "verified": "error:405"
+  },
+  "notes": "405 is ambiguous (a legacy SSE transport also rejects POST at the SSE URL): never ready, never broken."
+}

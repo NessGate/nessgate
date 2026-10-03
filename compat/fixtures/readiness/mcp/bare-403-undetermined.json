@@ -1,0 +1,22 @@
+{
+  "id": "readiness/mcp/bare-403-undetermined",
+  "check": "readiness",
+  "assessor": "mcp",
+  "origin": "real-world",
+  "provenance": "zapier.com /.well-known/mcp/server-card.json answered a bare 403 with no auth challenge; cohort run 2026-09-27",
+  "input": {
+    "init": {
+      "ok": false,
+      "status": 403,
+      "wwwAuthenticate": null
+    }
+  },
+  "expect": {
+    "outcome": "incomplete",
+    "verified": "denied:403",
+    "missingContains": [
+      "undetermined"
+    ]
+  },
+  "notes": "A bare 403 can be authorization or bot protection; a safe probe cannot distinguish them, so neither an OAuth requirement nor broken may be claimed."
+}

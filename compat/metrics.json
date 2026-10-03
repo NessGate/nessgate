@@ -1,9 +1,10 @@
 {
-  "generatedAt": "2026-09-21",
+  "generatedAt": "2026-10-03",
   "protocols": 13,
   "protocolVersions": 17,
   "adapters": 14,
   "fixtures": 34,
+  "readinessFixtures": 19,
   "positiveFixtures": 24,
   "rejectFixtures": 10,
   "realWorldFixtures": 4,

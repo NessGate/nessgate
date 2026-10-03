@@ -1,0 +1,19 @@
+{
+  "id": "readiness/fetch/network-failure-not-broken",
+  "check": "readiness",
+  "assessor": "fetchFailure",
+  "origin": "real-world",
+  "provenance": "transient network failures during repeated runs flip fetch results without any change on the service side; stability runs 2026-09-27",
+  "input": {
+    "protocol": "openapi",
+    "status": 0,
+    "what": "OpenAPI document"
+  },
+  "expect": {
+    "outcome": "incomplete",
+    "missingContains": [
+      "from this vantage"
+    ]
+  },
+  "notes": "A failure to reach the location is a property of the observing vantage, never evidence about the service."
+}

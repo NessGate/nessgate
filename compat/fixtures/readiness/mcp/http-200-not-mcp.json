@@ -1,0 +1,22 @@
+{
+  "id": "readiness/mcp/http-200-not-mcp",
+  "check": "readiness",
+  "assessor": "mcp",
+  "origin": "real-world",
+  "provenance": "replicate.com /docs/reference/mcp answered HTTP 200 (text/html) to a POST initialize; found in external testing 2026-09-30 and reproduced on the hosted service",
+  "input": {
+    "init": {
+      "ok": true,
+      "status": 200,
+      "protocolVersion": null
+    }
+  },
+  "expect": {
+    "outcome": "incomplete",
+    "verified": "http-200-not-mcp",
+    "missingContains": [
+      "protocol-level evidence"
+    ]
+  },
+  "notes": "HTTP 200 without a parseable JSON-RPC initialize result is not an MCP endpoint; a documentation page answers 200 too. ready requires the negotiated protocolVersion."
+}

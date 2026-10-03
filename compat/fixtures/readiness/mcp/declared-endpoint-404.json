@@ -1,0 +1,18 @@
+{
+  "id": "readiness/mcp/declared-endpoint-404",
+  "check": "readiness",
+  "assessor": "mcp",
+  "origin": "real-world",
+  "provenance": "huggingface.co /mcp/server-card declared but answering HTTP 404; cohort runs 2026-09-27..30",
+  "input": {
+    "init": {
+      "ok": false,
+      "status": 404
+    }
+  },
+  "expect": {
+    "outcome": "broken",
+    "verified": "error:404"
+  },
+  "notes": "The endpoint answered not-found: positive evidence the declaration is wrong, so broken rather than incomplete."
+}

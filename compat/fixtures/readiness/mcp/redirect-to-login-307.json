@@ -1,0 +1,18 @@
+{
+  "id": "readiness/mcp/redirect-to-login-307",
+  "check": "readiness",
+  "assessor": "mcp",
+  "origin": "real-world",
+  "provenance": "mcp.zapier.com /mcp answered 307 redirecting to /login; checked 2026-09-30",
+  "input": {
+    "init": {
+      "ok": false,
+      "status": 307
+    }
+  },
+  "expect": {
+    "outcome": "incomplete",
+    "verified": "error:307"
+  },
+  "notes": "A login redirect gates the endpoint without publishing an auth-metadata path; incomplete, never broken."
+}

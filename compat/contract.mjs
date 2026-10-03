@@ -87,5 +87,25 @@ export function validateContract(ctx) {
   for (const entry of Object.values(matrix)) for (const ver of Object.values(entry)) for (const fid of ver.fixtures || []) matrixFixtureRefs.add(fid);
   for (const f of fixtures) if (!matrixFixtureRefs.has(f.id)) v.push(`fixture '${f.id}' exists on disk but no matrix entry lists it`);
 
+  // Readiness-classification fixtures (check:"readiness") have their own
+  // coverage rule: each assessor family keeps at least one fixture, and the
+  // mcp/openapi/a2a assessors each cover a success outcome AND a non-success
+  // outcome — so a classification change can never land without corpus coverage.
+  if ("readinessFixtures" in ctx) {
+    const byAssessor = {};
+    for (const f of ctx.readinessFixtures || []) (byAssessor[f.assessor] ||= []).push(f);
+    for (const a of ["mcp", "openapi", "a2a", "fetchFailure", "protocol"]) {
+      if (!(byAssessor[a] || []).length) v.push(`readiness fixtures: assessor '${a}' has no fixture`);
+    }
+    for (const a of ["mcp", "openapi", "a2a"]) {
+      const outcomes = new Set((byAssessor[a] || []).map((f) => f.expect && f.expect.outcome));
+      const success = [...outcomes].some((o) => o === "ready" || o === "credentials-required");
+      const nonSuccess = [...outcomes].some((o) => o && o !== "ready" && o !== "credentials-required");
+      if ((byAssessor[a] || []).length && !(success && nonSuccess)) {
+        v.push(`readiness fixtures: assessor '${a}' must cover both a success and a non-success outcome`);
+      }
+    }
+  }
+
   return v;
 }

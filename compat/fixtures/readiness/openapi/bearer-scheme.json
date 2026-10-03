@@ -1,0 +1,35 @@
+{
+  "id": "readiness/openapi/bearer-scheme",
+  "check": "readiness",
+  "assessor": "openapi",
+  "origin": "real-world",
+  "provenance": "api.replicate.com/v1 OpenAPI shape (servers + http bearer scheme); library run 2026-09-30",
+  "input": {
+    "spec": {
+      "openapi": "3.0.0",
+      "servers": [
+        {
+          "url": "https://api.replicate.com/v1"
+        }
+      ],
+      "components": {
+        "securitySchemes": {
+          "bearer": {
+            "type": "http",
+            "scheme": "bearer"
+          }
+        }
+      }
+    }
+  },
+  "expect": {
+    "outcome": "credentials-required",
+    "version": "3.0.0",
+    "endpoint": "https://api.replicate.com/v1",
+    "auth": {
+      "required": true,
+      "type": "http:bearer"
+    }
+  },
+  "notes": "servers[] + a declared http bearer scheme is a complete connection declaration except for the caller's own token."
+}
