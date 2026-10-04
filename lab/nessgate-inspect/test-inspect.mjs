@@ -367,9 +367,22 @@ function signedRequestDict({ now = 1_000_000, label = "agent2", origin = "https:
   eq("E.2.1 signature base reproduced byte-exact",
     buildSignatureBase(req1, parseSignatureInput("sig2=" + raw1)),
     '"@authority": example.com\n"signature-agent";key="agent2": "https://signature-agent.test"\n"@signature-params": ' + raw1);
+  // VECTOR DEFECT (documented): E.2.1 as published uses label sig2 with member
+  // key agent2, violating the normative §5.2.1/§5.2.2 label rule. The verifier
+  // refuses it with the defect named — the rule is not weakened to fit the vector.
   const v1 = await inspect(req1, { fetch: vecFetch, now: 1735700000, dns: PUBDNS });
   const f1 = v1.facts.find((f) => f.kind === "web-bot-auth");
-  eq("E.2.1 verifies → cryptographically-verified", f1.tier, "cryptographically-verified");
+  ok("E.2.1 AS PUBLISHED → refused for the label/member mismatch (vector defect)",
+    f1.tier === "claimed" && /does not match the signature label/.test(f1.reason || ""));
+  // Label-corrected E.2.1 (label agent2 — the label is NOT part of the signed
+  // bytes, so the vector's signature itself still validates byte-exact).
+  const req1c = { method: "GET", url: "https://example.com/", headers: { ...req1.headers,
+    "signature-input": "agent2=" + raw1,
+    "signature": req1.headers["signature"].replace(/^sig2=/, "agent2="),
+  } };
+  const v1c = await inspect(req1c, { fetch: vecFetch, now: 1735700000, dns: PUBDNS });
+  eq("E.2.1 label-corrected → cryptographically-verified (vector crypto intact)",
+    v1c.facts.find((f) => f.kind === "web-bot-auth").tier, "cryptographically-verified");
 
   // E.2.2 — legacy bare-string form (expires 2025-01-01; verified at a vector-time now).
   const raw2 = '("@authority" "signature-agent");created=1735689600;keyid="' + VKID + '";alg="ed25519";expires=1735693200;nonce="e8N7S2MFd/qrd6T2R3tdfAuuANngKI7LFtKYI/vowzk4lAZYadIX6wW25MwG7DCT9RUKAJ0qVkU0mEeLElW1qg==";tag="web-bot-auth"';
@@ -479,15 +492,61 @@ function signedRequestDict({ now = 1_000_000, label = "agent2", origin = "https:
     d.request.headers["signature-input"] = 'zzz=("@authority");created=1;keyid="x";alg="ed25519";expires=2;tag="other", agent2=' + d.rawInner;
     d.request.headers["signature"] = "zzz=:AAAA:, " + d.request.headers["signature"];
     const r = await inspect(d.request, { fetch: d.fetch, now: d.now, dns: PUBDNS });
-    eq("one wba-tagged among several signatures → verified", r.facts.find((f) => f.kind === "web-bot-auth").tier, "cryptographically-verified");
+    const wfacts = r.facts.filter((f) => f.kind === "web-bot-auth");
+    ok("one wba-tagged among several signatures → exactly one fact, verified", wfacts.length === 1 && wfacts[0].tier === "cryptographically-verified");
   }
-  // two web-bot-auth-tagged signatures → explicit refusal
-  {
+  // §5.2.2 — multiple Web Bot Auth signatures are validated INDEPENDENTLY.
+  // Two fully conforming signers (a and b) on one request:
+  const twoSigners = () => {
+    const A = signedRequestDict({ label: "a", origin: "https://alpha.example" });
+    const B = signedRequestDict({ label: "b", origin: "https://beta.example" });
+    const headers = {
+      "user-agent": "ModernAgent/1.0",
+      "signature-agent": A.request.headers["signature-agent"] + ", " + B.request.headers["signature-agent"],
+      "signature-input": A.request.headers["signature-input"] + ", " + B.request.headers["signature-input"],
+      "signature": A.request.headers["signature"] + ", " + B.request.headers["signature"],
+    };
+    // each signer covered ITS member of the (now merged) dictionary; the base for
+    // each extracts only its own member, so both signatures stay valid
+    const fetch = async (u) => {
+      const ra = await A.fetch(u);
+      if (ra.ok) return ra;
+      return B.fetch(u);
+    };
+    return { request: { method: "GET", url: "https://shop.example/checkout", headers }, fetch, now: A.now, A, B };
+  };
+  { // two valid → two independent verified facts
+    const t = twoSigners();
+    const r = await inspect(t.request, { fetch: t.fetch, now: t.now, dns: PUBDNS });
+    const facts = r.facts.filter((f) => f.kind === "web-bot-auth");
+    ok("two valid WBA signatures → two facts, both verified independently",
+      facts.length === 2 && facts.every((f) => f.tier === "cryptographically-verified"));
+  }
+  { // one valid + one invalid → one verified, one claimed; no cross-contamination
+    const t = twoSigners();
+    t.request.headers["signature"] = t.A.request.headers["signature"] + ", b=:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA:";
+    const r = await inspect(t.request, { fetch: t.fetch, now: t.now, dns: PUBDNS });
+    const facts = r.facts.filter((f) => f.kind === "web-bot-auth");
+    ok("one valid + one invalid → exactly one verified and one claimed",
+      facts.length === 2 && facts.filter((f) => f.tier === "cryptographically-verified").length === 1 &&
+      facts.filter((f) => f.tier === "claimed").length === 1);
+  }
+  { // two invalid → two claimed, each with its own reason
+    const t = twoSigners();
+    t.request.headers["signature"] = "a=:AAAA:, b=:BBBB:";
+    const r = await inspect(t.request, { fetch: t.fetch, now: t.now, dns: PUBDNS });
+    const facts = r.facts.filter((f) => f.kind === "web-bot-auth");
+    ok("two invalid WBA signatures → two claimed facts (none fabricated)",
+      facts.length === 2 && facts.every((f) => f.tier === "claimed" && f.reason));
+  }
+  { // WBA + an unrelated non-WBA signature → the unrelated one is ignored
     const d = signedRequestDict();
-    d.request.headers["signature-input"] = "agent2=" + d.rawInner + ", second=" + d.rawInner;
+    d.request.headers["signature-input"] = 'zzz=("@authority");created=1;keyid="x";alg="ed25519";expires=2;tag="other", ' + d.request.headers["signature-input"];
+    d.request.headers["signature"] = "zzz=:AAAA:, " + d.request.headers["signature"];
     const r = await inspect(d.request, { fetch: d.fetch, now: d.now, dns: PUBDNS });
-    const w = r.facts.find((f) => f.kind === "web-bot-auth");
-    ok("two wba-tagged signatures → refused, never misattributed", w.tier === "claimed" && /refusing/.test(w.reason || ""));
+    const facts = r.facts.filter((f) => f.kind === "web-bot-auth");
+    ok("WBA + unrelated non-WBA signature → one verified fact, unrelated ignored",
+      facts.length === 1 && facts[0].tier === "cryptographically-verified");
   }
 }
 

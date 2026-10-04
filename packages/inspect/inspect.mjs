@@ -19,7 +19,7 @@
 //   - Every fact carries provenance (where it came from).
 //   - It reuses existing standards (RFC 9421 / Web Bot Auth, RFC 7638, published
 //     agent directories) and invents no NessGate identity standard.
-//   - It stores nothing and holds no credential.
+//   - It stores no request, credential, or key data.
 //
 // Isolated under lab/; imports nothing from the production resolver and changes
 // no current NessGate behavior.
@@ -78,42 +78,52 @@ export async function inspect(request, opts = {}) {
   }
 
   /* --- 3. Web Bot Auth: a signature CRYPTOGRAPHICALLY BOUND to this request --- */
-  const wba = await verifyWebBotAuth(request, opts).catch((e) => ({ present: true, verified: false, reason: "inspect error: " + (e && e.message) }));
-  if (wba.present) {
-    const sigAgent = header(headers, "signature-agent");
-    if (wba.verified && !wba.expired) {
-      add({
-        kind: "web-bot-auth",
-        tier: "cryptographically-verified",
-        statement: `an RFC 9421 HTTP Message Signature validates: the holder of key ${JSON.stringify(wba.keyid)} signed this request`,
-        boundComponents: wba.components,
-        keyid: wba.keyid, algorithm: wba.algorithm, created: wba.created, expires: wba.expires, directory: wba.directory, keyMatchedBy: wba.matchedBy,
-        provenance: [
-          { source: "request-header", header: "signature-input" },
-          { source: "request-header", header: "signature" },
-          { source: "key-directory", url: wba.directory, keyid: wba.keyid, matchedBy: wba.matchedBy },
-        ],
-        note: "proves ONLY that the holder of this key signed this exact request, binding the listed components. Per the Web Bot Auth specification this does NOT establish who operates the agent, its organization, or any authorization for the requested action — those remain the relying party's decision.",
-      });
-    } else {
-      // A signature is PRESENT but not a current cryptographic binding → it stays
-      // claimed, with the precise reason. (Also covers expired-but-valid: the
-      // crypto held, but it is not a fresh binding.)
-      add({
-        kind: "web-bot-auth",
-        tier: "claimed",
-        statement: wba.expired
-          ? `an RFC 9421 signature is cryptographically valid but EXPIRED (expires=${wba.expires}); not a current binding`
-          : `the caller presents an RFC 9421 signature that could not be verified`,
-        keyid: wba.keyid, directory: wba.directory,
-        reason: wba.reason || (wba.expired ? "expired" : "unverified"),
-        provenance: [
-          { source: "request-header", header: "signature-input" },
-          ...(sigAgent ? [{ source: "request-header", header: "signature-agent" }] : []),
-        ],
-        note: "a signature header is present but is not a verified, current binding to this request — so it is treated as claimed, not proven.",
-      });
+  const wbaAll = await verifyWebBotAuth(request, opts).catch((e) => ({ present: true, verified: false, signatures: [{ verified: false, reason: "inspect error: " + (e && e.message) }] }));
+  // §5.2.2: each web-bot-auth signature is validated independently — one fact
+  // per signature, each with its own verdict and provenance; a request-level
+  // failure (no tag / unparseable) yields a single claimed fact with the reason.
+  const wbaResults = wbaAll.present
+    ? (wbaAll.signatures && wbaAll.signatures.length ? wbaAll.signatures : [{ verified: false, reason: wbaAll.reason }])
+    : [];
+  for (const wba of wbaResults) {
+    wba.present = true;
+    if (wba.present) {
+      const sigAgent = header(headers, "signature-agent");
+      if (wba.verified && !wba.expired) {
+        add({
+          kind: "web-bot-auth",
+          tier: "cryptographically-verified",
+          statement: `an RFC 9421 HTTP Message Signature validates: the holder of key ${JSON.stringify(wba.keyid)} signed this request`,
+          boundComponents: wba.components,
+          keyid: wba.keyid, algorithm: wba.algorithm, created: wba.created, expires: wba.expires, directory: wba.directory, keyMatchedBy: wba.matchedBy,
+          provenance: [
+            { source: "request-header", header: "signature-input" },
+            { source: "request-header", header: "signature" },
+            { source: "key-directory", url: wba.directory, keyid: wba.keyid, matchedBy: wba.matchedBy },
+          ],
+          note: "proves ONLY that the holder of this key signed this exact request, binding the listed components. Per the Web Bot Auth specification this does NOT establish who operates the agent, its organization, or any authorization for the requested action — those remain the relying party's decision.",
+        });
+      } else {
+        // A signature is PRESENT but not a current cryptographic binding → it stays
+        // claimed, with the precise reason. (Also covers expired-but-valid: the
+        // crypto held, but it is not a fresh binding.)
+        add({
+          kind: "web-bot-auth",
+          tier: "claimed",
+          statement: wba.expired
+            ? `an RFC 9421 signature is cryptographically valid but EXPIRED (expires=${wba.expires}); not a current binding`
+            : `the caller presents an RFC 9421 signature that could not be verified`,
+          keyid: wba.keyid, directory: wba.directory,
+          reason: wba.reason || (wba.expired ? "expired" : "unverified"),
+          provenance: [
+            { source: "request-header", header: "signature-input" },
+            ...(sigAgent ? [{ source: "request-header", header: "signature-agent" }] : []),
+          ],
+          note: "a signature header is present but is not a verified, current binding to this request — so it is treated as claimed, not proven.",
+        });
+      }
     }
+
   }
 
   /* --- 4. Agent Card / published metadata (self-published → claimed) --- */

@@ -299,7 +299,7 @@ async function keyByThumbprint(fetchImpl, keysUrl, keyid, timeoutMs, opts = {}) 
 //   the member MUST be ignored; the mechanism is NEVER inferred.
 // - The legacy bare sf-string form (covered as plain "signature-agent") is
 //   accepted for migration, resolved as a directory URL/origin.
-function resolveKeySource(signatureAgent, coveredKey) {
+function resolveKeySource(signatureAgent, label, coveredKey) {
   if (typeof signatureAgent !== "string" || !signatureAgent.trim()) return { error: "no Signature-Agent header" };
   const v = signatureAgent.trim();
   const isDict = /^[a-zA-Z*][a-zA-Z0-9_.*-]*=/.test(v);
@@ -311,8 +311,13 @@ function resolveKeySource(signatureAgent, coveredKey) {
   };
   if (coveredKey !== null) {
     if (!isDict) return { error: 'the signature covers "signature-agent";key but the header is not a dictionary' };
-    const member = parseSfDict(v).find((m) => m.key === coveredKey);
-    if (!member) return { error: `the covered Signature-Agent member "${coveredKey}" is absent from the header` };
+    // Normative (§5.2.1, §5.2.2): the member KEYED TO THE SIGNATURE LABEL must
+    // exist and be the one covered. The draft's own Appendix E.2.1 vector
+    // (label sig2, member agent2) violates this and is treated as a vector
+    // defect, not as license to weaken the rule.
+    if (coveredKey !== label) return { error: `the covered Signature-Agent member key "${coveredKey}" does not match the signature label "${label}" (the profile requires the member keyed to the signature label; the draft's E.2.1 vector itself violates this and is treated as defective)` };
+    const member = parseSfDict(v).find((m) => m.key === label);
+    if (!member) return { error: `no Signature-Agent member is keyed to the signature label "${label}"` };
     const type = member.params.type === undefined ? "directory" : String(member.params.type);
     if (type === "directory") {
       const keysUrl = originKeysUrl(member.value);
@@ -341,33 +346,17 @@ function resolveKeySource(signatureAgent, coveredKey) {
   } catch { return { error: "unusable legacy Signature-Agent value" }; }
 }
 
-// Verify a Web Bot Auth signed request against the WG protocol profile.
-// Returns a structured result — never throws:
-//   { present, verified, reason?, profile, keyid, algorithm, components,
-//     created, expires, expired, directory, keySource }
+// Verify ONE parsed web-bot-auth signature member against the profile.
 // cryptographically-verified is returned ONLY when the profile holds in full:
-// a single web-bot-auth-tagged signature; created AND expires present; keyid is
-// the key's JWK thumbprint; at least @authority or @target-uri covered; the
-// Signature-Agent member the discovery used is itself covered by the signature.
-export async function verifyWebBotAuth(request, opts = {}) {
+// created AND expires present; keyid is the key's JWK thumbprint; at least
+// @authority or @target-uri covered; the Signature-Agent member keyed to the
+// signature label is the one covered and the one used for discovery.
+async function verifyOneSignature(request, parsed, sig, opts, now) {
   const fetchImpl = opts.fetch || globalThis.fetch;
-  const now = typeof opts.now === "number" ? opts.now : Math.floor(Date.now() / 1000);
   const headers = request.headers || {};
   const hget = (n) => { for (const k in headers) if (k.toLowerCase() === n.toLowerCase()) return headers[k]; return undefined; };
-
-  const sigInput = hget("signature-input");
-  const sig = hget("signature");
-  if (!sigInput || !sig) return { present: false };
-
-  const members = parseSignatureInputDict(sigInput);
-  if (!members.length) return { present: true, verified: false, profile: WBA_PROFILE, reason: "unparseable Signature-Input" };
-  const tagged = members.filter((p) => p.params.tag === "web-bot-auth");
-  if (!tagged.length) return { present: true, verified: false, profile: WBA_PROFILE, reason: 'no signature is tagged "web-bot-auth" (the profile requires the tag)' };
-  if (tagged.length > 1) return { present: true, verified: false, profile: WBA_PROFILE, reason: "several signatures are tagged web-bot-auth; refusing to pick one rather than misattribute" };
-  const parsed = tagged[0];
-
   const out = {
-    present: true, verified: false, profile: WBA_PROFILE,
+    verified: false, profile: WBA_PROFILE, label: parsed.label,
     keyid: parsed.params.keyid, algorithm: parsed.params.alg,
     components: parsed.components.map((c) => (typeof c === "string" ? c : c.name + c.paramsRaw)),
     created: parsed.params.created, expires: parsed.params.expires,
@@ -387,10 +376,11 @@ export async function verifyWebBotAuth(request, opts = {}) {
   const signature = parseSignature(sig, parsed.label);
   if (!signature) return { ...out, reason: "unparseable or missing Signature value for " + parsed.label };
 
+
   const base = buildSignatureBase(request, parsed);
   if (base == null) return { ...out, reason: "could not reconstruct signature base (a covered component is absent)" };
 
-  const src = resolveKeySource(hget("signature-agent"), saComp.key);
+  const src = resolveKeySource(hget("signature-agent"), parsed.label, saComp.key);
   if (src.error) return { ...out, reason: src.error };
   out.directory = src.keysUrl;
   out.keySource = { type: src.type, url: src.keysUrl, ...(src.legacy ? { legacy: true } : {}) };
@@ -409,4 +399,33 @@ export async function verifyWebBotAuth(request, opts = {}) {
   // surfaced for the relying party (inspect.mjs downgrades expired to claimed).
   const expired = out.expires < now;
   return { ...out, verified: true, expired };
+}
+
+// Verify a Web Bot Auth signed request. §5.2.2: "A request MAY contain more
+// than one Web Bot Auth signature" and "Verifiers MUST validate each signature
+// independently against its own covered components and its own key" — so every
+// web-bot-auth-tagged member is verified on its own, and the result preserves
+// one entry per signature. Never throws.
+//   { present, verified (any), profile, signatures: [perSignatureResult...] }
+export async function verifyWebBotAuth(request, opts = {}) {
+  const now = typeof opts.now === "number" ? opts.now : Math.floor(Date.now() / 1000);
+  const headers = request.headers || {};
+  const hget = (n) => { for (const k in headers) if (k.toLowerCase() === n.toLowerCase()) return headers[k]; return undefined; };
+
+  const sigInput = hget("signature-input");
+  const sig = hget("signature");
+  if (!sigInput || !sig) return { present: false };
+
+  const members = parseSignatureInputDict(sigInput);
+  if (!members.length) return { present: true, verified: false, profile: WBA_PROFILE, signatures: [], reason: "unparseable Signature-Input" };
+  const tagged = members.filter((p) => p.params.tag === "web-bot-auth");
+  if (!tagged.length) return { present: true, verified: false, profile: WBA_PROFILE, signatures: [], reason: 'no signature is tagged "web-bot-auth" (the profile requires the tag)' };
+  const signatures = [];
+  for (const parsed of tagged) {
+    let r;
+    try { r = await verifyOneSignature(request, parsed, sig, opts, now); }
+    catch (e) { r = { verified: false, profile: WBA_PROFILE, label: parsed.label, reason: "verify error: " + (e && e.message) }; }
+    signatures.push(r);
+  }
+  return { present: true, profile: WBA_PROFILE, verified: signatures.some((s) => s.verified && !s.expired), signatures };
 }

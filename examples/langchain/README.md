@@ -11,7 +11,7 @@ Two tools:
   publishes across every supported standard, each linked to its source.
 
 No API key, no auth, open CORS. NessGate reads what the domain already publishes and
-stores nothing; credentials stay with the caller and are never sent to NessGate.
+stores no discovered domain or resource data; credentials stay with the caller and are never sent to NessGate.
 
 ## Install
 
