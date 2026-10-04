@@ -29,7 +29,6 @@ All four are also MCP tools at `POST /mcp`: `discover_domain`, `connect_domain`,
 | `packages/resolver/` | npm `@nessgate/resolver`; `index.mjs` is a byte-copy of `public/resolver.mjs`. Bump `package.json` version to publish. |
 | `public/` | Static site + `openapi.json` + `llms.txt` (served by the worker). |
 | `compat/` | The permanent compatibility corpus (fixtures, matrix, adapter manifests). |
-| `lab/connection-plan/` | The R&D that produced readiness/connect: prototype, market measurement, `PROPOSAL.md`. Isolated (never imported by prod). |
 | `scripts/` | Tests, deploy, smoke. See below. |
 | `examples/langchain/` | LangChain tools (`connect_domain`, `discover_domain`) + MCP-adapter usage. |
 | `packages/resolver/ready-check.mjs` | `nessgate-ready` CLI (`npx @nessgate/resolver <domain>`): the open self-test / CI profile of the readiness predicate. |
@@ -118,10 +117,6 @@ the underlying drafts evolve); publish it with `gh workflow run publish-inspect.
 
 ## Where to look next
 
-- `lab/connection-plan/PROPOSAL.md` — the staged implementation record, remaining follow-ups
-  (A2A `securitySchemes` depth, version-string preservation, charter read-scope note).
-- `lab/connection-plan/README.md` — the market-rate findings (readiness is
-  concentrated in the modern MCP/OAuth segment; ~0% of the general web).
 - `docs/data-model.md` — the shared data model across all surfaces (axes, enums,
   provenance forms, disclosure fields); integrations consume this one shape.
 - Integration notes: the MCP server is the framework-neutral bridge (3 tools);

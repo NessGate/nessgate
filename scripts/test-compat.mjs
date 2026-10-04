@@ -2,7 +2,7 @@
 // compat/fixtures/**/*.json through the resolver's PURE parse/normalize path and
 // asserts the expected records — or, for `reject` fixtures, that the document is
 // correctly refused (catch-alls / HTML shells / wrong shape). No network.
-// Run with `npm run test:compat`. (Layer 1, official schemas/vectors, arrives in M2.)
+// Run with `npm run test:compat`. (Layer 1 is the official schemas/vectors under compat/vendor.)
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { validateProbeContent, probeShapeOk, normalizeResources, detectOpenApi, detectOpenApiYaml, assessMcpReadiness, assessOpenApiReadiness, assessA2aReadiness, assessFetchFailure, assessOversizedDocument, readinessProtocol } from "../packages/resolver/index.mjs";

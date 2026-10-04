@@ -176,7 +176,7 @@ await throws(() => resolveV2(SEED, { ...opts, tier: "nonsense" }), "unknown tier
 await throws(() => resolveV2(SEED, { ...opts, tier: "balanced" }), "balanced throws NotImplemented (needs /explore, not in alpha)");
 await throws(() => resolveV2(SEED, { ...opts, tier: "deep" }), "deep throws NotImplemented (needs /explore, not in alpha)");
 is(EXPERIMENTAL, true, "module is flagged EXPERIMENTAL");
-is(/NOT active/.test(bal.charter), true, "result states Charter v2 is not active");
+is(/not production behavior/.test(bal.charter), true, "result states this is not production behavior");
 
 console.log(failed ? `\n${failed} FAILURES` : "\nAll v2-alpha tests passed.");
 process.exit(failed ? 1 : 0);

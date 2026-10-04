@@ -54,3 +54,6 @@ lab/validation/package-lock.json
 lab/validation2/node_modules/
 lab/validation2/package.json
 lab/validation2/package-lock.json
+
+# local-only archive; never tracked
+.private/

@@ -1,4 +1,4 @@
-# NessGate Compatibility Lab (M5)
+# NessGate Compatibility Lab
 
 The Lab keeps the compatibility knowledge **current**: it turns spec/version changes and real resolution anomalies into
 **human-reviewable proposals** — candidate regression fixtures and change notes — so compatibility
@@ -15,8 +15,7 @@ Concretely, and machine-checked in CI:
 - Every Lab tool writes **only** under `lab/proposals/` — never into `compat/`, `packages/`, `src/`,
   or `public/`. A proposal becomes real only when a **human** reviews it, completes the fixture, and
   moves it into `compat/` through normal review + the full gate.
-- AI is optional and human-triggered (draft an investigation/fixture from a proposal stub). No AI
-  runs in CI, and no AI output is trusted until it passes the same official + regression + contract +
+- Nothing from the Lab is trusted until it passes the same official + regression + contract +
   security gate as any human change.
 
 ## Workflow

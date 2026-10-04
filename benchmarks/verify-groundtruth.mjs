@@ -1,4 +1,4 @@
-// M0.5 — refine ground truth: re-fetch each JSON surface the probe found and
+// Refine ground truth: re-fetch each JSON surface the probe found and
 // check it against the SPEC-DEFINED shape (not NessGate's code — these are the
 // standards' own required fields), to weed out catch-all/SPA false positives.
 // llms.txt (text) hits from the probe are trusted (already non-HTML checked).

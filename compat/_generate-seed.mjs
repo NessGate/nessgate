@@ -1,4 +1,4 @@
-// One-shot SEED generator for the compatibility corpus (M1 backfill). Emits the
+// One-shot SEED generator for the compatibility corpus (initial backfill). Emits the
 // initial fixtures, adapter manifests, and matrix from (a) the existing
 // hand-written normalization tests and (b) the live ADAPTERS array. After this,
 // NEW fixtures are added BY HAND per the rule in compat/README.md ("every
@@ -113,7 +113,7 @@ for (const a of ADAPTERS) {
     canEstablishAuthority: true,
     normalizeAs: a.normalizeAs || a.id,
     provenanceRequired: true,
-    officialSuite: null,             // filled in M2
+    officialSuite: null,             // filled when official vectors are vendored
     deviations: [],
     fixtures: fixturesByProto[a.normalizeAs || a.id] || fixturesByProto[a.id] || [],
   };

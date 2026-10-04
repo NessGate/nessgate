@@ -1,8 +1,8 @@
 {
   "meta": {
-    "name": "NessGate unseen-domain holdout (M0.5)",
+    "name": "NessGate unseen-domain holdout",
     "frozen": "2026-09-15",
-    "purpose": "Core metric: resolve domains NEVER seen in dev/corpus/tuning. FROZEN before corpus (M1).",
+    "purpose": "Core metric: resolve domains NEVER seen in dev/corpus/tuning. Frozen before the corpus was built.",
     "sourcesNote": "Candidates drawn from llms.txt/ARD/MCP adopters + negative/blocked controls; NONE overlap cohort A (Tranco top-100) or cohort B (public-apis first-100).",
     "groundTruthMethod": "Independent direct HTTPS GET of each protocol surface (probe-groundtruth.mjs) + spec-shape verification (verify-groundtruth.mjs). NOT established via @nessgate/resolver.",
     "groundTruthSourceHash": "sha256:d9b4cb48917ad2b9",
