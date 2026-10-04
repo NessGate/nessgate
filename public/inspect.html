@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inspect incoming agents — NessGate</title>
+<meta name="description" content="@nessgate/inspect describes what an incoming automated caller claims and what can actually be verified. Run it in your own server; it reports evidence only.">
+<link rel="canonical" href="https://nessgate.com/inspect">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#0F2D4A">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0F2D4A">
+<meta property="og:site_name" content="NessGate">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Inspect incoming agents — NessGate">
+<meta property="og:description" content="Run @nessgate/inspect in your own server to describe what an incoming automated caller claims and what can actually be verified. Evidence only.">
+<meta property="og:url" content="https://nessgate.com/inspect">
+<meta property="og:image" content="https://nessgate.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/style.css?v=12">
+<style>
+  .exp-tag { display:inline-block; font-size:12px; font-weight:600; color:#96610a; background:#fbf1dd; padding:2px 9px; border-radius:999px; vertical-align:middle; margin-left:8px; }
+  .flow { display:flex; align-items:stretch; gap:8px; flex-wrap:wrap; margin:20px 0; }
+  .flow .box { flex:1; min-width:130px; border:1px solid #d9dee3; border-radius:10px; padding:12px 14px; background:#fff; font-size:14px; }
+  .flow .box b { display:block; color:#0f2d4a; }
+  .flow .arrow { align-self:center; color:#9aa4ae; font-weight:700; }
+  .callout { border:1px solid #cfe0f5; background:#eef4fc; border-left:4px solid #1f5fae; border-radius:8px; padding:14px 16px; margin:22px 0; }
+  .callout strong { color:#0f2d4a; }
+  pre.code { background:#0f2335; color:#e7edf3; border-radius:10px; padding:14px 16px; overflow:auto; font-size:13px; line-height:1.5; }
+  pre.out { background:#f6f8fa; color:#1a1a1a; border:1px solid #e3e7eb; border-radius:10px; padding:12px 14px; overflow:auto; font-size:12.5px; line-height:1.45; }
+  .tier { border:1px solid #e3e7eb; border-radius:10px; padding:16px 18px; margin:14px 0; background:#fff; }
+  .tier h3 { margin:0 0 4px; font-size:15px; color:#0f2d4a; }
+  .tier .lead { margin:0 0 6px; }
+  .tier .input { color:#5b6672; font-size:13px; margin:0 0 10px; }
+  .tier .input b { color:#1a1a1a; font-weight:600; }
+  .b { display:inline-block; font-size:11.5px; font-weight:600; padding:2px 9px; border-radius:999px; }
+  .b-grey{color:#5b6672;background:#eef0f2;} .b-blue{color:#1f5fae;background:#e8f0fb;}
+  .b-green{color:#0a7d52;background:#e6f4ec;} .b-navy{color:#fff;background:#0f2d4a;}
+  code.k { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:0.92em; background:#eef0f2; padding:1px 5px; border-radius:4px; }
+  .note { border:1px solid #efe0c2; background:#fdf6e9; border-left:4px solid #b7861f; border-radius:8px; padding:12px 15px; margin:16px 0; font-size:14px; }
+  .note strong { color:#0f2d4a; }
+</style>
+</head>
+<body>
+<header class="site-head"><a class="brand" href="/"><img src="/logo-horizontal.svg" alt="NessGate" width="143" height="28" class="brand-logo"></a><nav class="top-nav" aria-label="Primary"><a href="/check">Check</a><a href="/guide">Guide</a><a href="/api">API</a><a href="/inspect" aria-current="page">Inspect</a><a href="/spec">Spec</a><a href="/about">About</a><a class="nav-gh" href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a></nav></header>
+<main class="prose">
+  <h1>Inspect incoming agents <span class="exp-tag">experimental · 0.x</span></h1>
+  <p class="lead"><code class="k">@nessgate/inspect</code> describes what an incoming automated caller claims and what can actually be verified. It reports evidence only — no scores, no allow/deny, no identity guarantees.</p>
+
+  <div class="flow" aria-label="Deployment model">
+    <div class="box"><b>Agent</b>sends a request</div>
+    <div class="arrow">→</div>
+    <div class="box"><b>Your server</b>receives it</div>
+    <div class="arrow">→</div>
+    <div class="box"><b>@nessgate/inspect</b>reads the request</div>
+    <div class="arrow">→</div>
+    <div class="box"><b>Evidence</b>to your application</div>
+  </div>
+
+  <div class="callout">
+    <strong>The hosted NessGate site cannot remotely observe agents visiting your website.</strong>
+    <code class="k">@nessgate/inspect</code> evaluates requests where it is running, so to inspect
+    traffic on your domain, run it in your own request-handling layer — where the source IP,
+    headers, and any signatures are available.
+  </div>
+
+  <h2>Run it locally</h2>
+  <p>Install the package:</p>
+  <pre class="code">npm i @nessgate/inspect</pre>
+  <p>A tiny server that reports evidence about each request it receives:</p>
+  <pre class="code">// inspect-server.mjs
+import { createServer } from "node:http";
+import { inspect } from "@nessgate/inspect";
+
+createServer(async (req, res) =&gt; {
+  const headers = Object.fromEntries(Object.entries(req.headers));
+  const request = { method: req.method, url: `http://${headers.host}${req.url}`, headers };
+  const evidence = await inspect(request, { sourceIp: req.socket.remoteAddress }); // the real connection peer
+  res.writeHead(200, { "content-type": "application/json" });
+  res.end(JSON.stringify(evidence, null, 2));
+}).listen(8799);</pre>
+  <p>Start it, then send it a request:</p>
+  <pre class="code">node inspect-server.mjs
+curl -s localhost:8799/ -H 'user-agent: Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)'</pre>
+  <p>Already using Express? Two lines — every handler then has <code class="k">req.nessgate</code>:</p>
+  <pre class="code">import { nessgateInspect } from "@nessgate/inspect/middleware";
+app.use(nessgateInspect());</pre>
+  <div class="note"><strong>Behind a proxy or CDN?</strong> Network verification depends on the real connection source IP. If your application sits behind a reverse proxy or CDN, pass the source IP only from a trusted platform integration (for example, the platform's documented client-IP field). Do not blindly trust client-supplied forwarding headers such as <code class="k">X-Forwarded-For</code>.</div>
+  <p class="input" style="color:#5b6672">A request from your own machine or a cloud function will show <span class="b b-grey">claimed</span>
+  (and <span class="b b-blue">directory-attributed</span> if you send a known bot User-Agent). The stronger
+  tiers appear only for genuine operator traffic or a signed request — that is the correct, honest result.</p>
+
+  <h2>Evidence levels</h2>
+  <p>Every fact is placed in exactly one tier and carries provenance. The examples below are real output
+  from the package, labelled with the exact input that produced each one.</p>
+
+  <div class="tier">
+    <h3><span class="b b-grey">claimed</span> &nbsp;User-Agent</h3>
+    <p class="lead">The caller's User-Agent, asserted in a request header. It is trivially spoofable and bound to nothing, so on its own it is not evidence of identity.</p>
+    <p class="input"><b>Worked example — input:</b> a request with <code class="k">User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36</code>.</p>
+    <pre class="out">{
+  "kind": "user-agent",
+  "tier": "claimed",
+  "statement": "the caller's User-Agent is \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36\"",
+  "value": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+  "provenance": [
+    {
+      "source": "request-header",
+      "header": "user-agent"
+    }
+  ],
+  "note": "a request header asserted by the caller; trivially spoofable and bound to nothing — not evidence of identity on its own."
+}</pre>
+  </div>
+
+  <div class="tier">
+    <h3><span class="b b-blue">directory-attributed</span> &nbsp;public attribution</h3>
+    <p class="lead">The declared User-Agent matches a published operator pattern (here, OpenAI's GPTBot). This shows the string is a recognized pattern; it does not bind this request to that operator, because the header can be spoofed.</p>
+    <p class="input"><b>Worked example — input:</b> a request with <code class="k">User-Agent: Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)</code>.</p>
+    <pre class="out">{
+  "kind": "public-attribution",
+  "tier": "directory-attributed",
+  "statement": "the declared User-Agent matches a published pattern operated by OpenAI",
+  "operator": "OpenAI",
+  "provenance": [
+    {
+      "source": "request-header",
+      "header": "user-agent"
+    },
+    {
+      "source": "public-agent-directory",
+      "pattern": "GPTBot",
+      "documentation": "https://platform.openai.com/docs/bots"
+    }
+  ],
+  "note": "attribution of a self-declared, spoofable string against a public directory — it does NOT bind this request to that operator. Corroborate with a verified signature or verified reverse-DNS for binding."
+}</pre>
+  </div>
+
+  <div class="tier">
+    <h3><span class="b b-green">network-verified</span> &nbsp;origin infrastructure</h3>
+    <p class="lead">The connection matches the operator's published network-verification method (here, Google's reverse-DNS forward-confirmation) and supports attribution to its documented infrastructure. It does not establish trust, authorization, or safety.</p>
+    <p class="input"><b>Worked example — input:</b> a request whose source IP <code class="k">66.249.66.1</code> reverse-resolves to a Google crawler host and forward-confirms, as Google's documented method requires. Methods are wired today for Google, Bing, Apple, OpenAI and Perplexity.</p>
+    <pre class="out">{
+  "kind": "network-attribution",
+  "tier": "network-verified",
+  "statement": "the source IP 66.249.66.1 is within infrastructure Google officially attributes to its bot (method: rdns-forward-confirm)",
+  "operator": "Google",
+  "method": "rdns-forward-confirm",
+  "provenance": [
+    {
+      "source": "connection",
+      "sourceIp": "66.249.66.1",
+      "note": "the real connection peer; forwarded headers were NOT trusted"
+    },
+    {
+      "source": "reverse-dns-forward-confirmed",
+      "hostname": "crawl-66-249-66-1.googlebot.com",
+      "documentation": "https://developers.google.com/search/docs/crawling-indexing/verifying-googlebot"
+    }
+  ],
+  "note": "means ONLY that this request originated from Google's documented infrastructure — it does NOT mean the caller is trusted, authorized, safe, or allowed. That decision is the relying party's."
+}</pre>
+  </div>
+
+  <div class="tier">
+    <h3><span class="b b-navy">cryptographically-verified</span> &nbsp;Web Bot Auth signature</h3>
+    <p class="lead">A valid signature establishes that the holder of the referenced key signed this request. It does not by itself establish the real-world operator, authorization, trust, or safety.</p>
+    <p class="input"><b>Worked example — input:</b> a request carrying a valid RFC 9421 Web Bot Auth signature whose Ed25519 key is published at the caller's <code class="k">Signature-Agent</code> directory.</p>
+    <pre class="out">{
+  "kind": "web-bot-auth",
+  "tier": "cryptographically-verified",
+  "statement": "an RFC 9421 HTTP Message Signature validates: the holder of key \"HuaaDCJ5d1JXjy9SLWFoX76L1VWQAAwA1xaowGw8IM8\" signed this request",
+  "boundComponents": [
+    "@authority",
+    "signature-agent;key=\"sig1\""
+  ],
+  "keyid": "HuaaDCJ5d1JXjy9SLWFoX76L1VWQAAwA1xaowGw8IM8",
+  "algorithm": "ed25519",
+  "created": 1791153422,
+  "expires": 1791153722,
+  "directory": "https://agent.example/.well-known/http-message-signatures-directory",
+  "keyMatchedBy": "thumbprint",
+  "provenance": [
+    {
+      "source": "request-header",
+      "header": "signature-input"
+    },
+    {
+      "source": "request-header",
+      "header": "signature"
+    },
+    {
+      "source": "key-directory",
+      "url": "https://agent.example/.well-known/http-message-signatures-directory",
+      "keyid": "HuaaDCJ5d1JXjy9SLWFoX76L1VWQAAwA1xaowGw8IM8",
+      "matchedBy": "thumbprint"
+    }
+  ],
+  "note": "proves ONLY that the holder of this key signed this exact request, binding the listed components. Per the Web Bot Auth specification this does NOT establish who operates the agent, its organization, or any authorization for the requested action — those remain the relying party's decision."
+}</pre>
+  </div>
+
+  <p style="color:#5b6672;font-size:13.5px;margin-top:26px">Inspect is experimental (0.x) and stores nothing: it reads a request, returns the evidence, and retains no request, credential, or key data. Source and documentation: <a href="https://github.com/NessGate/nessgate" rel="noopener">github.com/NessGate/nessgate</a> · <a href="https://www.npmjs.com/package/@nessgate/inspect" rel="noopener">@nessgate/inspect</a>.</p>
+</main>
+<footer>
+  <nav aria-label="Footer"><a href="/guide">Guide</a><a href="/api">API</a><a href="/inspect">Inspect</a><a href="/spec">Spec</a><a href="/charter">Charter</a><a href="/changelog">Changelog</a><a href="/blog">Blog</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></nav>
+  <p class="foot-src"><a href="https://github.com/NessGate/nessgate" rel="noopener">GitHub</a> &middot; <a href="https://www.npmjs.com/package/@nessgate/inspect" rel="noopener">npm</a></p>
+  <p>© 2026 NessGate</p>
+</footer>
+</body>
+</html>
