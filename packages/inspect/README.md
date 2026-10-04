@@ -64,14 +64,13 @@ authorization). Failures fall back to the weaker tier with the reason; a failed
 network check is never presented as proof of spoofing, and operators that publish
 no verification method are never given a fabricated one.
 
-Measured on real production traffic (7 days, 1,222 distinct callers): the
-no-network path costs well under a millisecond per request; when a network check
-runs (callers matching a wired operator, ~5% of distinct callers), median ~20 ms.
+The no-network path is pure parsing (well under a millisecond); a network check
+adds one or two DNS/HTTPS round-trips for callers matching a wired operator.
 For strict hot paths, run inspection out-of-band from logs instead of inline.
 
 ## API
 
-- `inspect(request, opts)` → `{ request, facts[], summary, note }`
+- `inspect(request, opts)` → `{ request, facts[], summary, note }` — one web-bot-auth fact per signature (several signatures are validated independently, per the draft)
 - `nessgateInspect(options)` (from `./middleware`) → Express/Connect middleware;
   `summarize(result)` extracts the six fields most sites log (declared agent,
   attributed operator, tier, method, provenance, unknowns)

@@ -9,7 +9,7 @@
 //   curl -s localhost:8799/anything -H 'user-agent: GPTBot/1.2' | jq
 //
 // For HTTPS/Web Bot Auth key-directory fetches it uses the global fetch. It still
-// stores nothing and holds no credential. Env PORT overrides the port.
+// stores no request, credential, or key data. Env PORT overrides the port.
 
 import { createServer } from "node:http";
 import { inspect } from "../../packages/inspect/inspect.mjs";

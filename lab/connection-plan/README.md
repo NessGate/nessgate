@@ -15,7 +15,7 @@ each with the source that proves it. It does **not** proxy, translate, or connec
 
 - Lives entirely under `lab/`. Production (`src/`, `public/`, `packages/`) never imports it —
   `scripts/test-lab-isolation.mjs` enforces this and passes with these files present.
-- Reads the resolver's **own** output; defines no protocol, stores nothing, changes no API or charter.
+- Reads the resolver's **own** output; defines no protocol, stores no discovered domain or resource data, changes no API or charter.
 
 ## Files
 

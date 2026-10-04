@@ -37,7 +37,7 @@ answer listing the resources that domain publishes, each linking back to its sou
 ## Notes
 
 - No authentication, no secrets, no local process.
-- Read-only: NessGate reads a domain on demand, stores nothing, and makes no ownership or safety
+- Read-only: NessGate reads a domain on demand, stores no discovered domain or resource data, and makes no ownership or safety
   claim.
 - If `nessgate.com` is ever unreachable, the tool simply returns no results — it never blocks.
 - Listed in the official MCP Registry as `com.nessgate/nessgate`.

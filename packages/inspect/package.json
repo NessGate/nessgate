@@ -1,6 +1,6 @@
 {
   "name": "@nessgate/inspect",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Experimental: a neutral, normalized description of what an incoming automated/agent HTTP request declares and what evidence exists — claimed / cryptographically-verified (RFC 9421 Web Bot Auth) / network-verified (operator-documented reverse-DNS or published IP ranges) / directory-attributed / unknown, each fact with provenance. Observation only: no trust, allow/deny, or scoring decisions; stores no request, credential, or key data; zero dependencies.",
   "type": "module",
   "exports": {

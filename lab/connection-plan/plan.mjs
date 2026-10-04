@@ -3,7 +3,7 @@
 // ⚠ ISOLATION: this module lives under lab/ and is NOT part of the published
 // product, the charter, or any hosted API. Production never imports it
 // (test-lab-isolation.mjs enforces this). It reads the resolver's OWN output and
-// adds one layer on top — it defines no protocol and stores nothing.
+// adds one layer on top — it defines no protocol and stores no discovered domain or resource data.
 //
 // WHAT IT DOES (and only this): given the answer NessGate already produces for a
 // domain (discovery) plus the CLIENT's declared capabilities, it computes one or

@@ -59,7 +59,7 @@ unknowns             what could not be established, with the reason (never a gue
 | Required config / options | **0** (all optional) |
 | Account / API key / signup | **none** |
 | Inbound/web-server changes | **none** (standard middleware) |
-| New stored data | **none** (Inspect stores nothing) |
+| New stored data | **none** (Inspect stores no request, credential, or key data) |
 
 ## Infrastructure assumptions
 
