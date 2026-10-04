@@ -46,3 +46,8 @@ lab/nessgate-inspect/*.log
 
 # MCP Registry domain-verification private key (local only; the public half is served at /.well-known/mcp-registry-auth)
 .mcp-registry-key.txt
+
+# validation lab: consumer-install artifacts (scripts and REPORT are committed)
+lab/validation/node_modules/
+lab/validation/package.json
+lab/validation/package-lock.json
