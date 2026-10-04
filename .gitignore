@@ -51,3 +51,6 @@ lab/nessgate-inspect/*.log
 lab/validation/node_modules/
 lab/validation/package.json
 lab/validation/package-lock.json
+lab/validation2/node_modules/
+lab/validation2/package.json
+lab/validation2/package-lock.json
