@@ -30,13 +30,14 @@ const PUBDNS = { resolve4: async () => ["93.184.216.34"], resolve6: async () => 
 }
 
 /* --- helper: produce a valid Web Bot Auth signed request + its directory --- */
-function signedRequest({ now = 1_000_000, expiresIn = 300, method = "GET", url = "https://shop.example/checkout" } = {}) {
+function signedRequest({ now = 1_000_000, expiresIn = 300, method = "GET", url = "https://shop.example/checkout", saValue = '"https://agent.example"' } = {}) {
   const { publicKey, privateKey } = generateKeyPairSync("ed25519");
   const jwk = publicKey.export({ format: "jwk" }); // {kty:"OKP",crv:"Ed25519",x}
   const keyid = rfc7638ThumbprintOKP(jwk);
+  // legacy bare-string values are https ORIGINS; keys live at the well-known path
   const dir = "https://agent.example/.well-known/http-message-signatures-directory";
   const rawInner = `("@authority" "@method" "signature-agent");created=${now};keyid="${keyid}";alg="ed25519";expires=${now + expiresIn};tag="web-bot-auth"`;
-  const headers = { "user-agent": "ExampleAgent/1.0", "signature-agent": `"${dir}"`, "signature-input": `sig1=${rawInner}` };
+  const headers = { "user-agent": "ExampleAgent/1.0", "signature-agent": saValue, "signature-input": `sig1=${rawInner}` };
   const base = buildSignatureBase({ method, url, headers }, parseSignatureInput(`sig1=${rawInner}`));
   const b64 = edSign(null, Buffer.from(base, "utf8"), privateKey).toString("base64");
   headers["signature"] = `sig1=:${b64}:`;
@@ -547,6 +548,22 @@ function signedRequestDict({ now = 1_000_000, label = "agent2", origin = "https:
     const facts = r.facts.filter((f) => f.kind === "web-bot-auth");
     ok("WBA + unrelated non-WBA signature → one verified fact, unrelated ignored",
       facts.length === 1 && facts[0].tier === "cryptographically-verified");
+  }
+}
+
+/* --- 12. legacy bare-string directory rule: https origin ONLY --- */
+{
+  // positive: origin with an explicit "/" is equivalent to the origin
+  const slash = signedRequest({ saValue: '"https://agent.example/"' });
+  const r1 = await inspect(slash.request, { fetch: slash.fetch, now: slash.now, dns: PUBDNS });
+  eq("legacy origin with bare '/' verifies", r1.facts.find((f) => f.kind === "web-bot-auth").tier, "cryptographically-verified");
+  // negatives: a path, query, or fragment is never used as a key location
+  for (const bad of ['"https://agent.example/some/path"', '"https://agent.example/?q=1"', '"https://agent.example/#frag"']) {
+    const d = signedRequest();
+    d.request.headers["signature-agent"] = bad; // tampering is irrelevant: rejection happens at key-source resolution
+    const r = await inspect(d.request, { fetch: d.fetch, now: d.now, dns: PUBDNS });
+    const w = r.facts.find((f) => f.kind === "web-bot-auth");
+    ok("legacy value " + bad + " → rejected (origin required)", w.tier === "claimed" && /https origin/.test(w.reason || ""));
   }
 }
 
