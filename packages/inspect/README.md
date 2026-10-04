@@ -54,7 +54,7 @@ Every fact is placed in exactly one tier and carries provenance:
 | Tier | Meaning |
 |---|---|
 | `claimed` | asserted by the caller, unverified (e.g. the `User-Agent`; an unverifiable or expired signature) |
-| `cryptographically-verified` | an RFC 9421 signature validates per draft-ietf-webbotauth-httpsig-protocol-00 (verified against its Appendix E.2 test vectors): `Signature-Agent` as a Structured Fields dictionary with `type` semantics (`directory` origins resolved at the well-known path, `jwks_uri` direct; unsupported types ignored, never inferred), the covered `;key=` member driving discovery, keyid required to be the JWK thumbprint, `created`/`expires`/`tag="web-bot-auth"`/`@authority`-or-`@target-uri` enforced, and no redirects followed during key discovery. The legacy bare-string form is accepted for migration |
+| `cryptographically-verified` | an RFC 9421 signature validates per draft-ietf-webbotauth-httpsig-protocol-00 (validated against Appendix E.2; the published E.2.1 vector contains a documented label/member mismatch — the non-conformant published form is rejected and the label-corrected form verifies the vector's cryptographic bytes): `Signature-Agent` as a Structured Fields dictionary with `type` semantics (`directory` origins resolved at the well-known path, `jwks_uri` direct; unsupported types ignored, never inferred), the covered `;key=` member driving discovery, keyid required to be the JWK thumbprint, `created`/`expires`/`tag="web-bot-auth"`/`@authority`-or-`@target-uri` enforced, and no redirects followed during key discovery. The legacy bare-string form is accepted for migration |
 | `network-verified` | the source IP belongs to infrastructure the operator documents for its bot, by that operator's own method — reverse-DNS + forward-confirm (Google, Bing, Apple) or published IP ranges (OpenAI, Perplexity; fetched live, bounded cache) |
 | `directory-attributed` | a public directory recognizes a declared identifier (~18 operators' published User-Agent patterns); binds nothing |
 | `unknown` | absent or indeterminate — a check that ran and did not conclude says why |
@@ -93,6 +93,6 @@ one at your fetch layer if you need it.
 
 ## Status
 
-Experimental. Web Bot Auth verification implements draft-ietf-webbotauth-httpsig-protocol-00 and passes its Appendix E.2 test vectors; the WG drafts are still evolving, so field
+Experimental. Web Bot Auth verification implements draft-ietf-webbotauth-httpsig-protocol-00, validated against Appendix E.2 — the published E.2.1 vector carries a documented signature-label/member mismatch, so the non-conformant published form is rejected while the label-corrected form verifies the vector's cryptographic bytes unchanged. The WG drafts are still evolving, so field
 names may change in 0.x releases. The classification principles — tiers kept
 separate, provenance always, no decisions, no scores — will not.

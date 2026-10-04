@@ -1,6 +1,9 @@
 // Web Bot Auth verification — RFC 9421 HTTP Message Signatures, Ed25519,
 // implemented against draft-ietf-webbotauth-httpsig-protocol-00 (the active
-// IETF WG protocol draft) and verified against its Appendix E.2 test vectors.
+// IETF WG protocol draft) and validated against Appendix E.2. The published
+// E.2.1 vector contains a documented signature-label / Signature-Agent-member
+// mismatch; the non-conformant published form is rejected and the
+// label-corrected form verifies the vector's cryptographic bytes unchanged.
 //
 // This is the ONE place NessGate Inspect does cryptography. It reuses existing
 // standards verbatim — RFC 9421 (message signatures), RFC 9651 (structured
@@ -332,18 +335,17 @@ function resolveKeySource(signatureAgent, label, coveredKey) {
     // infer the mechanism — with no usable member left, discovery fails honestly.
     return { error: `Signature-Agent type "${type}" is not supported by this verifier; the member is ignored as the profile requires` };
   }
-  // Plain "signature-agent" coverage: the legacy single sf-string form.
+  // Plain "signature-agent" coverage: the legacy single sf-string form. Under
+  // the current profile this is still the DIRECTORY mechanism, so the value
+  // must be an https ORIGIN (a bare "/" path tolerated) and the keys live at
+  // the well-known path — a value carrying a non-root path, query, or fragment
+  // is rejected rather than fetched as a key location.
   if (isDict) return { error: "plain signature-agent coverage with a dictionary-form header is not supported" };
   let s = v;
   if (s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1);
-  try {
-    if (/^https:\/\//i.test(s)) {
-      const u = new URL(s);
-      const keysUrl = (u.pathname === "/" || u.pathname === "") ? u.origin + DIRECTORY_WELL_KNOWN : u.toString();
-      return { type: "directory", keysUrl, legacy: true };
-    }
-    return { type: "directory", keysUrl: new URL("https://" + s + DIRECTORY_WELL_KNOWN).toString(), legacy: true };
-  } catch { return { error: "unusable legacy Signature-Agent value" }; }
+  const keysUrl = originKeysUrl(s);
+  if (!keysUrl) return { error: "a legacy Signature-Agent value must be an https origin (no path, query, or fragment)" };
+  return { type: "directory", keysUrl, legacy: true };
 }
 
 // Verify ONE parsed web-bot-auth signature member against the profile.
