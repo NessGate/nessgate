@@ -4,7 +4,7 @@
 // OpenAPI, host-meta and more) and returns ONE normalized answer, with a link
 // back to each source so an agent can always verify against the domain itself.
 //
-// - NessGate defines nothing and stores nothing: it reads the standards a
+// - NessGate defines nothing and stores no discovered domain or resource data: it reads the standards a
 //   domain already publishes and normalizes them. A new standard is just a new
 //   adapter (an ADAPTERS entry), never a competing format.
 // - Nothing is crawled, indexed, or persisted. Each answer is computed fresh
@@ -1391,7 +1391,7 @@ async function apiDiscover(raw, env, ctx, request) {
 // hosts only because the publisher itself named the target (evidence
 // "publisher-declared"). Every record carries a provenance chain. It is strictly
 // bounded (EXPLORE_LIMITS) so a malicious publisher cannot turn NessGate into an
-// SSRF/amplification proxy; it guesses no hosts or paths, stores nothing, runs no
+// SSRF/amplification proxy; it guesses no hosts or paths, stores no discovered domain or resource data, runs no
 // AI, and makes no ownership claim. /discover is unchanged for existing callers.
 // deadlineMs is a HARD wall-clock cap for one /explore request: sequential
 // best-effort fetches against slow or stalling hosts must never stack into
@@ -1643,7 +1643,7 @@ const EXPLORE_NOTE =
   "Exact-host results are served by the domain itself (publisher-hosted). Delegated results were " +
   "reached by following explicit machine-readable pointers the domain published (publisher-declared); " +
   "each carries a provenance chain. NessGate follows only what a document explicitly names — it never " +
-  "guesses hosts or paths, stores nothing, runs no AI, and makes no ownership claim.";
+  "guesses hosts or paths, stores no discovered domain or resource data, runs no AI, and makes no ownership claim.";
 
 // Pure: extract candidate URLs from an llms.txt document (markdown links + bare).
 function parseLlmsLinks(text) {
@@ -1982,7 +1982,7 @@ async function exploreData(raw, env, ctx, request, candidates = [], org = false,
   if (namespace && regText) for (const rec of mcpRegistryRecords(regText, namespace, domain)) out.push(rec);
 
   // Phase 4 — OPTIONAL candidate verification (opt-in via POST body). NessGate
-  // runs NO AI itself and stores nothing: the caller's AI/search supplies the
+  // runs NO AI itself and stores no discovered domain or resource data: the caller's AI/search supplies the
   // candidate URLs, and NessGate fetches each (bounded, SSRF-safe) and verifies it
   // is a real machine-readable resource. A verified candidate is labelled
   // evidence:"candidate" — its RELATIONSHIP to the domain is UNVERIFIED and
@@ -2751,13 +2751,13 @@ async function apiConnect(raw, env, ctx, request, clientCaps) {
 // (the tool dispatches to the same handler).
 
 const MCP_SUPPORTED_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26"];
-const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.22.0" };
+const MCP_SERVER_INFO = { name: "nessgate", title: "NessGate — the neutral resolver for the agentic web", version: "1.22.1" };
 const MCP_INSTRUCTIONS =
   "Three read-only tools. discover_domain: what a domain publishes (the raw normalized list). " +
   "connect_domain: given a domain AND your client's capabilities, HOW to connect — one outcome " +
   "(ready | credentials-required | incomplete | broken | no-compatible-method) with a connection plan, or the " +
   "exact missing field. check_readiness: per-endpoint readiness for a domain, client-agnostic. All read " +
-  "the domain live, store nothing, make no ownership/safety claim; credentials stay with the caller.";
+  "the domain live, store no discovered domain or resource data, make no ownership/safety claim; credentials stay with the caller.";
 
 const MCP_DOMAIN_INPUT = {
   type: "object",
@@ -2806,7 +2806,7 @@ const MCP_TOOLS = [
       "(llms.txt, /.well-known/ard.json, /.well-known/agent-card.json, /.well-known/api-catalog, " +
       "ai-info.json, openapi.json, and more) and return one normalized answer. Each resource keeps a " +
       "sourceUrl pointing back to the domain so the caller can verify. NessGate reads the domain live " +
-      "and stores nothing; it makes no ownership or safety claim.",
+      "and stores no discovered domain or resource data; it makes no ownership or safety claim.",
     inputSchema: MCP_DOMAIN_INPUT,
   },
   {
@@ -3030,7 +3030,7 @@ async function domainPage(raw, origin, env, ctx, request) {
         `<p class="status ok">${discovered.length} machine-readable ${discovered.length === 1 ? "resource" : "resources"} published</p>` +
         items +
         `<p class="meta">Read live from ${safeDomain} at standard well-known locations. ` +
-        `NessGate stores nothing and makes no ownership claim. ` +
+        `NessGate stores no discovered domain or resource data and makes no ownership claim. ` +
         `<a href="/discover/${safeDomain}" rel="nofollow">JSON</a>.</p>` +
         `</div>`,
     }),
