@@ -53,7 +53,9 @@ export async function discover(domain) {
 
 /* ---- readiness / auth resolution per protocol (app glue around SDK errors) ---- */
 export async function checkMcp(url) {
-  const client = new Client({ name: "b-stack", version: "1.0" });
+  // Official documented negotiation: probe server/discover (modern 2026-07-28
+  // era) with conservative fallback to the legacy initialize handshake.
+  const client = new Client({ name: "b-stack", version: "1.0" }, { versionNegotiation: { mode: "auto" } });
   const transport = new StreamableHTTPClientTransport(new URL(url));
   try {
     await client.connect(transport);

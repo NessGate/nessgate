@@ -103,6 +103,39 @@ if (process.argv.includes("--traps")) {
   }
   console.log("  T1 docs-page-200:                B SDK fails the JSON-RPC parse → errors (no false 'open'); readiness label still app-defined");
   console.log("  T3 bare 403:                     B glue guesses oauth2 exactly like DIY (classification is app-owned even with SDKs)");
-  console.log("  T6 stateless 2026-07-28:         depends on installed SDK revision support; endpoint DISCOVERY still unsolved for B either way");
+  // T6 — REAL exercise: a localhost stateless 2026-07-28 server (answers ONLY
+  // server/discover + modern tools/list; initialize gets a modern error) and a
+  // localhost legacy server. B's v2 client in mode:'auto' against both.
+  {
+    const { createServer } = await import("node:http");
+    const mk = (handler) => new Promise((res) => { const s = createServer(handler); s.listen(0, "127.0.0.1", () => res(s)); });
+    const modern = await mk((req, resp) => {
+      let body = ""; req.on("data", (c) => body += c);
+      req.on("end", () => {
+        let msg = {}; try { msg = JSON.parse(body); } catch {}
+        resp.setHeader("content-type", "application/json");
+        if (msg.method === "server/discover") return resp.end(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { resultType: "complete", supportedVersions: ["2026-07-28"], capabilities: { tools: {} }, _meta: { "io.modelcontextprotocol/serverInfo": { name: "modern-mock", version: "1" } } } }));
+        if (msg.method === "tools/list") return resp.end(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { resultType: "complete", ttlMs: 60000, cacheScope: "private", tools: [{ name: "modern_tool", inputSchema: { type: "object" } }] } }));
+        return resp.end(JSON.stringify({ jsonrpc: "2.0", id: msg.id ?? null, error: { code: -32022, message: "Unsupported protocol version", data: { supported: ["2026-07-28"], requested: msg.params && msg.params.protocolVersion } } }));
+      });
+    });
+    const legacy = await mk((req, resp) => {
+      let body = ""; req.on("data", (c) => body += c);
+      req.on("end", () => {
+        let msg = {}; try { msg = JSON.parse(body); } catch {}
+        resp.setHeader("content-type", "application/json");
+        if (msg.method === "initialize") return resp.end(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "legacy-mock", version: "1" } } }));
+        if (msg.method === "tools/list") return resp.end(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { tools: [{ name: "legacy_tool", inputSchema: { type: "object" } }] } }));
+        if (msg.id === undefined) return resp.writeHead(202).end();
+        return resp.end(JSON.stringify({ jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "method not found" } }));
+      });
+    });
+    const url = (s) => "http://127.0.0.1:" + s.address().port + "/mcp";
+    const rModern = await B.checkMcp(url(modern));
+    const rLegacy = await B.checkMcp(url(legacy));
+    modern.close(); legacy.close();
+    console.log(`  T6 stateless 2026-07-28 (REAL):  B(auto) → ${rModern.state}${rModern.state === "open" ? " — v2 auto mode NEGOTIATES THE MODERN ERA (previous editions were wrong that no official client could)" : " (" + (rModern.detail || "") + ")"}`);
+    console.log(`  T6b legacy fallback (REAL):      B(auto) → ${rLegacy.state} — auto mode falls back to initialize cleanly`);
+  }
   console.log("  T8 llms-doc-link:                not applicable — B cannot see llms.txt at all (structural gap)");
 }
