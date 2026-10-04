@@ -1,13 +1,12 @@
 # Readiness verification — observation semantics (DRAFT)
 
 Status: **PROPOSAL — nothing implemented, nothing active.** Date: 2026-09-27.
-Preconditions (hard gates, per `v2-architecture.md` §14): this program cannot become production
-behavior until (1) **Charter v2 is the active charter** (a standing verdict requires persistence and
-re-verification, which Charter v1 forbids), (2) this predicate is published and versioned, and
-(3) the underlying standards are published widely enough that verification is informative (measured via the `readiness:`/`connect:` metrics).
+Status: this document is a published specification draft for observation semantics. A hosted
+standing verdict would require persistence and scheduled re-verification, which the active
+charter does not permit — so everything here describes how such observations WOULD be
+classified, and the only shipped implementation is the client-side self-test below.
 
-Grounding: the verdict-stability experiment (`lab/connection-plan/README.md`,
-`lab/connection-plan/run-stability.mjs`, 2026-09-27). Its findings are the reason every rule below
+Grounding: a verdict-stability experiment (2026-09-27; repeated identical observations of the same endpoints from one vantage). Its findings are the reason every rule below
 exists; none of this is speculative design.
 
 ## 1. What a verified-readiness result would mean — and what it never means
@@ -85,7 +84,7 @@ The stability experiment measured the readiness pipeline over repeated runs and 
   blames the service for them.
 - The verification/relationship split is preserved: verification reads the **readiness axis only**.
   Evidence classes (`publisher-hosted` / `publisher-declared` / `namespace-verified`) are reported
-  alongside, never merged into the verdict (the two-axis rule of `v2-architecture.md` §1).
+  alongside, never merged into the verdict (the two-axis rule: verification never upgrades relationship).
 
 ## 7. Per-protocol requirements (the predicate content, `P`)
 
@@ -118,12 +117,12 @@ already-shipped assessors:
 A **CI profile** of this predicate ships as an open tool in `@nessgate/resolver` (bin
 `nessgate-ready`): back-to-back observations (default 3), unanimity required (the strict small-N
 mapping of §4's ≥80% rule), client-side execution on the publisher's own compute — so it needs no
-persistence, no hosted verdict, and therefore **no Charter v2 gate**. It implements the §1 self-check today: publishers get pass/fail plus the exact missing field in CI, and anyone can re-run the same predicate. The hosted standing verdict described in this document remains gated.
+persistence and no hosted verdict. It implements the self-check today: publishers get pass/fail plus the exact missing field in CI, and anyone can re-run the same predicate. The hosted standing verdict described in this document is not shipped.
 
 ## 9. Out of scope, explicitly
 
-Badges/logos programs, any storage or scheduling implementation (needs Charter v2 machinery), any
-paid tier, any subjective review, any ranking among Ready services, and any change to the shipped
+Badges/logos programs, any storage or scheduling implementation, any
+subjective review, any ranking among Ready services, and any change to the shipped
 resolver behavior. This document is the *semantics*; implementation is a later, separately gated
 stage.
 

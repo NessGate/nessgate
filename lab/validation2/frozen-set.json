@@ -1,5 +1,0 @@
-{
-  "frozenAt": "2026-10-04T02:55:00Z",
-  "rule": "Candidate pool of AI/dev-platform and API-first company domains written down a priori; mechanically filtered to domains with ZERO occurrences in this repository's content and git history (git grep + git log -S); first 14 surviving candidates in original pool order. nessgate.com excluded by instruction. Frozen before any A/B/C comparison ran.",
-  "domains": ["openrouter.ai","fireworks.ai","exa.ai","tavily.com","algolia.com","meilisearch.com","novu.co","knock.app","temporal.io","airbyte.com","dub.co","cal.com","axiom.co","paddle.com"]
-}

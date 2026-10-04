@@ -1,7 +1,7 @@
 # NessGate Compatibility Corpus
 
 This directory is the **core compatibility corpus**: accumulated, permanent compatibility knowledge. See
-`../docs/compatibility-foundation.md` for the full design. The guiding line:
+The guiding line:
 
 > NessGate's core capability is not knowing every domain in advance; it is knowing how to resolve domains it
 > has never seen before.
@@ -18,7 +18,7 @@ This directory is the **core compatibility corpus**: accumulated, permanent comp
 - `vendor/<protocol>/<version>/` — **official conformance material** (layer 1): the ecosystems' own
   canonical documents (OpenAPI OAI petstore; RFC 9727 / RFC 6415 examples), each with a `SOURCE.md`
   recording origin, license, and retrieval date. Run through the resolver by `scripts/test-conformance.mjs`.
-- `contract.mjs` — the adapter contract, formalized in code (M4). `scripts/test-contract.mjs`
+- `contract.mjs` — the adapter contract, formalized in code. `scripts/test-contract.mjs`
   machine-checks the full chain **adapter ↔ manifest ↔ matrix ↔ fixtures ↔ official vectors**:
   required manifest fields, surfaces/channel matching the runtime adapter (no drift), authority ↔
   two-axis level ↔ `canEstablishAuthority` consistency, provenance requirement, and conformance
@@ -98,4 +98,4 @@ The initial fixtures were backfilled from the resolver's existing hand-written n
 and the live `ADAPTERS` array by `_generate-seed.mjs` (kept for provenance; not part of CI). All
 **new** fixtures are added by hand under the rule above.
 
-Layer 1 (official schemas / conformance vectors ingested from each ecosystem) arrives in M2.
+Layer 1 is the official schemas / conformance vectors ingested from each ecosystem (compat/vendor).

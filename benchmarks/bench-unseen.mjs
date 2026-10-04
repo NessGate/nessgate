@@ -1,4 +1,4 @@
-// M0.5 — unseen-domain benchmark (the core metric). Runs the deterministic
+// Unseen-domain benchmark (the core coverage metric). Runs the deterministic
 // resolver (library exact-host via resolveV2 fast → two-axis, for classification
 // + provenance checks) against the FROZEN holdout and reports SEPARATED metrics.
 // Never one "accuracy" number: a resolver that returns nothing must not score

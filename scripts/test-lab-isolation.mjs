@@ -1,4 +1,4 @@
-// M5 hard invariant, machine-checked: the Compatibility Lab may only PROPOSE.
+// Hard invariant, machine-checked: the Compatibility Lab may only PROPOSE.
 // (1) The resolver core, the compatibility corpus code, and the CI gate import
 //     NOTHING from lab/ — there is no production/gate dependency on the Lab.
 // (2) Lab tools write ONLY under lab/ (proposals + their own snapshot state) and

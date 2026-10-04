@@ -1,4 +1,4 @@
-// The adapter contract, formalized in code (M4). One place defines what every
+// The adapter contract, formalized in code. One place defines what every
 // protocol adapter must declare, and validateContract() machine-checks the full
 // chain: runtime adapter ↔ manifest ↔ support matrix ↔ fixtures ↔ official
 // vectors — authority semantics, versions, surfaces, provenance, deviations, and

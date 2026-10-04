@@ -1,4 +1,4 @@
-// M0.5 — INDEPENDENT ground-truth probe for the unseen-domain holdout.
+// INDEPENDENT ground-truth probe for the unseen-domain holdout.
 // Directly fetches each protocol's own surface URLs and applies a MINIMAL,
 // self-contained validity check. It does NOT import @nessgate/resolver, so the
 // benchmark that later runs the resolver against this ground truth is a fair

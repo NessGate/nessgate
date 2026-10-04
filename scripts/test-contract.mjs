@@ -1,4 +1,4 @@
-// M4 — adapter contract enforcement. Loads the runtime adapters, manifests,
+// Adapter contract enforcement. Loads the runtime adapters, manifests,
 // matrix, fixtures, and vendored official vectors, and machine-checks the full
 // chain via compat/contract.mjs. Fails CI on any drift. Run with `npm run test:contract`.
 import { readdirSync, readFileSync, statSync } from "node:fs";

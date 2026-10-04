@@ -1,7 +1,8 @@
 // NessGate resolver — v2 ALPHA (EXPERIMENTAL). Stage 1: library-only.
 //
-// ⚠ This module exercises capabilities PROPOSED under Charter v2, which is NOT
-// YET ACTIVE. Charter v1 governs the production hosted resolver. Nothing here
+// ⚠ Experimental module (repo-only; not published to npm, not imported by the
+// production resolver). Exercises extended capabilities beyond the hosted
+// resolver's production scope. Nothing here
 // runs unless you explicitly call resolveV2(); the stable v1 `resolve()` in
 // ./index.mjs is imported unchanged and is never modified by this file.
 //
@@ -16,7 +17,7 @@
 //      therefore throw NotImplemented here rather than silently under-deliver.
 //   4. Provenance attached to every result.
 //
-// Explicitly NOT here (later stages, gated on Charter v2 becoming active):
+// Explicitly NOT implemented here:
 // persistent storage/index, publisher registration, hosted crawling/page-reading,
 // async refresh, registry federation, any external-service integration. This module has
 // NO store and reads nothing but the domain's own well-known files, its
@@ -31,7 +32,7 @@ import { resolve as resolveV1, normalizeDomain } from "./index.mjs";
 
 export const EXPERIMENTAL = true;
 export const CHARTER_STATUS =
-  "Exercises capabilities PROPOSED under Charter v2 (NOT active). Charter v1 governs production.";
+  "Experimental capabilities beyond the hosted resolver's production scope; not production behavior.";
 
 /* ----------------------------- two-axis model ----------------------------- */
 
@@ -164,7 +165,7 @@ async function fetchText(fetchImpl, url, accept, timeoutMs, maxBytes) {
   try {
     const res = await fetchImpl(url, {
       signal: ctrl.signal,
-      headers: { Accept: accept || "*/*", "User-Agent": "NessGate-Resolver-v2alpha/0 (+https://nessgate.com/charter-v2)" },
+      headers: { Accept: accept || "*/*", "User-Agent": "NessGate-Resolver-v2alpha/0 (+https://nessgate.com)" },
     });
     if (!res || !res.ok) throw new Error("HTTP " + (res && res.status));
     const text = await res.text();
@@ -343,7 +344,7 @@ export async function resolveV2(domain, opts = {}) {
   else if (tier === "balanced" || tier === "deep")
     throw new Error(tier + " tier is not implemented in this alpha: the architecture's '" + tier +
       "' additionally requires /explore delegation (declared pointers, org/related discovery, registry, redirect candidates), " +
-      "which is not yet in the library. Use tier:'discovery' for exact-host + CT + sitemap. See docs/v2-architecture.md.");
+      "which is not yet in the library. Use tier:'discovery' for exact-host + CT + sitemap.");
   else throw new Error("unknown tier: " + tier);
 
   const ctx = {
@@ -377,7 +378,7 @@ export async function resolveV2(domain, opts = {}) {
   // (exact-host < ct-subdomains < sitemap-hosts), so a resource never appears twice.
   const byUrl = new Map();
   for (const it of raw) {
-    const key = it.resource.url + " " + it.resource.source;
+    const key = it.resource.url + "\u0000" + it.resource.source;
     if (!byUrl.has(key)) { byUrl.set(key, it); continue; }
     const kept = byUrl.get(key);
     for (const p of it.provenance) kept.provenance.push(p);

@@ -8,7 +8,7 @@ package by path. The description below documents the module; file paths under
 
 # NessGate Inspect (EXPERIMENTAL)
 
-The domain-owner side of a two-sided, neutral observation layer:
+The inbound counterpart of the resolver — the same neutral observation discipline, pointed at incoming requests:
 
 > **Agent → NessGate** — understand what a *domain* publishes and how to connect.
 > **Domain owner → NessGate Inspect** — understand what an *incoming agent* declares and can prove.
