@@ -1,8 +1,8 @@
 // B — the BEST AVAILABLE stack: official SDKs and established tooling, used as
 // their documentation intends. Only the lines in THIS file are counted as
 // application-owned glue; everything inside the SDKs is free for B.
-//   @modelcontextprotocol/sdk  — client, Streamable HTTP transport, and its
-//                                official OAuth discovery helpers
+//   @modelcontextprotocol/client v2 — the CURRENT official client package
+//                                (2.3.0, 2026-10-02), transport + official OAuth discovery helpers
 //   @a2a-js/sdk                — DefaultAgentCardResolver (official card fetch,
 //                                including its v0.3 structural-drift handling)
 //   @apidevtools/swagger-parser — OpenAPI validate/dereference
@@ -11,15 +11,13 @@
 // Known structural gaps recorded, not papered over: no official tool reads
 // llms.txt or ARD catalogs, so B does not see them at all.
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { discoverOAuthProtectedResourceMetadata, discoverAuthorizationServerMetadata } from "@modelcontextprotocol/sdk/client/auth.js";
+import { Client, StreamableHTTPClientTransport, discoverOAuthProtectedResourceMetadata, discoverAuthorizationServerMetadata } from "@modelcontextprotocol/client";
 import { DefaultAgentCardResolver } from "@a2a-js/sdk/client";
 import SwaggerParser from "@apidevtools/swagger-parser";
 import { verify as wbaVerify } from "web-bot-auth";
 import { webcrypto } from "node:crypto";
 
-export const PACKAGES = ["@modelcontextprotocol/sdk", "@a2a-js/sdk", "@apidevtools/swagger-parser", "web-bot-auth"];
+export const PACKAGES = ["@modelcontextprotocol/client@2.3.0", "@a2a-js/sdk@1.3.0", "@apidevtools/swagger-parser@13.1.0", "web-bot-auth@0.2.0"];
 
 /* ---- domain discovery (no official cross-protocol tool exists; this is app glue) ---- */
 export async function discover(domain) {
