@@ -23,7 +23,7 @@ export async function discoverAndAssess(domain, opts = {}) {
 // Execution handoff: when a plan says an MCP endpoint is ready, the ordinary
 // official SDK takes over unchanged.
 export async function executeMcp(endpoint) {
-  const client = new Client({ name: "c-stack", version: "1.0" });
+  const client = new Client({ name: "c-stack", version: "1.0" }, { versionNegotiation: { mode: "auto" } });
   await client.connect(new StreamableHTTPClientTransport(new URL(endpoint)));
   const tools = await client.listTools();
   await client.close().catch(() => {});

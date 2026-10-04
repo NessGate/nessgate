@@ -1,151 +1,105 @@
-# Second validation — NessGate vs the best available SDK stack (frozen unseen set)
+# Validation 2 (authoritative) — NessGate vs the best current SDK stack, frozen unseen set
 
-Question: after a developer already uses the official SDKs and established
-tooling, does NessGate still remove a substantial recurring layer (domain
+Question: after a developer adopts the best current official SDKs and tooling,
+does NessGate still remove a substantial recurring layer — domain→interface
 discovery, cross-protocol normalization, readiness, auth/transport/version
-resolution, registry handling, provenance, inbound identity evidence)?
+interpretation, registry handling, provenance, inbound identity evidence?
+Protocol execution itself is not the claimed layer.
 
-Method: three implementations on identical inputs.
-A = DIY glue (../validation/baseline/glue.mjs, unchanged).
-B = best available stack, used as documented: @modelcontextprotocol/client
-2.3.0 — the CURRENT official v2 client package (published 2026-10-02; the 1.x
-monolith @modelcontextprotocol/sdk is not the newest client, a baseline error
-in the first edition of this report, corrected below) — plus @a2a-js/sdk 1.3.0
-(DefaultAgentCardResolver), @apidevtools/swagger-parser 13.1.0, and
-web-bot-auth 0.2.0 (all re-audited as current at rerun time). Only
-application-owned lines count against B.
-C = NessGate published packages for the layer + the SAME official MCP SDK used
-only for execution.
+This document supersedes two earlier editions. Corrections log:
+1. The first edition benchmarked `@modelcontextprotocol/sdk` 1.x as "the
+   latest official MCP SDK". Stale — the current official client is the
+   separate `@modelcontextprotocol/client` v2 package.
+2. The second edition then claimed no official client supports protocol
+   revision 2026-07-28, citing `SUPPORTED_PROTOCOL_VERSIONS`. Also wrong:
+   that constant describes only the LEGACY (initialize-era) list. The v2
+   client separates the eras — opt-in
+   `versionNegotiation: { mode: 'auto' }` probes `server/discover` for the
+   modern 2026-07-28 era and falls back to the legacy handshake
+   conservatively (`'legacy'` is the default, which is what the earlier
+   measurements exercised). Both B and C's execution now run with
+   `mode: 'auto'`.
 
-Scoring set: 14 live domains, frozen before any run, selected by a mechanical
-rule (a-priori candidate pool filtered to domains with zero occurrences in
-this repository's content or git history — see frozen-set.json). nessgate.com
-excluded. The historical TRAP suite ran separately as a regression benchmark
-only.
+## Setup
 
-## Frozen-set results (usable interfaces / auth fully resolved / hard errors)
+Stacks, identical inputs, application-owned lines only counted:
+A = DIY glue (fair first implementation; passes all mainstream mock cases).
+B = best current stack: `@modelcontextprotocol/client@2.3.0` with
+`versionNegotiation: { mode: 'auto' }` and its official OAuth discovery
+helpers; `@a2a-js/sdk@1.3.0` (DefaultAgentCardResolver);
+`@apidevtools/swagger-parser@13.1.0`; `web-bot-auth@0.2.0` (all current at run
+time).
+C = NessGate published packages (`@nessgate/resolver@1.22.1`,
+`@nessgate/inspect@0.1.4`) for the layer + the same v2 client (auto mode) for
+execution only. B never receives NessGate-derived endpoints.
 
-| Stack | Usable | Auth resolved | Errors | Protocols reached |
-|---|---|---|---|---|
-| A (DIY) | 6 → **5 real** (one was a false positive, below) | 5 | 0 | mcp, openapi |
-| B (best SDKs) | **3** | 3 | 0 | openapi, (a2a card found but incomplete) |
-| C (NessGate + SDK) | **12** | 12 | 0 | mcp, openapi, a2a |
+Scoring set: 14 live domains frozen before any comparison (mechanical
+selection rule, zero prior occurrences in this repository or its history —
+frozen-set.json), unchanged across all editions. The historical TRAP suite is
+a separate regression benchmark, never the scoring set.
 
-Highlights from the per-domain matrix (full output: `node run2.mjs`):
-
-- knock.app, novu.co, axiom.co, tavily.com: C resolved live **MCP OAuth chains
-  to the token endpoint** on four unseen domains; B found none of these MCP
-  endpoints at all — its only MCP discovery channel (the official registry)
-  does not list them. Domain→endpoint discovery is the structural gap SDKs do
-  not address.
-- tavily.com: C surfaced a live **A2A card as credentials-required**; B fetched
-  the same card (official resolver) but classified it only "incomplete" —
-  readiness semantics remain app glue even with the official resolver.
-- exa.ai: C's plan said an MCP endpoint was **ready**, and the official SDK
-  then connected and listed its tools (`web_search_exa`, `web_fetch_exa`) —
-  the layer→SDK handoff demonstrated live on an unseen domain. (This endpoint
-  appeared on a re-resolve but not the first pass of the same run — recorded
-  as run-to-run variance, not counted in C's 12.)
-- meilisearch.com: the unseen set produced a natural false-positive trap. Its
-  llms.txt links a marketing page under /integrations/mcp; the DIY baseline
-  POSTed initialize at it, got 200, and reported a usable MCP server. C
-  correctly surfaces no connectable endpoint there (documentation-section
-  paths are never endpoints). A's headline count is adjusted accordingly.
-- 6 of 14 domains publish nothing any stack can use — a property of today's
-  publication rates, identical across stacks.
-
-## Application-owned integration cost
-
-| | A (DIY) | B (best SDKs) | C (NessGate + SDK) |
-|---|---|---|---|
-| glue lines | 142 | **104** | **26** |
-| protocol-specific branches | 18 | **12** | **0** |
-| packages to coordinate | 0 | 4 | 3 (one of them execution-only) |
-| domain-discovery logic owned by the app | all of it | all of it (registry query, card probe, spec probe, selection) | none |
-| version/auth/transport classification owned by the app | all | most (SDK helpers fetch OAuth metadata; mapping errors→states, choosing endpoints, cross-protocol normalization stay app-side) | none |
-
-## Correction and rerun (same frozen set, B upgraded to the official v2 client)
-
-The first edition claimed "the latest official MCP SDK is 1.32.0". That was
-stale: a separate stable v2 client package exists
-(@modelcontextprotocol/client, 2.3.0 at rerun). B's MCP engine was replaced
-with it and the EXACT frozen 14-domain set was rerun, unchanged. Two facts,
-both from the package's own exports at 2.3.0:
-`SUPPORTED_PROTOCOL_VERSIONS = 2024-11-05 … 2025-11-25` (plus 2024-10-07) and
-`LATEST_PROTOCOL_VERSION = 2025-11-25` — so revision 2026-07-28 is NOT yet
-supported by any official client package either; the earlier substance stands
-with the corrected package name.
-
-Rerun totals (same scoring rules; live-set run-to-run variance is about ±1
-interface and is recorded as F4):
+## Authoritative frozen-set result
 
 | Stack | Usable | Auth resolved | False positives | Errors | Protocols |
 |---|---|---|---|---|---|
-| A (DIY) | 7 raw → **5 real** | 5 | **2** (meilisearch AND novu: llms-linked marketing pages answering 200 to initialize) | 0 | mcp, openapi |
-| B (v2 client + SDKs) | **4** | 4 | 0 | 0 | mcp (1), openapi (3) |
-| C (NessGate + v2 for execution) | **13** | 13 | 0 | 0 | mcp, openapi, a2a |
+| A (DIY) | 7 raw → **5 real** | 5 | **2** (meilisearch, novu: llms-linked marketing pages answering 200 to initialize) | 0 | mcp, openapi |
+| B (best current stack, auto mode) | **5** | 5 | 0 | 0 | mcp (2), openapi (3) |
+| C (NessGate + v2 execution) | **13** | 13 | 0 | 0 | mcp, openapi, a2a |
 
-What the v2 upgrade changed for B, split as required:
+Auto mode changed B by exactly one domain: axiom.co (registry-listed; the
+negotiation probe surfaced the 401 in a form B's mapping classified, and the
+official helpers then resolved the OAuth chain). Nothing else moved — every
+other prior miss was a discovery miss, which no client capability affects.
 
-- **Endpoint known, SDK speaks it:** exa.ai — the registry lists it, and the
-  v2 client connected (B's one MCP success). The v1 SDK could also speak this
-  revision, so the upgrade itself changed no outcome on this set; B's earlier
-  exa miss was registry-response variance, not SDK capability.
-- **Endpoint known, classification still app glue:** axiom.co — the registry
-  lists it, v2 reached it, and B's error→state mapping still failed to
-  classify the OAuth wall (C: credentials-required with the token endpoint).
-- **Endpoint never discovered, so no SDK could be invoked:** openrouter.ai,
-  tavily.com, novu.co, knock.app — four live MCP services with full OAuth
-  chains (C resolved each to the token endpoint) that are absent from the
-  registry and invisible to every official tool. No client version fixes
-  discovery.
+## The five MCP lanes (frozen set, as required)
 
-Live handoff, re-proven with v2 (three consecutive successes):
-exa.ai → NessGate plan: ready → @modelcontextprotocol/client 2.3.0 connected
-and listed `web_search_exa, web_fetch_exa`.
+| Lane | Domains | Evidence |
+|---|---|---|
+| 1 — endpoint not discovered | openrouter.ai, tavily.com, novu.co, knock.app | absent from the registry; invisible to every official tool; C resolved each OAuth chain to the token endpoint |
+| 2 — discovered, legacy MCP works | exa.ai | B(auto): open; C: ready; live handoff below |
+| 3 — discovered, modern 2026-07-28 works | none observed in the wild on this set | proven deterministically: against a real localhost stateless 2026-07-28 server, B(auto) negotiates and connects (`open`), and falls back cleanly on a legacy server |
+| 4 — discovered, authentication blocks negotiation | axiom.co | B(auto) + official helpers → needs-credentials with the token endpoint |
+| 5 — readiness/auth classification still application glue | all of the above | the open/needs-credentials/broken taxonomy, error→state mapping, and cross-protocol normalization live in B's 102 app-owned lines; no SDK emits them |
 
-## Maintenance and currency (measured, not estimated)
+## Integration cost (application-owned)
 
-- The current official v2 client (2.3.0, 2026-10-02) supports protocol
-  revisions through 2025-11-25 — not 2026-07-28, per its own exported
-  constants. A B-stack application cannot assess a current-revision stateless
-  server today and must wait for a client release or write glue; C already
-  classifies it (`ok:server-discover`).
-- One recorded week of protocol events cost this repository's own maintainers
-  +599/+247/+597/+435 lines (see ../validation/REPORT.md); a B-stack app
-  absorbs the SDK-covered share of such events via upgrades but keeps every
-  discovery/normalization/readiness change on its own books; a C app's diff
-  for all of them was 0.
+| | A | B | C |
+|---|---|---|---|
+| glue lines | 142 | 102 | **25** |
+| protocol-specific branches | 18 | 12 | **0** |
+| packages/configuration surfaces | 0 | 4 | 3 (one execution-only) |
+| domain-discovery logic owned by the app | all | all (registry query + selection, card probe, spec probe) | none |
+| version/auth/transport interpretation owned by the app | all | classification and normalization (SDKs fetch, apps interpret) | none |
 
-## Historical regression traps against B (separate benchmark, not scoring)
+## Live handoff (required chain, re-proven under auto mode)
 
-- T1 (docs page answers 200): B's SDK fails the JSON-RPC parse — no false
-  "open" (SDKs genuinely help here); the readiness *label* still comes from
-  app glue.
-- T3 (bare 403): B's glue guesses an OAuth wall exactly like DIY —
-  classification is not an SDK concern.
-- T4 (registry multi-version): B passes only because its app glue implemented
-  isLatest selection; the registry client behavior is still app-owned.
-- T6 (2026-07-28 stateless): B structurally cannot — confirmed against the v2
-  client's own version constants above.
-- T8 (llms doc link): not applicable — B has no llms.txt/ARD visibility at
-  all; whole discovery channels are invisible to the best-stack approach.
+domain → NessGate (plan: `ready`) → official `@modelcontextprotocol/client`
+2.3.0 with `versionNegotiation: { mode: 'auto' }` → real tools:
+exa.ai → `https://mcp.exa.ai/mcp` → `web_search_exa, web_fetch_exa`
+(four consecutive successes; the endpoint is intermittently undiscoverable
+upstream between runs — recorded as F4, variance ±1 across the set).
+
+## Regression traps (historical benchmark, separate from scoring)
+
+T1 docs-page-200: B's SDK errors rather than false-positives (SDKs help);
+the readiness label is still app glue. T3 bare-403: B guesses an OAuth wall
+exactly like DIY. T4 registry multi-version: correct only because B's app
+glue implements isLatest. T6: B(auto) now negotiates the modern era against
+the real stateless mock — corrected from earlier editions — and T6b confirms
+clean legacy fallback. T8: B has no llms.txt/ARD visibility at all.
 
 ## Findings (recorded only)
 
-- F4: run-to-run discovery variance on exa.ai (an endpoint surfaced on
-  re-resolve only) — source likely upstream content/timing; worth a
-  repeat-observation note in docs rather than a code change.
-- F5: @apidevtools/swagger-parser's strict validate() rejects some live specs
-  that are usable in practice; B under-detects OpenAPI through no fault of its
-  wiring. (A B developer would eventually write laxer glue — more lines.)
-- F6: web-bot-auth@0.2.0 hands key DISCOVERY to the application (resolver
-  callback): directory/type semantics, JWKS fetching, and transport hardening
-  remain app-side even with the published verifier.
-- F7: a second DIY false positive surfaced on rerun (novu.co, same
-  marketing-page class as meilisearch) — the unseen set keeps generating this
-  failure mode naturally.
-- F8: B's registry responses varied between runs (exa absent once, present
-  once) — registry-querying glue needs retry/variance handling, also app-side.
+- F4 run-to-run live variance (exa discoverability) — upstream, ±1 interface.
+- F5 swagger-parser strict validate() under-detects usable OpenAPI.
+- F6 web-bot-auth leaves key discovery/type semantics/transport hardening to
+  the application.
+- F7 second natural DIY false positive (novu) — the marketing-page class
+  recurs in the wild.
+- F8 registry responses varied between runs; retry handling is app glue.
+- F9 (method) two successive baseline-capability errors in earlier editions
+  came from auditing exported constants instead of option-gated modes;
+  corrected by exercising behavior (real localhost era servers) rather than
+  reading constants.
 
 Run: `cd lab/validation2 && npm install && node run2.mjs [--traps]`.
