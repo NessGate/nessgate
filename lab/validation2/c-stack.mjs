@@ -4,10 +4,9 @@
 
 import { resolve, assessReadiness, readinessProtocol } from "@nessgate/resolver";
 import { inspect } from "@nessgate/inspect";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 
-export const PACKAGES = ["@nessgate/resolver", "@nessgate/inspect", "@modelcontextprotocol/sdk (execution only)"];
+export const PACKAGES = ["@nessgate/resolver", "@nessgate/inspect", "@modelcontextprotocol/client v2 (execution only)"];
 
 export async function discoverAndAssess(domain, opts = {}) {
   const d = await resolve(domain, { registry: true, delegate: true, ...opts });
