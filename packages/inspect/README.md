@@ -74,8 +74,10 @@ For strict hot paths, run inspection out-of-band from logs instead of inline.
 - `nessgateInspect(options)` (from `./middleware`) → Express/Connect middleware;
   `summarize(result)` extracts the six fields most sites log (declared agent,
   attributed operator, tier, method, provenance, unknowns)
-- Lower-level, importable individually: `verifyWebBotAuth`, `matchUserAgent`,
-  `verifyNetworkAttribution`, `inspectAgentCard`
+- Lower-level pieces, each from its own subpath: `verifyWebBotAuth` /
+  `rfc7638ThumbprintRSA` (`@nessgate/inspect/webbotauth`), `matchUserAgent`
+  (`@nessgate/inspect/agents`), `verifyNetworkAttribution`
+  (`@nessgate/inspect/netattr`), `inspectAgentCard` (`@nessgate/inspect/agentcard`)
 
 Shapes follow the NessGate data model
 ([`docs/data-model.md`](https://github.com/NessGate/nessgate/blob/main/docs/data-model.md)).
