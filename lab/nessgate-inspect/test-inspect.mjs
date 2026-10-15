@@ -4,9 +4,9 @@
 // (→ claimed), known real-world robot User-Agents (→ directory-attributed), and
 // the no-decision/no-score invariant. Run: node test-inspect.mjs
 
-import { generateKeyPairSync, sign as edSign } from "node:crypto";
+import { generateKeyPairSync, sign as edSign, createPublicKey, constants as cryptoConstants } from "node:crypto";
 import { inspect } from "../../packages/inspect/inspect.mjs";
-import { buildSignatureBase, parseSignatureInput, rfc7638ThumbprintOKP } from "../../packages/inspect/webbotauth.mjs";
+import { buildSignatureBase, parseSignatureInput, rfc7638ThumbprintOKP, rfc7638ThumbprintRSA } from "../../packages/inspect/webbotauth.mjs";
 
 let pass = 0, fail = 0;
 const ok = (n, c) => { if (c) { pass++; } else { fail++; console.error("FAIL  " + n); } };
@@ -565,6 +565,73 @@ function signedRequestDict({ now = 1_000_000, label = "agent2", origin = "https:
     const w = r.facts.find((f) => f.kind === "web-bot-auth");
     ok("legacy value " + bad + " → rejected (origin required)", w.tier === "claimed" && /https origin/.test(w.reason || ""));
   }
+}
+
+/* --- 10b. RSA-PSS-SHA512 (draft Appendix E.1 vector + round-trip + negatives) --- */
+{
+  // RFC 9421 Appendix B.1.2 public key (the key E.1's keyid thumbprints).
+  const RSA_PUB_PEM = [
+    "-----BEGIN PUBLIC KEY-----",
+    "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAr4tmm3r20Wd/PbqvP1s2",
+    "+QEtvpuRaV8Yq40gjUR8y2Rjxa6dpG2GXHbPfvMs8ct+Lh1GH45x28Rw3Ry53mm+",
+    "oAXjyQ86OnDkZ5N8lYbggD4O3w6M6pAvLkhk95AndTrifbIFPNU8PPMO7OyrFAHq",
+    "gDsznjPFmTOtCEcN2Z1FpWgchwuYLPL+Wokqltd11nqqzi+bJ9cvSKADYdUAAN5W",
+    "Utzdpiy6LbTgSxP7ociU4Tn0g5I6aDZJ7A8Lzo0KSyZYoA485mqcO0GVAdVw9lq4",
+    "aOT9v6d+nb4bnNkQVklLQ3fVAvJm+xdDOp9LCNCN48V2pnDOkFV6+U9nV5oyc6XI",
+    "2wIDAQAB",
+    "-----END PUBLIC KEY-----",
+  ].join("\n");
+  const rsaJwk = createPublicKey(RSA_PUB_PEM).export({ format: "jwk" });
+  const VKID = "oD0HwocPBSfpNy5W3bpJeyFGY_IQ_YpqxSjQ3Yd-CLA";
+  eq("E.1 RSA keyid is the RFC 7638 thumbprint of the B.1.2 key", rfc7638ThumbprintRSA(rsaJwk), VKID);
+
+  const serve = (jwk, dir) => async (u) => (u === dir
+    ? { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ keys: [jwk] }) }
+    : { ok: false, status: 404, headers: { get: () => null }, text: async () => "" });
+  const dirUrl = "https://signature-agent.test/.well-known/http-message-signatures-directory";
+  const rawInner = '("@authority" "signature-agent";key="agent2");created=1735689600;keyid="' + VKID + '";alg="rsa-pss-sha512";expires=4889289600;nonce="wcfPQPh7SzkvrIVvhD00vNk9PkxJNY2NVbYl2PVBB4zmUoluSwE7W6bPtF60QA3k8g06FU7PPCD+J58YofY1zg==";tag="web-bot-auth"';
+  // E.1.1 as published uses label sig2 with member agent2 (same defect as E.2.1);
+  // the label-corrected form (label agent2) verifies the vector's bytes unchanged.
+  const vsig = "agent2=:gHzpLNeHaHIO19NaJH9YMW5dcVSi2s0wOMBr6p18vcofS106sfC4KBIS0/szPlBBd1vIcyQ88B6CTEWIhRAiVrb9zfX0mx1aG12CSGWcYkSirHeyTxhbuJvXd27ed6skWoy4PjXItq38936ivUQjfdIwXh1aX6HxkAC3vRnEdSNfntkLWeEuIQ5BLIOBGE39fSwg27Qjq6OVWYas/9/aFUr3HA34MXWYdp+//cvlEKDp3kRoLOw9ro0AOr6srHrTeEtxon2afcws1aZVSlPdd2fZSEIGmw9HAHLDCEkFTERu1gH2k/zIEqgy7CAYXI9E5slog0cLg/Vc6+f8gih33g==:";
+  const vreq = { method: "GET", url: "https://example.com/", headers: {
+    "signature-agent": 'agent2="https://signature-agent.test"',
+    "signature-input": "agent2=" + rawInner,
+    "signature": vsig,
+  } };
+  eq("E.1 signature base reproduced byte-exact",
+    buildSignatureBase(vreq, parseSignatureInput("agent2=" + rawInner)),
+    '"@authority": example.com\n"signature-agent";key="agent2": "https://signature-agent.test"\n"@signature-params": ' + rawInner);
+  const rv = await inspect(vreq, { fetch: serve(rsaJwk, dirUrl), now: 1735700000, dns: PUBDNS });
+  eq("E.1 RSA-PSS-SHA512 vector verifies → cryptographically-verified",
+    rv.facts.find((f) => f.kind === "web-bot-auth").tier, "cryptographically-verified");
+
+  // round-trip with a fresh RSA key
+  const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const jwk2 = publicKey.export({ format: "jwk" });
+  const keyid2 = rfc7638ThumbprintRSA(jwk2);
+  const dir2 = "https://rsa.example/.well-known/http-message-signatures-directory";
+  const raw2 = '("@authority" "signature-agent";key="k");created=1000;keyid="' + keyid2 + '";alg="rsa-pss-sha512";expires=2000;tag="web-bot-auth"';
+  const h2 = { "signature-agent": 'k="https://rsa.example"', "signature-input": "k=" + raw2 };
+  const base2 = buildSignatureBase({ method: "GET", url: "https://s.example/", headers: h2 }, parseSignatureInput("k=" + raw2));
+  const goodSig = edSign("sha512", Buffer.from(base2, "utf8"), { key: privateKey, padding: cryptoConstants.RSA_PKCS1_PSS_PADDING, saltLength: 64 }).toString("base64");
+  h2.signature = "k=:" + goodSig + ":";
+  const rr = await inspect({ method: "GET", url: "https://s.example/", headers: h2 }, { fetch: serve(jwk2, dir2), now: 1500, dns: PUBDNS });
+  eq("RSA round-trip verifies", rr.facts.find((f) => f.kind === "web-bot-auth").tier, "cryptographically-verified");
+
+  // negative: directory serves a different key (thumbprint != keyid) → claimed
+  const rn = await inspect({ method: "GET", url: "https://s.example/", headers: h2 }, { fetch: serve(rsaJwk, dir2), now: 1500, dns: PUBDNS });
+  ok("RSA: no key in directory matches keyid → claimed", rn.facts.find((f) => f.kind === "web-bot-auth").tier === "claimed" && /thumbprint matching keyid/.test(rn.facts.find((f) => f.kind === "web-bot-auth").reason || ""));
+
+  // negative: corrupted signature bytes → claimed
+  const corrupt = { "signature-agent": h2["signature-agent"], "signature-input": h2["signature-input"], "signature": "k=:AAAA" + goodSig.slice(4) + ":" };
+  const rc = await inspect({ method: "GET", url: "https://s.example/", headers: corrupt }, { fetch: serve(jwk2, dir2), now: 1500, dns: PUBDNS });
+  ok("corrupted RSA signature → claimed", rc.facts.find((f) => f.kind === "web-bot-auth").tier === "claimed" && /does not validate/.test(rc.facts.find((f) => f.kind === "web-bot-auth").reason || ""));
+
+  // negative: unsupported alg still rejected
+  const badAlgRaw = raw2.replace('alg="rsa-pss-sha512"', 'alg="rsa-pss-sha256"');
+  const ha = { "signature-agent": 'k="https://rsa.example"', "signature-input": "k=" + badAlgRaw, "signature": h2.signature };
+  const ra = await inspect({ method: "GET", url: "https://s.example/", headers: ha }, { fetch: serve(jwk2, dir2), now: 1500, dns: PUBDNS });
+  ok("unsupported alg (rsa-pss-sha256) → claimed with reason", ra.facts.find((f) => f.kind === "web-bot-auth").tier === "claimed" && /unsupported alg/.test(ra.facts.find((f) => f.kind === "web-bot-auth").reason || ""));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -164,6 +164,11 @@ export default {
 };
 ```
 
+The Workers runtime has no `node:dns`, so on Workers the `network-verified` tier cannot run and
+verification degrades to the header-based tiers (`claimed` / `directory-attributed`). For the full
+evidence set, run inspection on Node — see the runnable [`examples/fastify/`](../examples/fastify/)
+and [`examples/nextjs/`](../examples/nextjs/) (Node-runtime route handler).
+
 **Behind nginx or another reverse proxy:** the source IP for network attribution must be the
 real connection peer. Terminate at the proxy, ensure only the proxy can set
 `X-Forwarded-For`, and pass `{ trustProxy: true }` to the middleware (off by default — a

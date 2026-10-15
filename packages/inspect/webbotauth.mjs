@@ -13,7 +13,7 @@
 // operates the agent, nor any authorization — the profile says so explicitly,
 // and inspect.mjs surfaces that limit on every result.
 
-import { createPublicKey, verify as edVerify, createHash } from "node:crypto";
+import { createPublicKey, verify as nodeVerify, createHash, constants as cryptoConstants } from "node:crypto";
 import dnsPromises from "node:dns/promises";
 
 const WBA_PROFILE = "draft-ietf-webbotauth-httpsig-protocol-00";
@@ -170,6 +170,13 @@ export function rfc7638ThumbprintOKP(jwk) {
   return createHash("sha256").update(json).digest("base64url");
 }
 
+// RFC 7638 thumbprint for an RSA key: required members {e, kty, n} in
+// lexicographic order. The profile requires keyid to be this thumbprint.
+export function rfc7638ThumbprintRSA(jwk) {
+  const json = `{"e":"${jwk.e}","kty":"${jwk.kty}","n":"${jwk.n}"}`;
+  return createHash("sha256").update(json).digest("base64url");
+}
+
 // --- hardened fetch core ------------------------------------------------------
 const badHost = (h) => {
   h = String(h || "").toLowerCase().replace(/\.+$/, "");
@@ -281,12 +288,17 @@ async function keyByThumbprint(fetchImpl, keysUrl, keyid, timeoutMs, opts = {}) 
   if (r.error) return { error: "key discovery: " + r.error };
   const all = Array.isArray(r.json && r.json.keys) ? r.json.keys : [];
   const keys = all.slice(0, MAX_JWKS_KEYS); // bounded work on attacker-sized input
+  let kidOnly = false;
   for (const jwk of keys) {
-    if (!jwk || jwk.kty !== "OKP" || jwk.crv !== "Ed25519") continue;
-    if (typeof jwk.x !== "string" || jwk.x.length > 128) continue; // an Ed25519 x is 43 base64url chars
-    if (rfc7638ThumbprintOKP(jwk) === keyid) return { jwk };
-    if (jwk.kid === keyid) return { error: "a key's kid matches, but keyid must be the key's JWK thumbprint under this profile" };
+    if (!jwk || typeof jwk.kty !== "string") continue;
+    let tp = null;
+    if (jwk.kty === "OKP" && jwk.crv === "Ed25519" && typeof jwk.x === "string" && jwk.x.length <= 128) tp = rfc7638ThumbprintOKP(jwk); // Ed25519 x is 43 base64url chars
+    else if (jwk.kty === "RSA" && typeof jwk.n === "string" && typeof jwk.e === "string" && jwk.n.length <= 1400) tp = rfc7638ThumbprintRSA(jwk); // n up to ~8192-bit
+    else continue;
+    if (tp === keyid) return { jwk };
+    if (jwk.kid === keyid) kidOnly = true;
   }
+  if (kidOnly) return { error: "a key's kid matches, but keyid must be the key's JWK thumbprint under this profile" };
   return { error: "no key in the JWK Set has a thumbprint matching keyid" + (all.length > MAX_JWKS_KEYS ? " (inspected up to the " + MAX_JWKS_KEYS + "-key limit)" : "") };
 }
 
@@ -364,8 +376,9 @@ async function verifyOneSignature(request, parsed, sig, opts, now) {
     created: parsed.params.created, expires: parsed.params.expires,
     tag: parsed.params.tag,
   };
-  if (parsed.params.alg && String(parsed.params.alg).toLowerCase() !== "ed25519")
-    return { ...out, reason: `unsupported alg "${parsed.params.alg}" (this verifier implements ed25519 only)` };
+  const alg = parsed.params.alg ? String(parsed.params.alg).toLowerCase() : null;
+  if (alg && alg !== "ed25519" && alg !== "rsa-pss-sha512")
+    return { ...out, reason: `unsupported alg "${parsed.params.alg}" (this verifier implements ed25519 and rsa-pss-sha512)` };
   if (typeof parsed.params.created !== "number") return { ...out, reason: "the profile requires a created parameter" };
   if (typeof parsed.params.expires !== "number") return { ...out, reason: "the profile requires an expires parameter" };
   if (!parsed.params.keyid) return { ...out, reason: "no keyid in Signature-Input" };
@@ -391,10 +404,19 @@ async function verifyOneSignature(request, parsed, sig, opts, now) {
   if (found.error) return { ...out, reason: found.error };
   out.matchedBy = "thumbprint";
 
+  // The discovered key type must match the signature algorithm.
+  const kty = found.jwk.kty;
+  if ((alg === "rsa-pss-sha512" && kty !== "RSA") || ((alg === "ed25519" || alg === null) && kty !== "OKP"))
+    return { ...out, reason: `the discovered key type (${kty}) does not match the signature algorithm (${alg || "ed25519"})` };
   let keyObj;
   try { keyObj = createPublicKey({ key: found.jwk, format: "jwk" }); } catch (e) { return { ...out, reason: "bad JWK: " + (e && e.message) }; }
   let ok = false;
-  try { ok = edVerify(null, Buffer.from(base, "utf8"), keyObj, signature); } catch (e) { return { ...out, reason: "verify error: " + (e && e.message) }; }
+  try {
+    // rsa-pss-sha512 per RFC 9421 3.3.2: RSASSA-PSS, SHA-512, MGF1-SHA-512, 64-byte salt.
+    ok = alg === "rsa-pss-sha512"
+      ? nodeVerify("sha512", Buffer.from(base, "utf8"), { key: keyObj, padding: cryptoConstants.RSA_PKCS1_PSS_PADDING, saltLength: 64 }, signature)
+      : nodeVerify(null, Buffer.from(base, "utf8"), keyObj, signature);
+  } catch (e) { return { ...out, reason: "verify error: " + (e && e.message) }; }
   if (!ok) return { ...out, reason: "signature does not validate against the discovered key" };
 
   // Cryptographically valid under the profile. Expiry is a freshness fact,
