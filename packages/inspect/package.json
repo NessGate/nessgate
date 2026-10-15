@@ -1,11 +1,15 @@
 {
   "name": "@nessgate/inspect",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Experimental: a neutral, normalized description of what an incoming automated/agent HTTP request declares and what evidence exists — claimed / cryptographically-verified (RFC 9421 Web Bot Auth) / network-verified (operator-documented reverse-DNS or published IP ranges) / directory-attributed / unknown, each fact with provenance. Observation only: no trust, allow/deny, or scoring decisions; stores no request, credential, or key data; zero dependencies.",
   "type": "module",
   "exports": {
     ".": "./inspect.mjs",
-    "./middleware": "./middleware.mjs"
+    "./middleware": "./middleware.mjs",
+    "./webbotauth": "./webbotauth.mjs",
+    "./agents": "./agents.mjs",
+    "./netattr": "./netattr.mjs",
+    "./agentcard": "./agentcard.mjs"
   },
   "main": "./inspect.mjs",
   "files": [
