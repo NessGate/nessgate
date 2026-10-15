@@ -31,6 +31,9 @@ All four are also MCP tools at `POST /mcp`: `discover_domain`, `connect_domain`,
 | `compat/` | The permanent compatibility corpus (fixtures, matrix, adapter manifests). |
 | `scripts/` | Tests, deploy, smoke. See below. |
 | `examples/langchain/` | LangChain tools (`connect_domain`, `discover_domain`) + MCP-adapter usage. |
+| `examples/llamaindex/` | LlamaIndex tool equivalents of the same outbound flow. |
+| `examples/fastify/` | Inbound: `@nessgate/inspect` on every request via an `onRequest` hook (runnable). |
+| `examples/nextjs/` | Inbound: Node-runtime App Router route handler (Edge lacks `node:dns`, so network-verified needs the Node runtime). |
 | `packages/resolver/ready-check.mjs` | `nessgate-ready` CLI (`npx @nessgate/resolver <domain>`): the open self-test / CI profile of the readiness predicate. |
 | `packages/inspect/` | npm `@nessgate/inspect` (0.x, experimental): inbound-request inspection (tiers, Web Bot Auth, network attribution) + Express middleware. Tests/validation live in `lab/nessgate-inspect/`. |
 

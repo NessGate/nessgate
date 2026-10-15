@@ -26,6 +26,6 @@
     "test:metrics": "node scripts/test-metrics-isolation.mjs"
   },
   "devDependencies": {
-    "wrangler": "^4.143.1"
+    "wrangler": "^4.151.0"
   }
 }

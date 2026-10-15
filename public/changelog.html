@@ -33,6 +33,7 @@ stability guarantees live in the <a href="/spec">specification</a>.</p>
 
 <h3 id="dual-era-2026-10-03">Dual-era MCP, library federation, inbound inspection, hardening (1.18.0 → 1.22.0)</h3>
 <ul>
+<li><strong>@nessgate/inspect 0.2.0 / 0.2.1, /inspect page</strong> — Web Bot Auth verification accepts RSA-PSS-SHA512 signatures alongside Ed25519 (RFC 7638 RSA thumbprints, key-type-to-algorithm matching; validated against the protocol draft&#39;s Appendix E.1 vector). Lower-level modules are importable from their own subpaths (<code>/webbotauth</code>, <code>/agents</code>, <code>/netattr</code>, <code>/agentcard</code>). New <a href="/inspect">/inspect</a> page documenting the local, server-side workflow with worked examples of each evidence level, plus runnable Fastify and Next.js examples in the repository. The resolver is unchanged at 1.22.2. (2026-10-04)</li>
 <li><strong>1.22.2 / @nessgate/inspect 0.1.5</strong> — documentation and wording precision: storage statements now consistently distinguish persistent storage (none for discovered domain or resource data), temporary edge caching, short-lived rate-limit counters, and the anonymous operational events described in the Privacy Policy; assorted repository documentation tidying. No behavior changes. (2026-10-04)</li>
 <li><strong>@nessgate/inspect 0.1.3 / 0.1.4</strong> — normative Signature-Agent label rule (profile
 section 5.2.1): the member keyed to the signature label must be the covered member; the published
